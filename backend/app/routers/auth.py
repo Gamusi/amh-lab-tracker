@@ -1,7 +1,7 @@
 import datetime, sqlite3, logging
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from ..database import get_db
-from ..schemas import LoginRequest, UserCreate
+from ..schemas import LoginRequest, UserCreate, UserRegister
 from ..auth import verify_password, hash_password, create_session, get_current_user, require_admin
 
 logger = logging.getLogger("amh_auth")
@@ -28,7 +28,7 @@ def login(req: LoginRequest, response: Response, conn: sqlite3.Connection = Depe
         key="amh_session",
         value=token,
         httponly=True,
-        max_age=7 * 86400,
+        max_age=15 * 60,  # 15 minutes session
         samesite="lax"
     )
     
@@ -91,3 +91,21 @@ def create_user(req: UserCreate, admin_user: dict = Depends(require_admin), conn
     
     logger.info(f"User created successfully: '{req.username}' with ID {uid}")
     return {"status": "created", "user_id": uid}
+
+@router.post("/register")
+def register(req: UserRegister, conn: sqlite3.Connection = Depends(get_db)):
+    logger.info(f"Registration attempt for username: '{req.username}'")
+    cur = conn.cursor()
+    cur.execute("SELECT id FROM users WHERE username = ?", (req.username,))
+    if cur.fetchone():
+        logger.warning(f"Registration failed: username '{req.username}' already exists")
+        raise HTTPException(status_code=400, detail="Username already exists")
+    
+    cur.execute(
+        "INSERT INTO users (username, full_name, password_hash, role) VALUES (?, ?, ?, 'technician')",
+        (req.username, req.full_name, hash_password(req.password))
+    )
+    uid = cur.lastrowid
+    conn.commit()
+    logger.info(f"User registered successfully: '{req.username}' with ID {uid}")
+    return {"status": "registered", "user_id": uid}

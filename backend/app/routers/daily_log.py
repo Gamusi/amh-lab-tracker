@@ -69,11 +69,7 @@ def get_daily_log(date_str: str = Query(..., alias="date"), conn: sqlite3.Connec
 
 @router.post("")
 def save_daily_log(req: DailyLogSaveRequest, conn: sqlite3.Connection = Depends(get_db), current_user: dict = Depends(get_current_user)):
-    try:
-        entry_date = datetime.datetime.strptime(req.entry_date, "%Y-%m-%d").date()
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD.")
-
+    
     cur = conn.cursor()
     saved_count = 0
     now_str = datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")

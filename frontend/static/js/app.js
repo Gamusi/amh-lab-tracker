@@ -2,6 +2,9 @@ const app = {
   currentUser: null,
   currentView: 'daily-log',
   theme: null,
+  inactivityTimer: null,
+  inactivityTimeout: 15 * 60 * 1000, // 15 minutes in milliseconds
+  lastActivityTime: 0,
 
   icons: {
     'clipboard-list': `<svg class="lucide" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4"/><path d="M12 16h4"/><path d="M8 11h.01"/><path d="M8 16h.01"/></svg>`,
@@ -30,6 +33,7 @@ const app = {
   async init() {
     await this.loadTheme();
     await this.checkAuth();
+    this.setupInactivityListeners();
   },
 
   async loadTheme() {
@@ -57,6 +61,7 @@ const app = {
         this.renderUserNav();
         document.getElementById('login-modal').style.display = 'none';
         document.getElementById('app-nav').style.display = 'flex';
+        this.startInactivityTimer();
         this.navigate(this.currentView);
       } else {
         this.showLogin();
@@ -68,9 +73,11 @@ const app = {
 
   showLogin() {
     this.currentUser = null;
+    this.stopInactivityTimer();
     document.getElementById('app-nav').style.display = 'none';
     document.getElementById('user-nav').innerHTML = '';
     document.getElementById('login-modal').style.display = 'flex';
+    this.showLoginForm();
   },
 
   async handleLogin(event) {
@@ -93,6 +100,7 @@ const app = {
         document.getElementById('login-modal').style.display = 'none';
         document.getElementById('app-nav').style.display = 'flex';
         this.renderUserNav();
+        this.startInactivityTimer();
         this.navigate('daily-log');
       } else {
         const err = await res.json();
@@ -106,8 +114,99 @@ const app = {
   },
 
   async handleLogout() {
+    this.stopInactivityTimer();
     await fetch('/api/auth/logout', { method: 'POST' });
     this.showLogin();
+  },
+
+  showRegisterForm(event) {
+    if (event) event.preventDefault();
+    document.getElementById('login-form-container').style.display = 'none';
+    document.getElementById('register-form-container').style.display = 'block';
+    document.getElementById('register-error').style.display = 'none';
+    document.getElementById('register-success').style.display = 'none';
+  },
+
+  showLoginForm(event) {
+    if (event) event.preventDefault();
+    document.getElementById('register-form-container').style.display = 'none';
+    document.getElementById('login-form-container').style.display = 'block';
+    document.getElementById('login-error').style.display = 'none';
+  },
+
+  async handleRegister(event) {
+    event.preventDefault();
+    const fullname = document.getElementById('register-fullname').value;
+    const username = document.getElementById('register-username').value;
+    const password = document.getElementById('register-password').value;
+    const errDiv = document.getElementById('register-error');
+    const successDiv = document.getElementById('register-success');
+    
+    errDiv.style.display = 'none';
+    successDiv.style.display = 'none';
+
+    try {
+      const res = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ full_name: fullname, username: username, password: password })
+      });
+
+      if (res.ok) {
+        successDiv.textContent = 'Account registered successfully! Redirecting...';
+        successDiv.style.display = 'block';
+        document.getElementById('register-form').reset();
+        setTimeout(() => {
+          this.showLoginForm();
+        }, 1500);
+      } else {
+        const err = await res.json();
+        errDiv.textContent = err.detail || 'Registration failed';
+        errDiv.style.display = 'block';
+      }
+    } catch (e) {
+      errDiv.textContent = 'Connection error. Please try again.';
+      errDiv.style.display = 'block';
+    }
+  },
+
+  setupInactivityListeners() {
+    const reset = () => this.resetInactivityTimer();
+    window.addEventListener('mousemove', reset);
+    window.addEventListener('keydown', reset);
+    window.addEventListener('click', reset);
+    window.addEventListener('scroll', reset);
+  },
+
+  startInactivityTimer() {
+    this.resetInactivityTimer();
+  },
+
+  resetInactivityTimer() {
+    const now = Date.now();
+    if (now - this.lastActivityTime < 5000) {
+      return;
+    }
+    this.lastActivityTime = now;
+
+    if (this.inactivityTimer) {
+      clearTimeout(this.inactivityTimer);
+    }
+    
+    if (this.currentUser) {
+      this.inactivityTimer = setTimeout(() => {
+        console.log("Inactivity timeout reached. Logging out...");
+        this.handleLogout();
+        this.showToast("Logged out automatically due to inactivity.", "error");
+      }, this.inactivityTimeout);
+    }
+  },
+
+  stopInactivityTimer() {
+    if (this.inactivityTimer) {
+      clearTimeout(this.inactivityTimer);
+      this.inactivityTimer = null;
+    }
   },
 
   renderUserNav() {

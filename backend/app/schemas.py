@@ -52,7 +52,7 @@ class DailyEntryItem(BaseModel):
     positive: Optional[int] = None
 
 class DailyLogSaveRequest(BaseModel):
-    entry_date: str # YYYY-MM-DD
+    entry_date: datetime.date # YYYY-MM-DD
     entries: List[DailyEntryItem]
 
 class DailyEntryResponse(BaseModel):
@@ -89,3 +89,8 @@ class ReportFilterRequest(BaseModel):
 class TrendFilterRequest(BaseModel):
     from_month: str # YYYY-MM
     to_month: str # YYYY-MM
+
+class UserRegister(BaseModel):
+    username: str
+    full_name: str
+    password: str

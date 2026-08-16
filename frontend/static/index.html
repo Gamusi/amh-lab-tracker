@@ -39,22 +39,56 @@
   <!-- Login Modal -->
   <div class="modal-overlay" id="login-modal" style="display: none;">
     <div class="modal-content">
-      <div style="text-align: center; margin-bottom: 20px;">
-        <h2 style="color: var(--primary-color);">Lab Staff Login</h2>
-        <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 4px;">Sign in to access the AMH Lab Tracker</p>
+      <!-- Login Container -->
+      <div id="login-form-container">
+        <div style="text-align: center; margin-bottom: 20px;">
+          <h2 style="color: var(--primary-color);">Lab Staff Login</h2>
+          <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 4px;">Sign in to access the AMH Lab Tracker</p>
+        </div>
+        <form id="login-form" onsubmit="app.handleLogin(event)">
+          <div class="form-group" style="margin-bottom: 16px;">
+            <label for="login-username">Username</label>
+            <input type="text" id="login-username" required placeholder="Enter username">
+          </div>
+          <div class="form-group" style="margin-bottom: 24px;">
+            <label for="login-password">Password</label>
+            <input type="password" id="login-password" required placeholder="Enter password">
+          </div>
+          <div id="login-error" style="color: var(--danger-color); font-size: 0.85rem; margin-bottom: 16px; display: none;"></div>
+          <button type="submit" class="btn btn-primary" style="width: 100%; padding: 10px;">Sign In</button>
+          <p style="text-align: center; font-size: 0.85rem; margin-top: 16px; color: var(--text-muted);">
+            New user? <a href="#" onclick="app.showRegisterForm(event)" style="color: var(--primary-color); font-weight: 600; text-decoration: none;">Register here</a>
+          </p>
+        </form>
       </div>
-      <form id="login-form" onsubmit="app.handleLogin(event)">
-        <div class="form-group" style="margin-bottom: 16px;">
-          <label for="login-username">Username</label>
-          <input type="text" id="login-username" required placeholder="Enter username">
+
+      <!-- Register Container (hidden by default) -->
+      <div id="register-form-container" style="display: none;">
+        <div style="text-align: center; margin-bottom: 20px;">
+          <h2 style="color: var(--primary-color);">Create Account</h2>
+          <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 4px;">Register a new Lab staff profile</p>
         </div>
-        <div class="form-group" style="margin-bottom: 24px;">
-          <label for="login-password">Password</label>
-          <input type="password" id="login-password" required placeholder="Enter password">
-        </div>
-        <div id="login-error" style="color: var(--danger-color); font-size: 0.85rem; margin-bottom: 16px; display: none;"></div>
-        <button type="submit" class="btn btn-primary" style="width: 100%; padding: 10px;">Sign In</button>
-      </form>
+        <form id="register-form" onsubmit="app.handleRegister(event)">
+          <div class="form-group" style="margin-bottom: 16px;">
+            <label for="register-fullname">Full Name</label>
+            <input type="text" id="register-fullname" required placeholder="Enter full name">
+          </div>
+          <div class="form-group" style="margin-bottom: 16px;">
+            <label for="register-username">Username</label>
+            <input type="text" id="register-username" required placeholder="Enter username">
+          </div>
+          <div class="form-group" style="margin-bottom: 24px;">
+            <label for="register-password">Password</label>
+            <input type="password" id="register-password" required placeholder="Enter password">
+          </div>
+          <div id="register-error" style="color: var(--danger-color); font-size: 0.85rem; margin-bottom: 16px; display: none;"></div>
+          <div id="register-success" style="color: var(--success-color); font-size: 0.85rem; margin-bottom: 16px; display: none;"></div>
+          <button type="submit" class="btn btn-primary" style="width: 100%; padding: 10px;">Register</button>
+          <p style="text-align: center; font-size: 0.85rem; margin-top: 16px; color: var(--text-muted);">
+            Already have an account? <a href="#" onclick="app.showLoginForm(event)" style="color: var(--primary-color); font-weight: 600; text-decoration: none;">Sign in here</a>
+          </p>
+        </form>
+      </div>
     </div>
   </div>
 
