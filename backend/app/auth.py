@@ -1,21 +1,26 @@
+import os
 import secrets
 import hashlib
 import datetime
 import sqlite3
 from fastapi import Request, HTTPException, Depends, status
 from .database import get_db
+from .models import User
 
 def hash_password(password: str) -> str:
-    salt = b"amh_lab_salt_2026_pbkdf2"
+    salt = os.urandom(16)
     key = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt, 100000)
-    return key.hex()
+    return f"{salt.hex()}${key.hex()}"
 
-def verify_password(plain_password: str, password_hash: str) -> bool:
-    return secrets.compare_digest(hash_password(plain_password), password_hash)
+def verify_password(plain_password: str, stored_string: str) -> bool:
+    salt_hex, stored_hash_hex = stored_string.split('$')
+    salt = bytes.fromhex(salt_hex)
+    new_key = hashlib.pbkdf2_hmac("sha256", plain_password.encode("utf-8"), salt, 100000)
+    return secrets.compare_digest(new_key.hex(), stored_hash_hex)
 
 def create_session(conn: sqlite3.Connection, user_id: int) -> str:
     token = secrets.token_hex(32)
-    expires_at = (datetime.datetime.utcnow() + datetime.timedelta(days=7)).strftime("%Y-%m-%d %H:%M:%S")
+    expires_at = (datetime.datetime.utcnow() + datetime.timedelta(minutes=15)).strftime("%Y-%m-%d %H:%M:%S")
     conn.execute(
         "INSERT INTO user_sessions (user_id, token, expires_at) VALUES (?, ?, ?)",
         (user_id, token, expires_at)
@@ -23,7 +28,7 @@ def create_session(conn: sqlite3.Connection, user_id: int) -> str:
     conn.commit()
     return token
 
-def get_current_user(request: Request, conn: sqlite3.Connection = Depends(get_db)):
+def get_current_user(request: Request, conn: sqlite3.Connection = Depends(get_db)) -> User:
     token = request.cookies.get("amh_session") or request.headers.get("Authorization")
     if token and token.startswith("Bearer "):
         token = token[7:]
@@ -47,9 +52,20 @@ def get_current_user(request: Request, conn: sqlite3.Connection = Depends(get_db
     if not row["is_active"]:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Account is disabled")
     
-    return dict(row)
+    # Sliding Expiration: extend the session by another 15 minutes
+    new_expires_at = (datetime.datetime.utcnow() + datetime.timedelta(minutes=15)).strftime("%Y-%m-%d %H:%M:%S")
+    conn.execute("UPDATE user_sessions SET expires_at = ? WHERE token = ?", (new_expires_at, token))
+    conn.commit()
+    
+    return User(
+        id=row["id"],
+        full_name=row["full_name"],
+        username=row["username"],
+        role=row["role"],
+        is_active=bool(row["is_active"])
+    )
 
-def require_admin(current_user: dict = Depends(get_current_user)):
+def require_admin(current_user: User = Depends(get_current_user)) -> User:
     if current_user["role"] != "admin":
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin privileges required")
     return current_user

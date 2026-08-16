@@ -2,6 +2,7 @@ import sqlite3
 from fastapi import APIRouter, Depends, HTTPException
 from ..database import get_db
 from ..schemas import TestCreate
+from ..models import User
 from ..auth import get_current_user, require_admin
 
 router = APIRouter(prefix="/api/config", tags=["Configuration"])
@@ -42,6 +43,10 @@ def create_test(req: TestCreate, admin_user: dict = Depends(require_admin), conn
     conn.commit()
     
     return {"id": tid, "name": req.name, "section_id": req.section_id, "is_tracked": req.is_tracked}
+    
+@router.post("/results")
+def enter_result(req: TestCreate, current_user: User = Depends(get_current_user)):
+    print(current_user.full_name)
 
 @router.delete("/tests/{test_id}")
 def delete_test(test_id: int, admin_user: dict = Depends(require_admin), conn: sqlite3.Connection = Depends(get_db)):
