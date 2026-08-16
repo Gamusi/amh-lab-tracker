@@ -1,14 +1,32 @@
 import os
-from fastapi import FastAPI
+import time
+import logging
+from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
 from .database import init_db
-from .routers import auth, daily_log, config, reports, trends, audit, patients
+from .routers import auth, daily_log, config, reports, trends, audit, clients
+
+# Configure Logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(name)s - %(message)s"
+)
+logger = logging.getLogger("amh_server")
 
 # Initialize DB
 init_db()
 
 app = FastAPI(title="AMH Lab Tracker", version="1.0.0")
+
+# Request Logging Middleware
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    start_time = time.time()
+    response = await call_next(request)
+    process_time = (time.time() - start_time) * 1000
+    logger.info(f"Method={request.method} Path={request.url.path} Status={response.status_code} Time={process_time:.2f}ms")
+    return response
 
 # Register API Routers
 app.include_router(auth.router)
@@ -17,7 +35,7 @@ app.include_router(config.router)
 app.include_router(reports.router)
 app.include_router(trends.router)
 app.include_router(audit.router)
-app.include_router(patients.router)
+app.include_router(clients.router)
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 FRONTEND_DIR = os.path.join(BASE_DIR, "frontend", "static")

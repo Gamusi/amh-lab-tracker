@@ -1,14 +1,16 @@
-import datetime, sqlite3
+import datetime, sqlite3, logging
 from pydantic import BaseModel
 from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from ..database import get_db
 from ..auth import get_current_user
 
-router = APIRouter(prefix="/api/patients", tags=["Patients & Reports"])
+logger = logging.getLogger("amh_clients")
 
-class PatientCreate(BaseModel):
-    patient_number: str
+router = APIRouter(prefix="/api/clients", tags=["Clients & Reports"])
+
+class ClientCreate(BaseModel):
+    client_number: str
     full_name: str
     age_years: Optional[int] = None
     date_of_birth: Optional[str] = None
@@ -16,7 +18,7 @@ class PatientCreate(BaseModel):
     phone: Optional[str] = None
 
 class TestOrderCreate(BaseModel):
-    patient_id: int
+    client_id: int
     test_id: int
     sample_id: Optional[str] = None
     sample_type: Optional[str] = "Venous Blood"
@@ -34,49 +36,59 @@ class TestResultCreate(BaseModel):
     parameter_results: Optional[List[ParameterResultItem]] = None
 
 @router.get("")
-def list_patients(query: Optional[str] = None, conn: sqlite3.Connection = Depends(get_db), current_user: dict = Depends(get_current_user)):
+def list_clients(query: Optional[str] = None, conn: sqlite3.Connection = Depends(get_db), current_user: dict = Depends(get_current_user)):
+    logger.info(f"User '{current_user['username']}' requested clients list (query='{query or ''}')")
     cur = conn.cursor()
     if query:
         q = f"%{query}%"
-        cur.execute("SELECT * FROM patients WHERE full_name LIKE ? OR patient_number LIKE ? OR phone LIKE ? ORDER BY id DESC LIMIT 50", (q, q, q))
+        cur.execute("SELECT * FROM clients WHERE full_name LIKE ? OR client_number LIKE ? OR phone LIKE ? ORDER BY id DESC LIMIT 50", (q, q, q))
     else:
-        cur.execute("SELECT * FROM patients ORDER BY id DESC LIMIT 50")
-    return [dict(r) for r in cur.fetchall()]
+        cur.execute("SELECT * FROM clients ORDER BY id DESC LIMIT 50")
+    results = [dict(r) for r in cur.fetchall()]
+    logger.info(f"Returned {len(results)} clients")
+    return results
 
 @router.post("")
-def create_patient(req: PatientCreate, conn: sqlite3.Connection = Depends(get_db), current_user: dict = Depends(get_current_user)):
+def create_client(req: ClientCreate, conn: sqlite3.Connection = Depends(get_db), current_user: dict = Depends(get_current_user)):
+    logger.info(f"User '{current_user['username']}' is creating client: '{req.full_name}' ({req.client_number})")
     cur = conn.cursor()
-    cur.execute("SELECT id FROM patients WHERE patient_number = ?", (req.patient_number,))
+    cur.execute("SELECT id FROM clients WHERE client_number = ?", (req.client_number,))
     if cur.fetchone():
-        raise HTTPException(status_code=400, detail="Patient number already exists")
+        logger.warning(f"Client creation failed: client number '{req.client_number}' already exists")
+        raise HTTPException(status_code=400, detail="Client number already exists")
     
     cur.execute("""
-        INSERT INTO patients (patient_number, full_name, date_of_birth, sex, phone)
+        INSERT INTO clients (client_number, full_name, date_of_birth, sex, phone)
         VALUES (?, ?, ?, ?, ?)
-    """, (req.patient_number, req.full_name, req.date_of_birth, req.sex, req.phone))
+    """, (req.client_number, req.full_name, req.date_of_birth, req.sex, req.phone))
     
     pid = cur.lastrowid
     conn.commit()
-    return {"status": "created", "patient_id": pid}
+    logger.info(f"Client created successfully: ID {pid}")
+    return {"status": "created", "client_id": pid}
 
 @router.post("/orders")
 def create_order(req: TestOrderCreate, conn: sqlite3.Connection = Depends(get_db), current_user: dict = Depends(get_current_user)):
+    logger.info(f"User '{current_user['username']}' is creating test order: client_id={req.client_id}, test_id={req.test_id}")
     cur = conn.cursor()
-    cur.execute("SELECT id FROM patients WHERE id = ?", (req.patient_id,))
+    cur.execute("SELECT id FROM clients WHERE id = ?", (req.client_id,))
     if not cur.fetchone():
-        raise HTTPException(status_code=404, detail="Patient not found")
+        logger.warning(f"Order creation failed: client ID {req.client_id} not found")
+        raise HTTPException(status_code=404, detail="Client not found")
         
     cur.execute("SELECT id FROM tests WHERE id = ?", (req.test_id,))
     if not cur.fetchone():
+        logger.warning(f"Order creation failed: test ID {req.test_id} not found")
         raise HTTPException(status_code=404, detail="Test not found")
 
     cur.execute("""
-        INSERT INTO test_orders (patient_id, test_id, sample_id, ordered_by_user_id, status)
+        INSERT INTO test_orders (client_id, test_id, sample_id, ordered_by_user_id, status)
         VALUES (?, ?, ?, ?, 'pending')
-    """, (req.patient_id, req.test_id, req.sample_id, current_user["id"]))
+    """, (req.client_id, req.test_id, req.sample_id, current_user["id"]))
     
     oid = cur.lastrowid
     conn.commit()
+    logger.info(f"Order created successfully: order_id={oid}")
     return {"status": "ordered", "order_id": oid}
 
 def increment_daily_entry(cur: sqlite3.Cursor, entry_date: str, test_id: int, is_positive: bool, user_id: int):
@@ -116,10 +128,12 @@ def increment_daily_entry(cur: sqlite3.Cursor, entry_date: str, test_id: int, is
 
 @router.post("/results")
 def enter_result(req: TestResultCreate, conn: sqlite3.Connection = Depends(get_db), current_user: dict = Depends(get_current_user)):
+    logger.info(f"User '{current_user['username']}' is entering result for order ID {req.order_id}")
     cur = conn.cursor()
-    cur.execute("SELECT id, patient_id, test_id FROM test_orders WHERE id = ?", (req.order_id,))
+    cur.execute("SELECT id, client_id, test_id FROM test_orders WHERE id = ?", (req.order_id,))
     order = cur.fetchone()
     if not order:
+        logger.warning(f"Result entry failed: order ID {req.order_id} not found")
         raise HTTPException(status_code=404, detail="Order not found")
 
     now_str = datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
@@ -157,19 +171,20 @@ def enter_result(req: TestResultCreate, conn: sqlite3.Connection = Depends(get_d
     increment_daily_entry(cur, today_str, order["test_id"], overall_positive, current_user["id"])
 
     conn.commit()
+    logger.info(f"Result saved successfully for order ID {req.order_id}")
     return {"status": "result_saved", "order_id": req.order_id, "auto_incremented_daily_log": True}
 
 @router.get("/report/{order_id}")
-def get_printable_patient_report(order_id: int, conn: sqlite3.Connection = Depends(get_db), current_user: dict = Depends(get_current_user)):
+def get_printable_client_report(order_id: int, conn: sqlite3.Connection = Depends(get_db), current_user: dict = Depends(get_current_user)):
     cur = conn.cursor()
     cur.execute("""
         SELECT 
             o.id as order_id, o.sample_id, o.ordered_at, o.status,
-            p.patient_number, p.full_name as patient_name, p.date_of_birth, p.sex, p.phone,
+            p.client_number, p.full_name as client_name, p.date_of_birth, p.sex, p.phone,
             t.name as test_name, t.is_tracked, s.name as section_name,
             u.full_name as technician_name
         FROM test_orders o
-        JOIN patients p ON o.patient_id = p.id
+        JOIN clients p ON o.client_id = p.id
         JOIN tests t ON o.test_id = t.id
         JOIN sections s ON t.section_id = s.id
         LEFT JOIN users u ON o.ordered_by_user_id = u.id
@@ -178,7 +193,7 @@ def get_printable_patient_report(order_id: int, conn: sqlite3.Connection = Depen
     
     order_info = cur.fetchone()
     if not order_info:
-        raise HTTPException(status_code=404, detail="Patient report order not found")
+        raise HTTPException(status_code=404, detail="Client report order not found")
 
     cur.execute("""
         SELECT r.id, r.parameter_id, tp.parameter_name, tp.unit, tp.ref_range, r.result_value, r.is_positive
@@ -194,8 +209,8 @@ def get_printable_patient_report(order_id: int, conn: sqlite3.Connection = Depen
     data["results"] = results
     return data
 
-@router.get("/{patient_id}/orders")
-def get_patient_orders(patient_id: int, conn: sqlite3.Connection = Depends(get_db), current_user: dict = Depends(get_current_user)):
+@router.get("/{client_id}/orders")
+def get_client_orders(client_id: int, conn: sqlite3.Connection = Depends(get_db), current_user: dict = Depends(get_current_user)):
     cur = conn.cursor()
     cur.execute("""
         SELECT 
@@ -206,9 +221,9 @@ def get_patient_orders(patient_id: int, conn: sqlite3.Connection = Depends(get_d
         JOIN tests t ON o.test_id = t.id
         JOIN sections s ON t.section_id = s.id
         LEFT JOIN users u ON o.ordered_by_user_id = u.id
-        WHERE o.patient_id = ?
+        WHERE o.client_id = ?
         ORDER BY o.id DESC
-    """, (patient_id,))
+    """, (client_id,))
     
     orders = [dict(r) for r in cur.fetchall()]
     

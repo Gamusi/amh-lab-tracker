@@ -1,10 +1,12 @@
-import os, sqlite3
+import os, sqlite3, logging
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 DATA_DIR = os.path.join(BASE_DIR, "data")
 
 DEFAULT_DB = os.path.join(DATA_DIR, "amh_lab.db")
 DB_PATH = os.environ.get("AMH_DB_PATH", DEFAULT_DB)
+
+logger = logging.getLogger("amh_db")
 
 SCHEMA_SQL = """
     CREATE TABLE IF NOT EXISTS users (
@@ -73,9 +75,9 @@ SCHEMA_SQL = """
         timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
     );
 
-    CREATE TABLE IF NOT EXISTS patients (
+    CREATE TABLE IF NOT EXISTS clients (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        patient_number TEXT UNIQUE NOT NULL,
+        client_number TEXT UNIQUE NOT NULL,
         full_name TEXT NOT NULL,
         date_of_birth DATE,
         sex TEXT,
@@ -85,7 +87,7 @@ SCHEMA_SQL = """
 
     CREATE TABLE IF NOT EXISTS test_orders (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        patient_id INTEGER NOT NULL REFERENCES patients(id),
+        client_id INTEGER NOT NULL REFERENCES clients(id),
         test_id INTEGER NOT NULL REFERENCES tests(id),
         sample_id TEXT,
         ordered_by_user_id INTEGER REFERENCES users(id),
@@ -112,6 +114,7 @@ def get_connection():
         os.makedirs(db_dir, exist_ok=True)
     conn = sqlite3.connect(DB_PATH, check_same_thread=False)
     conn.execute("PRAGMA foreign_keys = ON;")
+    logger.debug(f"Connected to database at {DB_PATH}")
     return conn
 
 def get_db():
@@ -121,8 +124,10 @@ def get_db():
         yield conn
     finally:
         conn.close()
+        logger.debug("Closed database connection")
 
 def init_db():
+    logger.info("Initializing database schema...")
     conn = get_connection()
     cursor = conn.cursor()
     cursor.executescript(SCHEMA_SQL)
@@ -137,11 +142,13 @@ def init_db():
     for table, col, col_def in migrations:
         try:
             cursor.execute(f"ALTER TABLE {table} ADD COLUMN {col} {col_def}")
+            logger.info(f"Migration: Added column {col} to table {table}")
         except sqlite3.OperationalError:
             pass # Column already exists
 
     conn.commit()
     conn.close()
+    logger.info("Database schema initialized and migrated successfully")
 
 if __name__ == "__main__":
     init_db()

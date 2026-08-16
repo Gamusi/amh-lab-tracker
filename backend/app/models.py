@@ -56,9 +56,9 @@ class AuditLog:
     timestamp: Optional[datetime.datetime] = None
 
 @dataclass
-class Patient:
+class Client:
     id: int
-    patient_number: str
+    client_number: str
     full_name: str
     date_of_birth: Optional[datetime.date] = None
     sex: Optional[str] = None
@@ -68,7 +68,7 @@ class Patient:
 @dataclass
 class TestOrder:
     id: int
-    patient_id: int
+    client_id: int
     test_id: int
     ordered_by_user_id: Optional[int] = None
     ordered_at: Optional[datetime.datetime] = None

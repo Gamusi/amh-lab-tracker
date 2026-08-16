@@ -24,7 +24,7 @@
 
 ## Overview
 
-**AMH Lab Tracker** is an offline-first laboratory management system built to digitize diagnostic reporting and patient test workflows. Designed to comply with the Ugandan Ministry of Health **HMIS 105 Section 6 Laboratory Surveillance** guidelines, it completely replaces fragile legacy Excel macros with a robust, relational database-backed application.
+**AMH Lab Tracker** is an offline-first laboratory management system built to digitize diagnostic reporting and client test workflows. Designed to comply with the Ugandan Ministry of Health **HMIS 105 Section 6 Laboratory Surveillance** guidelines, it completely replaces fragile legacy Excel macros with a robust, relational database-backed application.
 
 It is specifically engineered to run flawlessly on legacy hospital workstations (Core 2 Duo / 2GB RAM) without requiring an internet connection, complex installations, or heavy browser frameworks.
 
@@ -45,8 +45,8 @@ This system was built to directly solve the structural vulnerabilities of the pr
 
 ## Features
 
-- **Patient Diagnostic Logging:** Track patient demographics alongside detailed multi-parameter test results (e.g., CBC panels, WBC counts, reference ranges).
-- **Automated Surveillance Roll-up:** Patient-level diagnostics (like HIV Determine/STAT-PAK) automatically increment the master HMIS 105 daily aggregate counts.
+- **Client Diagnostic Logging:** Track client demographics alongside detailed multi-parameter test results (e.g., CBC panels, WBC counts, reference ranges).
+- **Automated Surveillance Roll-up:** Client-level diagnostics (like HIV Determine/STAT-PAK) automatically increment the master HMIS 105 daily aggregate counts.
 - **Dynamic Aggregation:** Real-time generation of Daily, Weekly, Monthly, and Financial Year (July–June) performance reports and positivity rates.
 - **Native Print Integration:** Custom `@media print` CSS strips out the UI for beautiful, official A4 paper slips and reports via `window.print()`.
 - **Client-Side CSV Export:** One-click data exports generated locally via JS Blob objects for use in Microsoft Excel.

@@ -140,7 +140,7 @@ const app = {
     if (viewName === 'daily-log') this.renderDailyLog(container);
     else if (viewName === 'reports') this.renderReports(container);
     else if (viewName === 'trends') this.renderTrends(container);
-    else if (viewName === 'patients') this.renderPatients(container);
+    else if (viewName === 'clients') this.renderClients(container);
     else if (viewName === 'config') this.renderConfig(container);
     else if (viewName === 'audit') this.renderAuditLog(container);
   },
@@ -629,39 +629,39 @@ const app = {
     }
   },
 
-  // Patient Reports View
-  async renderPatients(container) {
+  // Test Reports View
+  async renderClients(container) {
     container.innerHTML = `
       <div class="card">
         <div class="card-header">
-          <span class="card-title">${this.icon('file-text')} Patient Reports & Diagnostic Test Entry</span>
+          <span class="card-title">${this.icon('file-text')} Test Reports & Diagnostic Test Entry</span>
           <div class="controls-row">
-            <button class="btn btn-primary" onclick="app.showNewPatientModal()">${this.icon('user-plus')} Register New Patient</button>
+            <button class="btn btn-primary" onclick="app.showNewClientModal()">${this.icon('user-plus')} Register New Client</button>
           </div>
         </div>
 
         <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 20px;">
-          <!-- Patient List -->
+          <!-- Client List -->
           <div>
-            <h3 style="font-size: 0.95rem; color: var(--primary-color); margin-bottom: 10px;">Registered Patients</h3>
+            <h3 style="font-size: 0.95rem; color: var(--primary-color); margin-bottom: 10px;">Registered Clients</h3>
             <div class="form-group" style="margin-bottom: 12px;">
-              <input type="text" id="patient-search-input" placeholder="Search patient name/ID..." oninput="app.searchPatients(this.value)">
+              <input type="text" id="client-search-input" placeholder="Search client name/ID..." oninput="app.searchClients(this.value)">
             </div>
-            <div id="patient-list-box" style="background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 6px; max-height: 500px; overflow-y: auto;">
-              <p style="padding: 12px; color: var(--text-muted);">Loading patient directory...</p>
+            <div id="client-list-box" style="background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 6px; max-height: 500px; overflow-y: auto;">
+              <p style="padding: 12px; color: var(--text-muted);">Loading client directory...</p>
             </div>
           </div>
 
-          <!-- Patient Detail & Official Report Paper -->
-          <div id="patient-detail-box">
+          <!-- Client Detail & Official Report Paper -->
+          <div id="client-detail-box">
             <div style="padding: 32px; background: #F8FAFC; border-radius: 8px; border: 2px dashed var(--border-color); text-align: center; color: var(--text-muted);">
-              Select a patient from the list on the left to log diagnostic test results or view their official letterhead report.
+              Select a client from the list on the left to log diagnostic test results or view their official letterhead report.
             </div>
           </div>
         </div>
       </div>
     `;
-    await this.searchPatients('');
+    await this.searchClients('');
   },
 
   // Configuration View
@@ -729,39 +729,39 @@ const app = {
     }
   },
 
-  async searchPatients(q) {
+  async searchClients(q) {
     try {
-      const res = await fetch(`/api/patients?query=${encodeURIComponent(q || '')}`);
+      const res = await fetch(`/api/clients?query=${encodeURIComponent(q || '')}`);
       if (!res.ok) return;
-      const patients = await res.json();
+      const clients = await res.json();
 
-      const box = document.getElementById('patient-list-box');
-      if (patients.length === 0) {
-        box.innerHTML = '<p style="padding: 12px; color: var(--text-muted);">No patients found.</p>';
+      const box = document.getElementById('client-list-box');
+      if (clients.length === 0) {
+        box.innerHTML = '<p style="padding: 12px; color: var(--text-muted);">No clients found.</p>';
         return;
       }
 
       let html = '';
-      patients.forEach(p => {
+      clients.forEach(p => {
         html += `
           <div style="padding: 10px 14px; border-bottom: 1px solid var(--border-color); cursor: pointer; transition: background 0.2s;" 
-               onclick="app.selectPatient(${p.id}, '${this.escape(p.patient_number)}', '${this.escape(p.full_name)}', '${p.sex}')"
+               onclick="app.selectClient(${p.id}, '${this.escape(p.client_number)}', '${this.escape(p.full_name)}', '${p.sex}')"
                onmouseover="this.style.background='#F1F5F9'" onmouseout="this.style.background='transparent'">
             <div style="font-weight: 700; color: var(--primary-color);">${this.escape(p.full_name)}</div>
-            <div style="font-size: 0.8rem; color: var(--text-muted);">ID: ${this.escape(p.patient_number)} | Sex: ${p.sex}</div>
+            <div style="font-size: 0.8rem; color: var(--text-muted);">ID: ${this.escape(p.client_number)} | Sex: ${p.sex}</div>
           </div>
         `;
       });
       box.innerHTML = html;
     } catch (e) {
-      console.error('Patient search error:', e);
+      console.error('Client search error:', e);
     }
   },
 
-  async selectPatient(pid, pnum, pname, psex) {
-    const box = document.getElementById('patient-detail-box');
+  async selectClient(pid, pnum, pname, psex) {
+    const box = document.getElementById('client-detail-box');
     box.innerHTML = `
-      <div class="patient-report-paper">
+      <div class="client-report-paper">
         <!-- Official Hospital Header Banner -->
         <div class="official-header-banner">
           <img src="/assets/branding/logo.png" alt="Hospital Crest" style="height: 72px; width: auto; object-fit: contain;">
@@ -774,17 +774,17 @@ const app = {
         </div>
 
         <div class="report-document-title">
-          <span>PATIENT DIAGNOSTIC LABORATORY REPORT</span>
+          <span>CLIENT DIAGNOSTIC LABORATORY REPORT</span>
         </div>
 
         <div class="report-watermark">AMH MBALE LAB</div>
 
-        <!-- Patient Info Card -->
-        <div class="patient-info-grid">
-          <div class="patient-info-item"><span class="label">Patient Full Name:</span> <span class="val">${pname}</span></div>
-          <div class="patient-info-item"><span class="label">Hospital Patient ID:</span> <span class="val">${pnum}</span></div>
-          <div class="patient-info-item"><span class="label">Gender / Sex:</span> <span class="val">${psex}</span></div>
-          <div class="patient-info-item"><span class="label">Date of Report:</span> <span class="val">${new Date().toLocaleDateString()}</span></div>
+        <!-- Client Info Card -->
+        <div class="client-info-grid">
+          <div class="client-info-item"><span class="label">Client Full Name:</span> <span class="val">${pname}</span></div>
+          <div class="client-info-item"><span class="label">Hospital Client ID:</span> <span class="val">${pnum}</span></div>
+          <div class="client-info-item"><span class="label">Gender / Sex:</span> <span class="val">${psex}</span></div>
+          <div class="client-info-item"><span class="label">Date of Report:</span> <span class="val">${new Date().toLocaleDateString()}</span></div>
         </div>
 
         <!-- Result Entry Form -->
@@ -824,7 +824,7 @@ const app = {
         </div>
 
         <!-- Dynamic Results Table -->
-        <div id="patient-orders-table-container">
+        <div id="client-orders-table-container">
           <p style="color: var(--text-muted); padding: 12px;">Loading test results...</p>
         </div>
 
@@ -846,7 +846,7 @@ const app = {
     `;
 
     await this.loadTestOptions();
-    await this.loadPatientOrders(pid);
+    await this.loadClientOrders(pid);
   },
 
   async loadTestOptions() {
@@ -973,17 +973,17 @@ const app = {
 
     try {
       // 1. Create order
-      const ordRes = await fetch('/api/patients/orders', {
+      const ordRes = await fetch('/api/clients/orders', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ patient_id: pid, test_id: tid, sample_id: sampleId })
+        body: JSON.stringify({ client_id: pid, test_id: tid, sample_id: sampleId })
       });
 
       if (!ordRes.ok) throw new Error('Order creation failed');
       const ordData = await ordRes.json();
 
       // 2. Submit result
-      const resRes = await fetch('/api/patients/results', {
+      const resRes = await fetch('/api/clients/results', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -996,7 +996,7 @@ const app = {
 
       if (resRes.ok) {
         this.showToast('Result recorded successfully! Daily Log auto-incremented.', 'success');
-        await this.loadPatientOrders(pid);
+        await this.loadClientOrders(pid);
       } else {
         this.showToast('Failed to record result.', 'error');
       }
@@ -1005,19 +1005,19 @@ const app = {
     }
   },
 
-  async loadPatientOrders(pid) {
+  async loadClientOrders(pid) {
     try {
-      const res = await fetch(`/api/patients/${pid}/orders`);
+      const res = await fetch(`/api/clients/${pid}/orders`);
       if (!res.ok) return;
       const orders = await res.json();
 
-      const container = document.getElementById('patient-orders-table-container');
+      const container = document.getElementById('client-orders-table-container');
       if (!container) return;
 
       if (orders.length === 0) {
         container.innerHTML = `
           <p style="padding: 16px; color: var(--text-muted); background: #F8FAFC; border-radius: 6px; text-align: center;">
-            No laboratory test results recorded yet for this patient. Use the form above to log a diagnostic result.
+            No laboratory test results recorded yet for this client. Use the form above to log a diagnostic result.
           </p>
         `;
         return;
@@ -1069,23 +1069,23 @@ const app = {
         </table>
       `;
     } catch (e) {
-      console.error('Error loading patient orders:', e);
+      console.error('Error loading client orders:', e);
     }
   },
 
-  async showNewPatientModal() {
-    const pnum = 'AMH-P' + Math.floor(1000 + Math.random() * 9000);
-    const pname = prompt('Enter Patient Full Name:');
+  async showNewClientModal() {
+    const pnum = 'AMH-C' + Math.floor(1000 + Math.random() * 9000);
+    const pname = prompt('Enter Client Full Name:');
     if (!pname) return;
-    const psex = prompt('Enter Patient Gender (Male/Female):', 'Male') || 'Male';
+    const psex = prompt('Enter Client Gender (Male/Female):', 'Male') || 'Male';
     const pphone = prompt('Enter Phone Number (Optional):', '') || '';
 
     try {
-      const res = await fetch('/api/patients', {
+      const res = await fetch('/api/clients', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          patient_number: pnum,
+          client_number: pnum,
           full_name: pname,
           sex: psex,
           phone: pphone
@@ -1093,10 +1093,10 @@ const app = {
       });
 
       if (res.ok) {
-        this.showToast(`Patient registered successfully! Assigned ID: ${pnum}`, 'success');
-        this.searchPatients('');
+        this.showToast(`Client registered successfully! Assigned ID: ${pnum}`, 'success');
+        this.searchClients('');
       } else {
-        this.showToast('Error registering patient.', 'error');
+        this.showToast('Error registering client.', 'error');
       }
     } catch (e) {
       this.showToast('Connection error.', 'error');
@@ -1115,17 +1115,17 @@ const app = {
 
     try {
       // 1. Create order
-      const ordRes = await fetch('/api/patients/orders', {
+      const ordRes = await fetch('/api/clients/orders', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ patient_id: pid, test_id: tid })
+        body: JSON.stringify({ client_id: pid, test_id: tid })
       });
 
       if (!ordRes.ok) throw new Error('Order creation failed');
       const ordData = await ordRes.json();
 
       // 2. Submit result
-      const resRes = await fetch('/api/patients/results', {
+      const resRes = await fetch('/api/clients/results', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1137,7 +1137,7 @@ const app = {
 
       if (resRes.ok) {
         this.showToast('Result recorded successfully! Daily Log auto-incremented.', 'success');
-        await this.loadPatientOrders(pid);
+        await this.loadClientOrders(pid);
         window.print();
       } else {
         this.showToast('Failed to record result.', 'error');
