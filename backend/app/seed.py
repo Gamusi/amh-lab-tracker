@@ -126,47 +126,19 @@ def seed_database():
                     """, (tid, pname, unit, ref_range, s_order))
 
     conn.commit()
-
-    # 4. Seed Historical Daily Entries
     cur.execute("SELECT id FROM users LIMIT 1")
     user_row = cur.fetchone()
     admin_id = user_row["id"] if user_row else None
 
-    sample_dates = [
-        ("2026-03-23", 146), ("2026-03-24", 50), ("2026-03-25", 16), ("2026-03-26", 41),
-        ("2026-03-27", 51), ("2026-03-28", 16), ("2026-03-29", 33), ("2026-03-30", 51),
-        ("2026-03-31", 116), ("2026-04-01", 28), ("2026-04-02", 34), ("2026-04-03", 37),
-        ("2026-04-04", 45), ("2026-04-05", 85), ("2026-08-05", 35)
-    ]
-
-    entries_count = 0
-    for date_s, total_vol in sample_dates:
-        for (sec_k, t_k), tid in test_obj_map.items():
-            if t_k in ["cbc", "hemoglobin", "mrdt", "urinalysis", "fasting blood sugar"]:
-                d_val = 10 if t_k == "mrdt" else 5
-                cur.execute("SELECT is_tracked FROM tests WHERE id = ?", (tid,))
-                is_tr = cur.fetchone()["is_tracked"]
-                p_val = 2 if is_tr else None
-                
-                cur.execute("""
-                    INSERT INTO daily_entries (entry_date, test_id, done, positive, entered_by_user_id)
-                    VALUES (?, ?, ?, ?, ?)
-                    ON CONFLICT(entry_date, test_id) DO UPDATE SET
-                    done = excluded.done, positive = excluded.positive
-                """, (date_s, tid, d_val, p_val, admin_id))
-                entries_count += 1
-
-    conn.commit()
-
     # Audit Log
     cur.execute(
         "INSERT INTO audit_log (user_id, action, detail) VALUES (?, ?, ?)",
-        (admin_id, "seed_database", f"Database seeded with {len(sec_map)} sections, {test_count} tests, and {entries_count} daily entries.")
+        (admin_id, "seed_database", f"Database seeded with {len(sec_map)} sections and {test_count} tests.")
     )
     conn.commit()
     conn.close()
 
-    print(f"Seeding completed: {len(sec_map)} sections, {test_count} tests, {entries_count} daily entries.")
+    print(f"Seeding completed: {len(sec_map)} sections, {test_count} tests.")
 
 if __name__ == "__main__":
     seed_database()
