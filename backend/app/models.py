@@ -10,6 +10,7 @@ class User:
     password_hash: str = ""
     role: str = "technician"  # 'admin' or 'technician'
     is_active: bool = True
+    password_reset_required: bool = False
     created_at: Optional[datetime.datetime] = None
 
     def __getitem__(self, key):
