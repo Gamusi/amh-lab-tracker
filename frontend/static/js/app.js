@@ -17,6 +17,7 @@ const app = {
     'printer': `<svg class="lucide" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect width="12" height="8" x="6" y="14"/></svg>`,
     'download': `<svg class="lucide" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>`,
     'user': `<svg class="lucide" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`,
+    'users': `<svg class="lucide" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>`,
     'user-plus': `<svg class="lucide" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" x2="19" y1="8" y2="14"/><line x1="16" x2="22" y1="11" y2="11"/></svg>`,
     'plus': `<svg class="lucide" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" x2="12" y1="5" y2="19"/><line x1="5" x2="19" y1="12" y2="12"/></svg>`,
     'chevron-left': `<svg class="lucide" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>`,
@@ -62,7 +63,12 @@ const app = {
         document.getElementById('login-modal').style.display = 'none';
         document.getElementById('app-nav').style.display = 'flex';
         this.startInactivityTimer();
-        this.navigate(this.currentView);
+
+        if (this.currentUser.password_reset_required) {
+          this.showResetPasswordModal();
+        } else {
+          this.navigate(this.currentView);
+        }
       } else {
         this.showLogin();
       }
@@ -102,7 +108,12 @@ const app = {
         document.getElementById('app-nav').style.display = 'flex';
         this.renderUserNav();
         this.startInactivityTimer();
-        this.navigate('daily-log');
+
+        if (data.status === 'reset_required' || (data.user && data.user.password_reset_required)) {
+          this.showResetPasswordModal();
+        } else {
+          this.navigate('daily-log');
+        }
       } else {
         const err = await res.json();
         errDiv.textContent = err.detail || 'Login failed';
@@ -118,6 +129,72 @@ const app = {
     this.stopInactivityTimer();
     await fetch('/api/auth/logout', { method: 'POST' });
     this.showLogin();
+  },
+
+  showResetPasswordModal() {
+    const modal = document.getElementById('reset-password-modal');
+    if (modal) {
+      modal.style.display = 'flex';
+      const err = document.getElementById('reset-password-error');
+      if (err) {
+        err.textContent = '';
+        err.style.display = 'none';
+      }
+      const form = document.getElementById('reset-password-form');
+      if (form) form.reset();
+      const oldPw = document.getElementById('reset-old-password');
+      if (oldPw) oldPw.focus();
+    }
+  },
+
+  async handleChangePassword(event) {
+    event.preventDefault();
+    const oldPassword = document.getElementById('reset-old-password').value;
+    const newPassword = document.getElementById('reset-new-password').value;
+    const confirmPassword = document.getElementById('reset-confirm-password').value;
+    const errDiv = document.getElementById('reset-password-error');
+
+    errDiv.style.display = 'none';
+
+    if (!newPassword || newPassword.trim().length < 4) {
+      errDiv.textContent = 'New password must be at least 4 characters.';
+      errDiv.style.display = 'block';
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      errDiv.textContent = 'New password and confirmation do not match.';
+      errDiv.style.display = 'block';
+      return;
+    }
+
+    try {
+      const res = await fetch('/api/auth/change-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          old_password: oldPassword,
+          new_password: newPassword
+        })
+      });
+
+      if (res.ok) {
+        if (this.currentUser) {
+          this.currentUser.password_reset_required = false;
+        }
+        document.getElementById('reset-password-modal').style.display = 'none';
+        document.getElementById('reset-password-form').reset();
+        this.showToast('Password changed successfully!', 'success');
+        this.navigate('daily-log');
+      } else {
+        const err = await res.json();
+        errDiv.textContent = err.detail || 'Failed to change password.';
+        errDiv.style.display = 'block';
+      }
+    } catch (e) {
+      errDiv.textContent = 'Connection error. Please try again.';
+      errDiv.style.display = 'block';
+    }
   },
 
   showRegisterForm(event) {
@@ -233,7 +310,7 @@ const app = {
 
   cleanseDOM() {
     // Reset all password input types back to password
-    ['login-password', 'register-password'].forEach(id => {
+    ['login-password', 'register-password', 'reset-old-password', 'reset-new-password', 'reset-confirm-password'].forEach(id => {
       const input = document.getElementById(id);
       if (input) {
         input.setAttribute('type', 'password');
@@ -246,6 +323,10 @@ const app = {
 
     // Reset all forms in modal/app
     document.querySelectorAll('form').forEach(form => form.reset());
+
+    // Hide reset password modal
+    const resetModal = document.getElementById('reset-password-modal');
+    if (resetModal) resetModal.style.display = 'none';
 
     // Reset dynamic view container content to default placeholder
     const container = document.getElementById('view-container');
@@ -262,20 +343,30 @@ const app = {
     const nav = document.getElementById('user-nav');
     if (!this.currentUser) return;
 
+    const isPrivileged = this.currentUser.role === 'admin' || this.currentUser.role === 'superadmin';
     const adminTabs = document.querySelectorAll('.admin-only');
     adminTabs.forEach(tab => {
-      tab.style.display = (this.currentUser.role === 'admin') ? 'inline-block' : 'none';
+      tab.style.display = isPrivileged ? 'inline-block' : 'none';
     });
+
+    const roleLabel = this.currentUser.role === 'superadmin' ? 'Super Administrator'
+      : (this.currentUser.role === 'admin' ? 'Administrator'
+      : (this.currentUser.role === 'technologist' || this.currentUser.role === 'Laboratory Technologist' ? 'Laboratory Technologist'
+      : 'Technician'));
 
     nav.innerHTML = `
       <div class="user-badge">
-        ${this.icon('user')} <strong>${this.escape(this.currentUser.full_name)}</strong> (${this.currentUser.role})
+        ${this.icon('user')} <strong>${this.escape(this.currentUser.full_name)}</strong> (${this.escape(roleLabel)})
       </div>
       <button class="btn btn-secondary" style="padding: 4px 12px; font-size: 0.8rem;" onclick="app.handleLogout()">${this.icon('log-out')} Logout</button>
     `;
   },
 
   navigate(viewName) {
+    if (this.currentUser && this.currentUser.password_reset_required) {
+      this.showResetPasswordModal();
+      return;
+    }
     this.currentView = viewName;
     document.querySelectorAll('.nav-tab').forEach(tab => {
       tab.classList.remove('active');
@@ -301,7 +392,7 @@ const app = {
     toast.className = `toast toast-${type}`;
     toast.innerHTML = `
       <span>${this.escape(message)}</span>
-      <span style="cursor:pointer; opacity:0.8; font-weight:700;" onclick="this.parentElement.remove()">✕</span>
+      <span style="cursor:pointer; opacity:0.8; font-weight:700;" onclick="this.parentElement.remove()">&times;</span>
     `;
 
     container.appendChild(toast);
@@ -361,7 +452,7 @@ const app = {
           </div>
           <div class="check-item">
             <span class="label">Register Check:</span>
-            <span class="val" id="audit-check-status">—</span>
+            <span class="val" id="audit-check-status">&mdash;</span>
           </div>
           <button class="btn btn-primary" onclick="app.submitShiftAudit()">${this.icon('save')} Verify Shift Audit</button>
         </div>
@@ -421,7 +512,7 @@ const app = {
               </tbody>
               <tfoot>
                 <tr style="background-color: #F8FAFC; font-weight: 700;">
-                  <td colspan="2">Subtotal — ${this.escape(sec.section_name)}</td>
+                  <td colspan="2">Subtotal &mdash; ${this.escape(sec.section_name)}</td>
                   <td style="text-align: right;" id="sec-subtotal-done-${sec.section_id}">0</td>
                   <td style="text-align: center;" id="sec-subtotal-pos-${sec.section_id}">0</td>
                 </tr>
@@ -506,10 +597,10 @@ const app = {
         statusSpan.textContent = '—';
         statusSpan.className = 'val';
       } else if (paperVal === sysDone) {
-        statusSpan.textContent = '✓ Match';
+        statusSpan.textContent = 'Match';
         statusSpan.className = 'val status-match';
       } else {
-        statusSpan.textContent = '⚠ Mismatch';
+        statusSpan.textContent = 'Mismatch';
         statusSpan.className = 'val status-mismatch';
       }
     }
@@ -812,80 +903,6 @@ const app = {
     await this.searchClients('');
   },
 
-  // Configuration View
-  async renderConfig(container) {
-    container.innerHTML = `
-      <div class="card" style="margin-bottom: 24px;">
-        <div class="card-header">
-          <span class="card-title">${this.icon('settings')} Test Catalog & Section Configuration</span>
-          <button class="btn btn-primary" onclick="app.showAddTestModal()">${this.icon('plus')} Add New Test</button>
-        </div>
-        <div id="config-table-container">
-          <p>Loading configuration...</p>
-        </div>
-      </div>
-
-      <div class="card" id="user-management-card" style="display: none;">
-        <div class="card-header">
-          <span class="card-title">${this.icon('users') || '👥'} Lab Staff Accounts & Approvals</span>
-        </div>
-        <div id="users-table-container">
-          <p>Loading accounts...</p>
-        </div>
-      </div>
-    `;
-    await this.loadConfigData();
-  },
-
-  // Audit Log View
-  async renderAuditLog(container) {
-    container.innerHTML = `
-      <div class="card">
-        <div class="card-header">
-          <span class="card-title">${this.icon('shield-check')} System Audit Trail</span>
-        </div>
-        <div id="audit-table-container">
-          <p>Loading audit log...</p>
-        </div>
-      </div>
-    `;
-    try {
-      const res = await fetch('/api/audit-log');
-      if (!res.ok) return;
-      const logs = await res.json();
-
-      let rows = '';
-      logs.forEach(l => {
-        rows += `
-          <tr>
-            <td>${l.timestamp ? l.timestamp.replace('T', ' ').substring(0, 19) : ''}</td>
-            <td><strong>${this.escape(l.username)}</strong></td>
-            <td><code>${this.escape(l.action)}</code></td>
-            <td>${this.escape(l.detail || '')}</td>
-          </tr>
-        `;
-      });
-
-      document.getElementById('audit-table-container').innerHTML = `
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th style="width: 180px;">Timestamp</th>
-              <th style="width: 140px;">User</th>
-              <th style="width: 160px;">Action</th>
-              <th>Details</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${rows}
-          </tbody>
-        </table>
-      `;
-    } catch (e) {
-      console.error('Audit log error:', e);
-    }
-  },
-
   async searchClients(q) {
     try {
       const res = await fetch(`/api/clients?query=${encodeURIComponent(q || '')}`);
@@ -977,7 +994,7 @@ const app = {
           <div id="test-parameters-container" style="display: none; margin-bottom: 12px; background: #FFFFFF; padding: 12px; border-radius: 6px; border: 1px solid #BFDBFE;">
           </div>
 
-          <button class="btn btn-success" style="width: 100%; padding: 10px;" onclick="app.submitTestResult(${pid})">💾 Submit Result & Add to Report</button>
+          <button class="btn btn-success" style="width: 100%; padding: 10px;" onclick="app.submitTestResult(${pid})">${this.icon('save')} Submit Result & Add to Report</button>
         </div>
 
         <!-- Dynamic Results Table -->
@@ -997,7 +1014,7 @@ const app = {
         </div>
 
         <div style="margin-top: 20px; text-align: right;" class="no-print">
-          <button class="btn btn-primary" onclick="window.print()">🖨️ Print Official Report</button>
+          <button class="btn btn-primary" onclick="window.print()">${this.icon('printer')} Print Official Report</button>
         </div>
       </div>
     `;
@@ -1087,8 +1104,7 @@ const app = {
 
       if (res.ok) {
         const data = await res.json();
-        const icon = data.match === 'MATCH' ? '✓' : '⚠';
-        this.showToast(`${icon} Shift audit recorded: ${data.match} (System: ${sysTotal}, Register: ${paperVal})`, data.match === 'MATCH' ? 'success' : 'error');
+        this.showToast(`Shift audit recorded: ${data.match} (System: ${sysTotal}, Register: ${paperVal})`, data.match === 'MATCH' ? 'success' : 'error');
       } else {
         this.showToast('Failed to record shift audit.', 'error');
       }
@@ -1154,6 +1170,7 @@ const app = {
       if (resRes.ok) {
         this.showToast('Result recorded successfully! Daily Log auto-incremented.', 'success');
         await this.loadClientOrders(pid);
+        window.print();
       } else {
         this.showToast('Failed to record result.', 'error');
       }
@@ -1260,48 +1277,42 @@ const app = {
     }
   },
 
-  async submitTestResult(pid) {
-    const tid = parseInt(document.getElementById('order-test-select').value, 10);
-    const rval = document.getElementById('order-result-value').value;
-    const isPos = document.getElementById('order-result-pos').value === 'true';
+  // Configuration View
+  async renderConfig(container) {
+    const isSuperAdmin = this.currentUser && this.currentUser.role === 'superadmin';
 
-    if (!rval) {
-      this.showToast('Please enter a result value.', 'error');
-      return;
-    }
+    container.innerHTML = `
+      <div class="card" style="margin-bottom: 24px;">
+        <div class="card-header">
+          <span class="card-title">${this.icon('settings')} Test Catalog & Section Configuration</span>
+          <button class="btn btn-primary" onclick="app.showAddTestModal()">${this.icon('plus')} Add New Test</button>
+        </div>
+        <div id="config-table-container">
+          <p style="color: var(--text-muted);">Loading configuration...</p>
+        </div>
+      </div>
 
-    try {
-      // 1. Create order
-      const ordRes = await fetch('/api/clients/orders', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ client_id: pid, test_id: tid })
-      });
+      ${isSuperAdmin ? `
+      <div class="card" id="pending-users-card" style="margin-bottom: 24px;">
+        <div class="card-header">
+          <span class="card-title">${this.icon('user-plus')} Pending Registration Requests</span>
+        </div>
+        <div id="pending-users-container">
+          <p style="color: var(--text-muted);">Loading pending requests...</p>
+        </div>
+      </div>
 
-      if (!ordRes.ok) throw new Error('Order creation failed');
-      const ordData = await ordRes.json();
-
-      // 2. Submit result
-      const resRes = await fetch('/api/clients/results', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          order_id: ordData.order_id,
-          result_value: rval,
-          is_positive: isPos
-        })
-      });
-
-      if (resRes.ok) {
-        this.showToast('Result recorded successfully! Daily Log auto-incremented.', 'success');
-        await this.loadClientOrders(pid);
-        window.print();
-      } else {
-        this.showToast('Failed to record result.', 'error');
-      }
-    } catch (e) {
-      this.showToast('Error submitting result.', 'error');
-    }
+      <div class="card" id="active-users-card">
+        <div class="card-header">
+          <span class="card-title">${this.icon('users')} Active Lab Staff Accounts</span>
+        </div>
+        <div id="active-users-container">
+          <p style="color: var(--text-muted);">Loading accounts...</p>
+        </div>
+      </div>
+      ` : ''}
+    `;
+    await this.loadConfigData();
   },
 
   async loadConfigData() {
@@ -1323,90 +1334,186 @@ const app = {
             </tr>
           `;
         });
-        document.getElementById('config-table-container').innerHTML = `
-          <table class="data-table">
-            <thead>
-              <tr>
-                <th>Test Name</th>
-                <th>Section ID</th>
-                <th>Surveillance Tracking</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${rows}
-            </tbody>
-          </table>
-        `;
-      }
-
-      // 2. Load user management for admin
-      if (this.currentUser && this.currentUser.role === 'admin') {
-        const managementCard = document.getElementById('user-management-card');
-        if (managementCard) managementCard.style.display = 'block';
-        
-        const userRes = await fetch('/api/auth/users');
-        if (userRes.ok) {
-          const users = await userRes.json();
-          let userRows = '';
-          users.forEach(u => {
-            const isSelf = u.id === this.currentUser.id;
-            const statusBadge = u.is_active 
-              ? '<span class="tag-positive">Active</span>' 
-              : '<span class="tag-na" style="background: var(--warning-color); color: white;">Pending Approval</span>';
-            
-            const actionBtn = u.is_active
-              ? `<button class="btn btn-secondary" style="padding: 2px 8px; font-size: 0.8rem; background: var(--danger-color); color: white; border: none;" ${isSelf ? 'disabled' : ''} onclick="app.changeUserStatus(${u.id}, '${u.role}', false)">Deactivate</button>`
-              : `<button class="btn btn-primary" style="padding: 2px 8px; font-size: 0.8rem; background: var(--success-color); color: white; border: none;" onclick="app.changeUserStatus(${u.id}, '${u.role}', true)">Approve</button>`;
-
-            const roleSelect = `
-              <select onchange="app.changeUserRole(${u.id}, this.value, ${u.is_active})" ${isSelf ? 'disabled' : ''} style="padding: 4px; border-radius: 4px; border: 1px solid var(--border-color); font-size: 0.85rem;">
-                <option value="technician" ${u.role === 'technician' ? 'selected' : ''}>Technician</option>
-                <option value="Laboratory Technologist" ${u.role === 'Laboratory Technologist' ? 'selected' : ''}>Laboratory Technologist</option>
-                <option value="admin" ${u.role === 'admin' ? 'selected' : ''}>Administrator</option>
-              </select>
-            `;
-
-            userRows += `
-              <tr>
-                <td><strong>${this.escape(u.full_name)}</strong></td>
-                <td><code>${this.escape(u.username)}</code></td>
-                <td>${roleSelect}</td>
-                <td>${statusBadge}</td>
-                <td>
-                  <div style="display: flex; gap: 8px; align-items: center;">
-                    ${actionBtn}
-                    <div style="display: flex; gap: 4px; align-items: center;">
-                      <input type="password" id="pw-reset-${u.id}" placeholder="Reset password" style="padding: 2px 6px; font-size: 0.8rem; width: 110px; margin: 0; box-sizing: border-box; height: 26px;">
-                      <button class="btn btn-secondary" style="padding: 2px 8px; font-size: 0.8rem; height: 26px;" onclick="app.resetUserPassword(${u.id}, '${u.role}', ${u.is_active})">Set</button>
-                    </div>
-                  </div>
-                </td>
-              </tr>
-            `;
-          });
-
-          document.getElementById('users-table-container').innerHTML = `
+        const catalogContainer = document.getElementById('config-table-container');
+        if (catalogContainer) {
+          catalogContainer.innerHTML = `
             <table class="data-table">
               <thead>
                 <tr>
-                  <th>Full Name</th>
-                  <th>Username</th>
-                  <th>Role</th>
-                  <th>Status</th>
-                  <th>Actions & Password Reset</th>
+                  <th>Test Name</th>
+                  <th>Section ID</th>
+                  <th>Surveillance Tracking</th>
+                  <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
-                ${userRows}
+                ${rows}
               </tbody>
             </table>
           `;
         }
       }
+
+      // 2. Load user management for superadmin
+      if (this.currentUser && this.currentUser.role === 'superadmin') {
+        const userRes = await fetch('/api/auth/users');
+        if (userRes.ok) {
+          const users = await userRes.json();
+
+          // Split into pending and active
+          const pendingUsers = users.filter(u => !u.is_active);
+          const activeUsers = users.filter(u => u.is_active);
+
+          // 2a. Render Pending Registrations
+          const pendingContainer = document.getElementById('pending-users-container');
+          if (pendingContainer) {
+            if (pendingUsers.length === 0) {
+              pendingContainer.innerHTML = '<p style="padding: 12px; color: var(--text-muted);">No pending registration requests.</p>';
+            } else {
+              let pendingRows = '';
+              pendingUsers.forEach(u => {
+                const formattedDate = u.created_at ? u.created_at.replace('T', ' ').substring(0, 19) : '—';
+                pendingRows += `
+                  <tr>
+                    <td><strong>${this.escape(u.full_name)}</strong></td>
+                    <td><code>${this.escape(u.username)}</code></td>
+                    <td>${this.escape(formattedDate)}</td>
+                    <td>
+                      <div style="display: flex; gap: 8px; align-items: center;">
+                        <button class="btn btn-success" style="padding: 4px 10px; font-size: 0.8rem;" onclick="app.approveUser(${u.id}, '${this.escape(u.role)}')">Approve</button>
+                        <button class="btn btn-secondary" style="padding: 4px 10px; font-size: 0.8rem; background: var(--danger-color); color: white; border: none;" onclick="app.rejectUser(${u.id}, '${this.escape(u.username)}')">Reject</button>
+                      </div>
+                    </td>
+                  </tr>
+                `;
+              });
+
+              pendingContainer.innerHTML = `
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>Full Name</th>
+                      <th>Username</th>
+                      <th>Registered On</th>
+                      <th style="width: 180px;">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${pendingRows}
+                  </tbody>
+                </table>
+              `;
+            }
+          }
+
+          // 2b. Render Active Staff
+          const activeContainer = document.getElementById('active-users-container');
+          if (activeContainer) {
+            if (activeUsers.length === 0) {
+              activeContainer.innerHTML = '<p style="padding: 12px; color: var(--text-muted);">No active staff accounts found.</p>';
+            } else {
+              let activeRows = '';
+              activeUsers.forEach(u => {
+                const isSelf = u.id === this.currentUser.id;
+                const statusBadge = u.password_reset_required
+                  ? '<span class="tag-na" style="background: var(--warning-color); color: white;">Temporary (Reset Required)</span>'
+                  : '<span class="tag-positive">Active</span>';
+
+                const roleSelect = `
+                  <select onchange="app.changeUserRole(${u.id}, this.value, true)" ${isSelf ? 'disabled' : ''} style="padding: 4px 8px; border-radius: 4px; border: 1px solid var(--border-color); font-size: 0.85rem;">
+                    <option value="technician" ${u.role === 'technician' ? 'selected' : ''}>Technician</option>
+                    <option value="Laboratory Technologist" ${u.role === 'Laboratory Technologist' ? 'selected' : ''}>Laboratory Technologist</option>
+                    <option value="admin" ${u.role === 'admin' ? 'selected' : ''}>Administrator</option>
+                    <option value="superadmin" ${u.role === 'superadmin' ? 'selected' : ''}>Super Administrator</option>
+                  </select>
+                `;
+
+                const deactivateBtn = !isSelf
+                  ? `<button class="btn btn-secondary" style="padding: 4px 8px; font-size: 0.8rem; color: var(--danger-color); border-color: var(--danger-color);" onclick="app.deactivateUser(${u.id}, '${this.escape(u.role)}')">Deactivate</button>`
+                  : '';
+
+                activeRows += `
+                  <tr>
+                    <td><strong>${this.escape(u.full_name)}</strong> ${isSelf ? '<small style="color: var(--primary-color); font-weight: 600;">(You)</small>' : ''}</td>
+                    <td><code>${this.escape(u.username)}</code></td>
+                    <td>${roleSelect}</td>
+                    <td>${statusBadge}</td>
+                    <td>
+                      <div style="display: flex; gap: 6px; align-items: center;">
+                        <button class="btn btn-secondary" style="padding: 4px 10px; font-size: 0.8rem;" onclick="app.promptResetPassword(${u.id}, '${this.escape(u.username)}', '${this.escape(u.role)}')">Reset Password</button>
+                        ${deactivateBtn}
+                      </div>
+                    </td>
+                  </tr>
+                `;
+              });
+
+              activeContainer.innerHTML = `
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>Full Name</th>
+                      <th>Username</th>
+                      <th>Role</th>
+                      <th>Status</th>
+                      <th style="width: 220px;">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${activeRows}
+                  </tbody>
+                </table>
+              `;
+            }
+          }
+        }
+      }
     } catch (e) {
       console.error('Config loading error:', e);
     }
+  },
+
+  async approveUser(userId, role) {
+    await this.saveUserUpdate(userId, { role: role || 'technician', is_active: true });
+    this.showToast('User registration approved successfully!', 'success');
+  },
+
+  async rejectUser(userId, username) {
+    if (!confirm(`Are you sure you want to reject and delete the registration for '${username}'?`)) return;
+    try {
+      const res = await fetch(`/api/auth/users/${userId}`, { method: 'DELETE' });
+      if (res.ok) {
+        this.showToast(`Registration for '${username}' rejected and removed.`, 'success');
+        await this.loadConfigData();
+      } else {
+        const err = await res.json();
+        this.showToast(err.detail || 'Failed to reject registration.', 'error');
+      }
+    } catch (e) {
+      this.showToast('Connection error rejecting registration.', 'error');
+    }
+  },
+
+  async deactivateUser(userId, role) {
+    if (!confirm('Are you sure you want to deactivate this account?')) return;
+    await this.saveUserUpdate(userId, { role: role, is_active: false });
+    this.showToast('User account deactivated.', 'success');
+  },
+
+  async changeUserRole(userId, newRole, isActive) {
+    await this.saveUserUpdate(userId, { role: newRole, is_active: isActive });
+    this.showToast('Role updated successfully.', 'success');
+  },
+
+  async promptResetPassword(userId, username, role) {
+    const tempPw = prompt(`Enter a new temporary password for user '${username}' (minimum 4 characters):`);
+    if (tempPw === null) return; // user clicked Cancel
+    if (tempPw.trim().length < 4) {
+      this.showToast('Password must be at least 4 characters long.', 'error');
+      return;
+    }
+    await this.saveUserUpdate(userId, { role: role, is_active: true, password: tempPw.trim() });
+    this.showToast(`Password reset for '${username}'. User will be required to change it on next login.`, 'success');
   },
 
   async saveUserUpdate(userId, updateBody) {
@@ -1417,7 +1524,6 @@ const app = {
         body: JSON.stringify(updateBody)
       });
       if (res.ok) {
-        this.showToast('Account updated successfully.', 'success');
         if (userId === this.currentUser.id) {
           await this.checkAuth();
         } else {
@@ -1432,22 +1538,49 @@ const app = {
     }
   },
 
-  async changeUserStatus(userId, role, isActive) {
-    await this.saveUserUpdate(userId, { role, is_active: isActive });
-  },
+  async showAddTestModal() {
+    const name = prompt('Enter Test Name:');
+    if (!name) return;
+    const secStr = prompt('Enter Section ID (1-8):', '1');
+    if (!secStr) return;
+    const isTracked = confirm('Enable Surveillance Tracking (Positives) for this test?');
 
-  async changeUserRole(userId, newRole, isActive) {
-    await this.saveUserUpdate(userId, { role: newRole, is_active: isActive });
-  },
-
-  async resetUserPassword(userId, role, isActive) {
-    const pwInput = document.getElementById(`pw-reset-${userId}`);
-    if (!pwInput || !pwInput.value) {
-      this.showToast('Please enter a new password.', 'error');
-      return;
+    try {
+      const res = await fetch('/api/config/tests', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: name.trim(),
+          section_id: parseInt(secStr, 10),
+          is_tracked: isTracked,
+          sort_order: 0
+        })
+      });
+      if (res.ok) {
+        this.showToast('Test added successfully!', 'success');
+        this.loadConfigData();
+      } else {
+        const err = await res.json();
+        this.showToast(err.detail || 'Failed to add test.', 'error');
+      }
+    } catch (e) {
+      this.showToast('Connection error.', 'error');
     }
-    await this.saveUserUpdate(userId, { role, is_active: isActive, password: pwInput.value });
-    pwInput.value = '';
+  },
+
+  async deleteTest(testId) {
+    if (!confirm('Are you sure you want to deactivate/delete this test from the catalog?')) return;
+    try {
+      const res = await fetch(`/api/config/tests/${testId}`, { method: 'DELETE' });
+      if (res.ok) {
+        this.showToast('Test removed from catalog.', 'success');
+        this.loadConfigData();
+      } else {
+        this.showToast('Failed to delete test.', 'error');
+      }
+    } catch (e) {
+      this.showToast('Connection error.', 'error');
+    }
   },
 
   // Audit Log View
@@ -1455,7 +1588,7 @@ const app = {
     container.innerHTML = `
       <div class="card">
         <div class="card-header">
-          <span class="card-title">🛡️ System Audit Trail</span>
+          <span class="card-title">${this.icon('shield-check')} System Audit Trail</span>
         </div>
         <div id="audit-table-container">
           <p>Loading audit log...</p>

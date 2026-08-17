@@ -102,6 +102,49 @@
     </div>
   </div>
 
+  <!-- Reset Password Modal (Mandatory Temporary Password Change) -->
+  <div class="modal-overlay" id="reset-password-modal" style="display: none;">
+    <div class="modal-content">
+      <div id="reset-password-form-container">
+        <div style="text-align: center; margin-bottom: 20px;">
+          <h2 style="color: var(--primary-color);">Change Temporary Password</h2>
+          <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 4px;">An administrator has reset your password. You must set a new password to proceed.</p>
+        </div>
+        <form id="reset-password-form" onsubmit="app.handleChangePassword(event)">
+          <div class="form-group" style="margin-bottom: 16px;">
+            <label for="reset-old-password">Current / Temporary Password</label>
+            <div style="position: relative; display: flex; align-items: center; width: 100%;">
+              <input type="password" id="reset-old-password" required placeholder="Enter current temporary password" style="padding-right: 40px; width: 100%;">
+              <button type="button" onclick="app.togglePasswordVisibility('reset-old-password')" style="position: absolute; right: 12px; background: none; border: none; cursor: pointer; color: var(--text-muted); padding: 0; display: flex; align-items: center;">
+                <svg class="lucide" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0z"/><circle cx="12" cy="12" r="3"/></svg>
+              </button>
+            </div>
+          </div>
+          <div class="form-group" style="margin-bottom: 16px;">
+            <label for="reset-new-password">New Password</label>
+            <div style="position: relative; display: flex; align-items: center; width: 100%;">
+              <input type="password" id="reset-new-password" required placeholder="Enter new password (min 4 chars)" style="padding-right: 40px; width: 100%;">
+              <button type="button" onclick="app.togglePasswordVisibility('reset-new-password')" style="position: absolute; right: 12px; background: none; border: none; cursor: pointer; color: var(--text-muted); padding: 0; display: flex; align-items: center;">
+                <svg class="lucide" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0z"/><circle cx="12" cy="12" r="3"/></svg>
+              </button>
+            </div>
+          </div>
+          <div class="form-group" style="margin-bottom: 24px;">
+            <label for="reset-confirm-password">Confirm New Password</label>
+            <div style="position: relative; display: flex; align-items: center; width: 100%;">
+              <input type="password" id="reset-confirm-password" required placeholder="Confirm new password" style="padding-right: 40px; width: 100%;">
+              <button type="button" onclick="app.togglePasswordVisibility('reset-confirm-password')" style="position: absolute; right: 12px; background: none; border: none; cursor: pointer; color: var(--text-muted); padding: 0; display: flex; align-items: center;">
+                <svg class="lucide" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0z"/><circle cx="12" cy="12" r="3"/></svg>
+              </button>
+            </div>
+          </div>
+          <div id="reset-password-error" style="color: var(--danger-color); font-size: 0.85rem; margin-bottom: 16px; display: none;"></div>
+          <button type="submit" class="btn btn-primary" style="width: 100%; padding: 10px;">Update Password</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
   <!-- App Footer -->
   <footer class="app-footer">
     <span id="footer-text">Ahmadiyya Muslim Hospital — Laboratory Department, Mbale, Uganda</span>
