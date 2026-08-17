@@ -1,6 +1,6 @@
 const app = {
   currentUser: null,
-  currentView: 'daily-log',
+  currentView: 'clients',
   theme: null,
   inactivityTimer: null,
   inactivityTimeout: 15 * 60 * 1000, // 15 minutes in milliseconds
@@ -112,7 +112,7 @@ const app = {
         if (data.status === 'reset_required' || (data.user && data.user.password_reset_required)) {
           this.showResetPasswordModal();
         } else {
-          this.navigate('daily-log');
+          this.navigate('clients');
         }
       } else {
         const err = await res.json();
@@ -185,7 +185,7 @@ const app = {
         document.getElementById('reset-password-modal').style.display = 'none';
         document.getElementById('reset-password-form').reset();
         this.showToast('Password changed successfully!', 'success');
-        this.navigate('daily-log');
+        this.navigate('clients');
       } else {
         const err = await res.json();
         errDiv.textContent = err.detail || 'Failed to change password.';
@@ -372,7 +372,7 @@ const app = {
       tab.classList.remove('active');
     });
 
-    const activeBtn = Array.from(document.querySelectorAll('.nav-tab')).find(b => b.textContent.toLowerCase().includes(viewName.replace('-', '')));
+    const activeBtn = Array.from(document.querySelectorAll('.nav-tab')).find(b => b.getAttribute('onclick').includes(viewName));
     if (activeBtn) activeBtn.classList.add('active');
 
     const container = document.getElementById('view-container');
@@ -837,7 +837,7 @@ const app = {
     container.innerHTML = `
       <div class="card">
         <div class="card-header">
-          <span class="card-title">${this.icon('file-text')} Test Reports & Diagnostic Test Entry</span>
+          <span class="card-title">${this.icon('file-text')} Lab Reports and Client Details</span>
           <div class="controls-row">
             <button class="btn btn-primary" onclick="app.showNewClientModal()">${this.icon('user-plus')} Register New Client</button>
           </div>
