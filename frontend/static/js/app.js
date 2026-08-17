@@ -479,12 +479,12 @@ const app = {
         sec.tests.forEach(t => {
           const posCell = t.is_tracked 
             ? `<input type="number" class="test-pos-input" data-test-id="${t.test_id}" min="0" value="${t.positive !== null ? t.positive : ''}" oninput="app.updateAuditCheck()">`
-            : `<span class="tag-na">N/A</span>`;
+            : `N/A`;
 
           rowsHtml += `
             <tr>
               <td><strong>${this.escape(t.test_name)}</strong></td>
-              <td>${t.is_tracked ? '<span class="tag-positive">Tracked</span>' : '<span style="color:#94A3B8;">Standard</span>'}</td>
+              <td>${t.is_tracked ? 'Tracked' : 'Standard'}</td>
               <td style="text-align: right;">
                 <input type="number" class="test-done-input" data-test-id="${t.test_id}" min="0" value="${t.done || ''}" oninput="app.updateAuditCheck()">
               </td>
@@ -735,7 +735,7 @@ const app = {
             <tr>
               <td><strong>${this.escape(t.test_name)}</strong></td>
               <td style="text-align: right;">${t.done}</td>
-              <td style="text-align: center;">${t.is_tracked ? (t.positive !== null ? t.positive : 0) : '<span class="tag-na">N/A</span>'}</td>
+              <td style="text-align: center;">${t.is_tracked ? (t.positive !== null ? t.positive : 0) : 'N/A'}</td>
               <td style="text-align: right;">${t.positivity_rate !== null ? t.positivity_rate + '%' : '—'}</td>
             </tr>
           `;
@@ -1327,7 +1327,7 @@ const app = {
             <tr>
               <td><strong>${this.escape(t.name)}</strong></td>
               <td>Section ${t.section_id}</td>
-              <td>${t.is_tracked ? '<span class="tag-positive">Tracked (Positive Checked)</span>' : '<span class="tag-na">Standard (Done Only)</span>'}</td>
+              <td>${t.is_tracked ? 'Tracked (Positive Checked)' : 'Standard (Done Only)'}</td>
               <td>
                 <button class="btn btn-secondary" style="padding: 2px 8px; font-size: 0.8rem;" onclick="app.deleteTest(${t.id})">Delete</button>
               </td>
@@ -1416,8 +1416,8 @@ const app = {
               activeUsers.forEach(u => {
                 const isSelf = u.id === this.currentUser.id;
                 const statusBadge = u.password_reset_required
-                  ? '<span class="tag-na" style="background: var(--warning-color); color: white;">Temporary (Reset Required)</span>'
-                  : '<span class="tag-positive">Active</span>';
+                  ? 'Temporary (Reset Required)'
+                  : 'Active';
 
                 const roleSelect = `
                   <select onchange="app.changeUserRole(${u.id}, this.value, true)" ${isSelf ? 'disabled' : ''} style="padding: 4px 8px; border-radius: 4px; border: 1px solid var(--border-color); font-size: 0.85rem;">

@@ -134,6 +134,10 @@ Admins can easily re-theme the entire application without touching code:
 1. Replace `assets/branding/logo.png` with a new facility logo.
 2. Edit `assets/branding/theme.json` to update the facility name and inject custom CSS variables (Primary `#0B5FA5`, Accent `#2E8B57`).
 
+## Developer Guidelines
+
+For developers contributing to this project, please strictly adhere to our [Best Practices](docs/BEST_PRACTICES.md) which outline UI/UX constraints and coding standards.
+
 ---
 
 ## License

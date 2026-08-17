@@ -239,23 +239,7 @@ input:focus, select:focus {
   text-align: right;
 }
 
-.tag-na {
-  background-color: #E2E8F0;
-  color: #64748B;
-  padding: 2px 8px;
-  border-radius: 4px;
-  font-size: 0.8rem;
-  font-weight: 600;
-}
 
-.tag-positive {
-  background-color: #FEE2E2;
-  color: #991B1B;
-  padding: 2px 8px;
-  border-radius: 4px;
-  font-size: 0.8rem;
-  font-weight: 600;
-}
 
 /* Today Check Panel */
 .audit-check-panel {
