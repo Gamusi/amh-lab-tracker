@@ -1,7 +1,8 @@
 import datetime, sqlite3, logging
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from ..database import get_db
-from ..schemas import LoginRequest, UserCreate, UserRegister
+from typing import Optional
+from ..schemas import LoginRequest, UserCreate, UserRegister, UserUpdate
 from ..auth import verify_password, hash_password, create_session, get_current_user, require_admin
 
 logger = logging.getLogger("amh_auth")
@@ -28,7 +29,6 @@ def login(req: LoginRequest, response: Response, conn: sqlite3.Connection = Depe
         key="amh_session",
         value=token,
         httponly=True,
-        max_age=15 * 60,  # 15 minutes session
         samesite="lax"
     )
     
@@ -101,11 +101,63 @@ def register(req: UserRegister, conn: sqlite3.Connection = Depends(get_db)):
         logger.warning(f"Registration failed: username '{req.username}' already exists")
         raise HTTPException(status_code=400, detail="Username already exists")
     
+    # First-run bootstrap check: if no users exist in the DB, make this first user an active admin
+    cur.execute("SELECT COUNT(*) as count FROM users")
+    count = cur.fetchone()["count"]
+    
+    if count == 0:
+        role = "admin"
+        is_active = 1
+        logger.info(f"First-run bootstrap: promoting first user '{req.username}' to active admin")
+    else:
+        role = "technician"
+        is_active = 0
+        logger.info(f"Standard registration: user '{req.username}' registered as pending technician")
+        
     cur.execute(
-        "INSERT INTO users (username, full_name, password_hash, role) VALUES (?, ?, ?, 'technician')",
-        (req.username, req.full_name, hash_password(req.password))
+        "INSERT INTO users (username, full_name, password_hash, role, is_active) VALUES (?, ?, ?, ?, ?)",
+        (req.username, req.full_name, hash_password(req.password), role, is_active)
     )
     uid = cur.lastrowid
     conn.commit()
-    logger.info(f"User registered successfully: '{req.username}' with ID {uid}")
-    return {"status": "registered", "user_id": uid}
+    
+    # Audit log the user creation
+    # If this is first admin, audit log under their own ID, else under user ID 0 (system registration)
+    actor_id = uid if role == "admin" else None
+    cur.execute("INSERT INTO audit_log (user_id, action, detail) VALUES (?, ?, ?)",
+                (actor_id, "register", f"User {req.username} self-registered as {role} (Active: {is_active})"))
+    conn.commit()
+    
+    logger.info(f"User registered successfully: '{req.username}' with ID {uid} (Role: {role}, Active: {is_active})")
+    return {"status": "registered", "user_id": uid, "is_active": bool(is_active)}
+
+@router.put("/users/{user_id}")
+def update_user(user_id: int, req: UserUpdate, admin_user: dict = Depends(require_admin), conn: sqlite3.Connection = Depends(get_db)):
+    logger.info(f"Admin '{admin_user['username']}' is updating user ID {user_id}: role={req.role}, active={req.is_active}")
+    
+    if user_id == admin_user["id"] and (req.role != "admin" or not req.is_active):
+        raise HTTPException(status_code=400, detail="Administrators cannot deactivate or demote themselves to avoid lockouts.")
+        
+    cur = conn.cursor()
+    cur.execute("SELECT id FROM users WHERE id = ?", (user_id,))
+    if not cur.fetchone():
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    if req.password:
+        cur.execute(
+            "UPDATE users SET role = ?, is_active = ?, password_hash = ? WHERE id = ?",
+            (req.role, 1 if req.is_active else 0, hash_password(req.password), user_id)
+        )
+    else:
+        cur.execute(
+            "UPDATE users SET role = ?, is_active = ? WHERE id = ?",
+            (req.role, 1 if req.is_active else 0, user_id)
+        )
+    conn.commit()
+    
+    cur.execute("INSERT INTO audit_log (user_id, action, detail) VALUES (?, ?, ?)",
+                (admin_user["id"], "update_user", f"Updated user ID {user_id}: role={req.role}, active={req.is_active}"))
+    conn.commit()
+    
+    logger.info(f"User ID {user_id} updated successfully by admin '{admin_user['username']}'")
+    return {"status": "updated"}

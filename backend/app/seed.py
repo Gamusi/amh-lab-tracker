@@ -14,13 +14,13 @@ def seed_database():
     cur.execute("""
         INSERT INTO users (full_name, username, password_hash, role)
         VALUES (?, ?, ?, ?)
-        ON CONFLICT(username) DO UPDATE SET password_hash = excluded.password_hash
+        ON CONFLICT(username) DO NOTHING
     """, ("Laboratory Administrator", "admin", hash_password("amh_admin2026"), "admin"))
 
     cur.execute("""
         INSERT INTO users (full_name, username, password_hash, role)
         VALUES (?, ?, ?, ?)
-        ON CONFLICT(username) DO UPDATE SET password_hash = excluded.password_hash
+        ON CONFLICT(username) DO NOTHING
     """, ("Lab Technician", "tech1", hash_password("amh_tech2026"), "technician"))
 
     conn.commit()

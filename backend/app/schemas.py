@@ -94,3 +94,8 @@ class UserRegister(BaseModel):
     username: str
     full_name: str
     password: str
+
+class UserUpdate(BaseModel):
+    role: str
+    is_active: bool
+    password: Optional[str] = None

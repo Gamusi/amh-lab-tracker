@@ -74,6 +74,7 @@ const app = {
   showLogin() {
     this.currentUser = null;
     this.stopInactivityTimer();
+    this.cleanseDOM();
     document.getElementById('app-nav').style.display = 'none';
     document.getElementById('user-nav').innerHTML = '';
     document.getElementById('login-modal').style.display = 'flex';
@@ -153,12 +154,17 @@ const app = {
       });
 
       if (res.ok) {
-        successDiv.textContent = 'Account registered successfully! Redirecting...';
+        const data = await res.json();
+        if (data.is_active) {
+          successDiv.textContent = 'Super Administrator account registered successfully! Redirecting...';
+        } else {
+          successDiv.textContent = 'Registration submitted! Access is pending administrator approval.';
+        }
         successDiv.style.display = 'block';
         document.getElementById('register-form').reset();
         setTimeout(() => {
           this.showLoginForm();
-        }, 1500);
+        }, 3000);
       } else {
         const err = await res.json();
         errDiv.textContent = err.detail || 'Registration failed';
@@ -207,6 +213,49 @@ const app = {
       clearTimeout(this.inactivityTimer);
       this.inactivityTimer = null;
     }
+  },
+
+  togglePasswordVisibility(inputId) {
+    const input = document.getElementById(inputId);
+    if (!input) return;
+    const type = input.getAttribute('type') === 'password' ? 'text' : 'password';
+    input.setAttribute('type', type);
+    
+    const btn = input.nextElementSibling;
+    if (btn) {
+      if (type === 'text') {
+        btn.innerHTML = `<svg class="lucide" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.52 13.52 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><line x1="2" x2="22" y1="2" y2="22"/></svg>`;
+      } else {
+        btn.innerHTML = `<svg class="lucide" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0z"/><circle cx="12" cy="12" r="3"/></svg>`;
+      }
+    }
+  },
+
+  cleanseDOM() {
+    // Reset all password input types back to password
+    ['login-password', 'register-password'].forEach(id => {
+      const input = document.getElementById(id);
+      if (input) {
+        input.setAttribute('type', 'password');
+        const btn = input.nextElementSibling;
+        if (btn) {
+          btn.innerHTML = `<svg class="lucide" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0z"/><circle cx="12" cy="12" r="3"/></svg>`;
+        }
+      }
+    });
+
+    // Reset all forms in modal/app
+    document.querySelectorAll('form').forEach(form => form.reset());
+
+    // Reset dynamic view container content to default placeholder
+    const container = document.getElementById('view-container');
+    if (container) {
+      container.innerHTML = '<p class="text-muted" style="text-align: center; padding: 40px;">Session inactive. Please sign in.</p>';
+    }
+
+    // Reset state caches to prevent data leakage between technician shifts
+    this.currentClient = null;
+    this.currentOrder = null;
   },
 
   renderUserNav() {
@@ -766,13 +815,22 @@ const app = {
   // Configuration View
   async renderConfig(container) {
     container.innerHTML = `
-      <div class="card">
+      <div class="card" style="margin-bottom: 24px;">
         <div class="card-header">
           <span class="card-title">${this.icon('settings')} Test Catalog & Section Configuration</span>
           <button class="btn btn-primary" onclick="app.showAddTestModal()">${this.icon('plus')} Add New Test</button>
         </div>
         <div id="config-table-container">
           <p>Loading configuration...</p>
+        </div>
+      </div>
+
+      <div class="card" id="user-management-card" style="display: none;">
+        <div class="card-header">
+          <span class="card-title">${this.icon('users') || '👥'} Lab Staff Accounts & Approvals</span>
+        </div>
+        <div id="users-table-container">
+          <p>Loading accounts...</p>
         </div>
       </div>
     `;
@@ -1246,60 +1304,150 @@ const app = {
     }
   },
 
-  // Configuration View
-  async renderConfig(container) {
-    container.innerHTML = `
-      <div class="card">
-        <div class="card-header">
-          <span class="card-title">⚙️ Test Catalog & Section Configuration</span>
-          <button class="btn btn-primary" onclick="app.showAddTestModal()">+ Add New Test</button>
-        </div>
-        <div id="config-table-container">
-          <p>Loading configuration...</p>
-        </div>
-      </div>
-    `;
-    await this.loadConfigData();
-  },
-
   async loadConfigData() {
     try {
+      // 1. Load test catalog
       const res = await fetch('/api/config/tests');
-      if (!res.ok) return;
-      const tests = await res.json();
-
-      let rows = '';
-      tests.forEach(t => {
-        rows += `
-          <tr>
-            <td><strong>${this.escape(t.name)}</strong></td>
-            <td>Section ${t.section_id}</td>
-            <td>${t.is_tracked ? '<span class="tag-positive">Tracked (Positive Checked)</span>' : '<span class="tag-na">Standard (Done Only)</span>'}</td>
-            <td>
-              <button class="btn btn-secondary" style="padding: 2px 8px; font-size: 0.8rem;" onclick="app.deleteTest(${t.id})">Delete</button>
-            </td>
-          </tr>
-        `;
-      });
-
-      document.getElementById('config-table-container').innerHTML = `
-        <table class="data-table">
-          <thead>
+      if (res.ok) {
+        const tests = await res.json();
+        let rows = '';
+        tests.forEach(t => {
+          rows += `
             <tr>
-              <th>Test Name</th>
-              <th>Section ID</th>
-              <th>Surveillance Tracking</th>
-              <th>Actions</th>
+              <td><strong>${this.escape(t.name)}</strong></td>
+              <td>Section ${t.section_id}</td>
+              <td>${t.is_tracked ? '<span class="tag-positive">Tracked (Positive Checked)</span>' : '<span class="tag-na">Standard (Done Only)</span>'}</td>
+              <td>
+                <button class="btn btn-secondary" style="padding: 2px 8px; font-size: 0.8rem;" onclick="app.deleteTest(${t.id})">Delete</button>
+              </td>
             </tr>
-          </thead>
-          <tbody>
-            ${rows}
-          </tbody>
-        </table>
-      `;
+          `;
+        });
+        document.getElementById('config-table-container').innerHTML = `
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Test Name</th>
+                <th>Section ID</th>
+                <th>Surveillance Tracking</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rows}
+            </tbody>
+          </table>
+        `;
+      }
+
+      // 2. Load user management for admin
+      if (this.currentUser && this.currentUser.role === 'admin') {
+        const managementCard = document.getElementById('user-management-card');
+        if (managementCard) managementCard.style.display = 'block';
+        
+        const userRes = await fetch('/api/auth/users');
+        if (userRes.ok) {
+          const users = await userRes.json();
+          let userRows = '';
+          users.forEach(u => {
+            const isSelf = u.id === this.currentUser.id;
+            const statusBadge = u.is_active 
+              ? '<span class="tag-positive">Active</span>' 
+              : '<span class="tag-na" style="background: var(--warning-color); color: white;">Pending Approval</span>';
+            
+            const actionBtn = u.is_active
+              ? `<button class="btn btn-secondary" style="padding: 2px 8px; font-size: 0.8rem; background: var(--danger-color); color: white; border: none;" ${isSelf ? 'disabled' : ''} onclick="app.changeUserStatus(${u.id}, '${u.role}', false)">Deactivate</button>`
+              : `<button class="btn btn-primary" style="padding: 2px 8px; font-size: 0.8rem; background: var(--success-color); color: white; border: none;" onclick="app.changeUserStatus(${u.id}, '${u.role}', true)">Approve</button>`;
+
+            const roleSelect = `
+              <select onchange="app.changeUserRole(${u.id}, this.value, ${u.is_active})" ${isSelf ? 'disabled' : ''} style="padding: 4px; border-radius: 4px; border: 1px solid var(--border-color); font-size: 0.85rem;">
+                <option value="technician" ${u.role === 'technician' ? 'selected' : ''}>Technician</option>
+                <option value="Laboratory Technologist" ${u.role === 'Laboratory Technologist' ? 'selected' : ''}>Laboratory Technologist</option>
+                <option value="admin" ${u.role === 'admin' ? 'selected' : ''}>Administrator</option>
+              </select>
+            `;
+
+            userRows += `
+              <tr>
+                <td><strong>${this.escape(u.full_name)}</strong></td>
+                <td><code>${this.escape(u.username)}</code></td>
+                <td>${roleSelect}</td>
+                <td>${statusBadge}</td>
+                <td>
+                  <div style="display: flex; gap: 8px; align-items: center;">
+                    ${actionBtn}
+                    <div style="display: flex; gap: 4px; align-items: center;">
+                      <input type="password" id="pw-reset-${u.id}" placeholder="Reset password" style="padding: 2px 6px; font-size: 0.8rem; width: 110px; margin: 0; box-sizing: border-box; height: 26px;">
+                      <button class="btn btn-secondary" style="padding: 2px 8px; font-size: 0.8rem; height: 26px;" onclick="app.resetUserPassword(${u.id}, '${u.role}', ${u.is_active})">Set</button>
+                    </div>
+                  </div>
+                </td>
+              </tr>
+            `;
+          });
+
+          document.getElementById('users-table-container').innerHTML = `
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Full Name</th>
+                  <th>Username</th>
+                  <th>Role</th>
+                  <th>Status</th>
+                  <th>Actions & Password Reset</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${userRows}
+              </tbody>
+            </table>
+          `;
+        }
+      }
     } catch (e) {
-      console.error('Config error:', e);
+      console.error('Config loading error:', e);
     }
+  },
+
+  async saveUserUpdate(userId, updateBody) {
+    try {
+      const res = await fetch(`/api/auth/users/${userId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updateBody)
+      });
+      if (res.ok) {
+        this.showToast('Account updated successfully.', 'success');
+        if (userId === this.currentUser.id) {
+          await this.checkAuth();
+        } else {
+          await this.loadConfigData();
+        }
+      } else {
+        const err = await res.json();
+        this.showToast(err.detail || 'Failed to update user account.', 'error');
+      }
+    } catch (e) {
+      this.showToast('Connection error updating account.', 'error');
+    }
+  },
+
+  async changeUserStatus(userId, role, isActive) {
+    await this.saveUserUpdate(userId, { role, is_active: isActive });
+  },
+
+  async changeUserRole(userId, newRole, isActive) {
+    await this.saveUserUpdate(userId, { role: newRole, is_active: isActive });
+  },
+
+  async resetUserPassword(userId, role, isActive) {
+    const pwInput = document.getElementById(`pw-reset-${userId}`);
+    if (!pwInput || !pwInput.value) {
+      this.showToast('Please enter a new password.', 'error');
+      return;
+    }
+    await this.saveUserUpdate(userId, { role, is_active: isActive, password: pwInput.value });
+    pwInput.value = '';
   },
 
   // Audit Log View

@@ -39,7 +39,7 @@ def get_current_user(request: Request, conn: sqlite3.Connection = Depends(get_db
     now_str = datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
     cur = conn.cursor()
     cur.execute("""
-        SELECT u.id, u.username, u.full_name, u.role, u.is_active
+        SELECT u.id, u.username, u.full_name, u.role, u.is_active, s.expires_at
         FROM user_sessions s
         JOIN users u ON s.user_id = u.id
         WHERE s.token = ? AND s.expires_at > ?
@@ -52,10 +52,13 @@ def get_current_user(request: Request, conn: sqlite3.Connection = Depends(get_db
     if not row["is_active"]:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Account is disabled")
     
-    # Sliding Expiration: extend the session by another 15 minutes
-    new_expires_at = (datetime.datetime.utcnow() + datetime.timedelta(minutes=15)).strftime("%Y-%m-%d %H:%M:%S")
-    conn.execute("UPDATE user_sessions SET expires_at = ? WHERE token = ?", (new_expires_at, token))
-    conn.commit()
+    # Throttle DB writes: only update expires_at if less than 10 minutes (600 seconds) remain on current session
+    expires_dt = datetime.datetime.strptime(row["expires_at"], "%Y-%m-%d %H:%M:%S")
+    time_remaining = (expires_dt - datetime.datetime.utcnow()).total_seconds()
+    if time_remaining < 600:
+        new_expires_at = (datetime.datetime.utcnow() + datetime.timedelta(minutes=15)).strftime("%Y-%m-%d %H:%M:%S")
+        conn.execute("UPDATE user_sessions SET expires_at = ? WHERE token = ?", (new_expires_at, token))
+        conn.commit()
     
     return User(
         id=row["id"],
