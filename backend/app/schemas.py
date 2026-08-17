@@ -13,6 +13,7 @@ class UserCreate(UserBase):
 class UserResponse(UserBase):
     id: int
     is_active: bool
+    password_reset_required: bool = False
     created_at: datetime.datetime
 
     class Config:
@@ -21,6 +22,10 @@ class UserResponse(UserBase):
 class LoginRequest(BaseModel):
     username: str
     password: str
+
+class ChangePasswordRequest(BaseModel):
+    old_password: str
+    new_password: str
 
 class SectionResponse(BaseModel):
     id: int

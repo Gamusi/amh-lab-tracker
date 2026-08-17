@@ -39,7 +39,7 @@ def get_current_user(request: Request, conn: sqlite3.Connection = Depends(get_db
     now_str = datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
     cur = conn.cursor()
     cur.execute("""
-        SELECT u.id, u.username, u.full_name, u.role, u.is_active, s.expires_at
+        SELECT u.id, u.username, u.full_name, u.role, u.is_active, u.password_reset_required, s.expires_at
         FROM user_sessions s
         JOIN users u ON s.user_id = u.id
         WHERE s.token = ? AND s.expires_at > ?
@@ -65,10 +65,16 @@ def get_current_user(request: Request, conn: sqlite3.Connection = Depends(get_db
         full_name=row["full_name"],
         username=row["username"],
         role=row["role"],
-        is_active=bool(row["is_active"])
+        is_active=bool(row["is_active"]),
+        password_reset_required=bool(row["password_reset_required"])
     )
 
 def require_admin(current_user: User = Depends(get_current_user)) -> User:
-    if current_user["role"] != "admin":
+    if current_user["role"] not in ("admin", "superadmin"):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin privileges required")
+    return current_user
+
+def require_superadmin(current_user: User = Depends(get_current_user)) -> User:
+    if current_user["role"] != "superadmin":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Super Admin privileges required")
     return current_user

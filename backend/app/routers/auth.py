@@ -2,8 +2,9 @@ import datetime, sqlite3, logging
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from ..database import get_db
 from typing import Optional
-from ..schemas import LoginRequest, UserCreate, UserRegister, UserUpdate
-from ..auth import verify_password, hash_password, create_session, get_current_user, require_admin
+from ..schemas import LoginRequest, UserCreate, UserRegister, UserUpdate, ChangePasswordRequest
+from ..auth import verify_password, hash_password, create_session, get_current_user, require_admin, require_superadmin
+from ..models import User
 
 logger = logging.getLogger("amh_auth")
 
@@ -13,7 +14,7 @@ router = APIRouter(prefix="/api/auth", tags=["Auth"])
 def login(req: LoginRequest, response: Response, conn: sqlite3.Connection = Depends(get_db)):
     logger.info(f"Login attempt for user: '{req.username}'")
     cur = conn.cursor()
-    cur.execute("SELECT id, username, full_name, password_hash, role, is_active FROM users WHERE username = ?", (req.username,))
+    cur.execute("SELECT id, username, full_name, password_hash, role, is_active, password_reset_required FROM users WHERE username = ?", (req.username,))
     user = cur.fetchone()
     
     if not user or not verify_password(req.password, user["password_hash"]):
@@ -21,8 +22,8 @@ def login(req: LoginRequest, response: Response, conn: sqlite3.Connection = Depe
         raise HTTPException(status_code=400, detail="Invalid username or password")
     
     if not user["is_active"]:
-        logger.warning(f"Failed login attempt: account '{req.username}' is disabled")
-        raise HTTPException(status_code=400, detail="Account is disabled")
+        logger.warning(f"Failed login attempt: account '{req.username}' is disabled or pending approval")
+        raise HTTPException(status_code=400, detail="Account is disabled or pending administrator approval")
     
     token = create_session(conn, user["id"])
     response.set_cookie(
@@ -36,19 +37,21 @@ def login(req: LoginRequest, response: Response, conn: sqlite3.Connection = Depe
     conn.commit()
     
     logger.info(f"Login successful: user '{req.username}' logged in successfully (Role: {user['role']})")
+    status_str = "reset_required" if user["password_reset_required"] else "success"
     return {
-        "status": "success",
+        "status": status_str,
         "token": token,
         "user": {
             "id": user["id"],
             "username": user["username"],
             "full_name": user["full_name"],
-            "role": user["role"]
+            "role": user["role"],
+            "password_reset_required": bool(user["password_reset_required"])
         }
     }
 
 @router.post("/logout")
-def logout(response: Response, current_user: dict = Depends(get_current_user), conn: sqlite3.Connection = Depends(get_db)):
+def logout(response: Response, current_user: User = Depends(get_current_user), conn: sqlite3.Connection = Depends(get_db)):
     response.delete_cookie("amh_session")
     conn.execute("INSERT INTO audit_log (user_id, action, detail) VALUES (?, ?, ?)", (current_user["id"], "logout", f"User {current_user['username']} logged out"))
     conn.commit()
@@ -56,24 +59,51 @@ def logout(response: Response, current_user: dict = Depends(get_current_user), c
     return {"status": "logged out"}
 
 @router.get("/me")
-def get_me(current_user: dict = Depends(get_current_user)):
+def get_me(current_user: User = Depends(get_current_user)):
     return {
         "id": current_user["id"],
         "username": current_user["username"],
         "full_name": current_user["full_name"],
-        "role": current_user["role"]
+        "role": current_user["role"],
+        "password_reset_required": bool(current_user["password_reset_required"])
     }
 
-@router.get("/users")
-def list_users(admin_user: dict = Depends(require_admin), conn: sqlite3.Connection = Depends(get_db)):
+@router.post("/change-password")
+def change_password(req: ChangePasswordRequest, current_user: User = Depends(get_current_user), conn: sqlite3.Connection = Depends(get_db)):
+    logger.info(f"Password change requested for user '{current_user['username']}'")
     cur = conn.cursor()
-    cur.execute("SELECT id, username, full_name, role, is_active, created_at FROM users")
+    cur.execute("SELECT id, username, password_hash FROM users WHERE id = ?", (current_user["id"],))
+    user = cur.fetchone()
+    
+    if not user or not verify_password(req.old_password, user["password_hash"]):
+        raise HTTPException(status_code=400, detail="Current password is incorrect")
+        
+    if not req.new_password or len(req.new_password.strip()) < 4:
+        raise HTTPException(status_code=400, detail="New password must be at least 4 characters")
+        
+    new_hash = hash_password(req.new_password)
+    cur.execute(
+        "UPDATE users SET password_hash = ?, password_reset_required = 0 WHERE id = ?",
+        (new_hash, current_user["id"])
+    )
+    cur.execute(
+        "INSERT INTO audit_log (user_id, action, detail) VALUES (?, ?, ?)",
+        (current_user["id"], "change_password", f"User {user['username']} changed their password")
+    )
+    conn.commit()
+    logger.info(f"Password changed successfully for user '{user['username']}'")
+    return {"status": "success", "message": "Password changed successfully"}
+
+@router.get("/users")
+def list_users(admin_user: User = Depends(require_superadmin), conn: sqlite3.Connection = Depends(get_db)):
+    cur = conn.cursor()
+    cur.execute("SELECT id, username, full_name, role, is_active, password_reset_required, created_at FROM users")
     users = cur.fetchall()
     return [dict(u) for u in users]
 
 @router.post("/users")
-def create_user(req: UserCreate, admin_user: dict = Depends(require_admin), conn: sqlite3.Connection = Depends(get_db)):
-    logger.info(f"Admin '{admin_user['username']}' is creating user: '{req.username}' (Role: {req.role})")
+def create_user(req: UserCreate, admin_user: User = Depends(require_superadmin), conn: sqlite3.Connection = Depends(get_db)):
+    logger.info(f"Superadmin '{admin_user['username']}' is creating user: '{req.username}' (Role: {req.role})")
     cur = conn.cursor()
     cur.execute("SELECT id FROM users WHERE username = ?", (req.username,))
     if cur.fetchone():
@@ -101,14 +131,14 @@ def register(req: UserRegister, conn: sqlite3.Connection = Depends(get_db)):
         logger.warning(f"Registration failed: username '{req.username}' already exists")
         raise HTTPException(status_code=400, detail="Username already exists")
     
-    # First-run bootstrap check: if no users exist in the DB, make this first user an active admin
+    # First-run bootstrap check: if no users exist in the DB, make this first user an active superadmin
     cur.execute("SELECT COUNT(*) as count FROM users")
     count = cur.fetchone()["count"]
     
     if count == 0:
-        role = "admin"
+        role = "superadmin"
         is_active = 1
-        logger.info(f"First-run bootstrap: promoting first user '{req.username}' to active admin")
+        logger.info(f"First-run bootstrap: promoting first user '{req.username}' to active superadmin")
     else:
         role = "technician"
         is_active = 0
@@ -122,8 +152,8 @@ def register(req: UserRegister, conn: sqlite3.Connection = Depends(get_db)):
     conn.commit()
     
     # Audit log the user creation
-    # If this is first admin, audit log under their own ID, else under user ID 0 (system registration)
-    actor_id = uid if role == "admin" else None
+    # If this is first superadmin, audit log under their own ID, else under user ID None (system registration)
+    actor_id = uid if role == "superadmin" else None
     cur.execute("INSERT INTO audit_log (user_id, action, detail) VALUES (?, ?, ?)",
                 (actor_id, "register", f"User {req.username} self-registered as {role} (Active: {is_active})"))
     conn.commit()
@@ -132,11 +162,11 @@ def register(req: UserRegister, conn: sqlite3.Connection = Depends(get_db)):
     return {"status": "registered", "user_id": uid, "is_active": bool(is_active)}
 
 @router.put("/users/{user_id}")
-def update_user(user_id: int, req: UserUpdate, admin_user: dict = Depends(require_admin), conn: sqlite3.Connection = Depends(get_db)):
-    logger.info(f"Admin '{admin_user['username']}' is updating user ID {user_id}: role={req.role}, active={req.is_active}")
+def update_user(user_id: int, req: UserUpdate, admin_user: User = Depends(require_superadmin), conn: sqlite3.Connection = Depends(get_db)):
+    logger.info(f"Superadmin '{admin_user['username']}' is updating user ID {user_id}: role={req.role}, active={req.is_active}")
     
-    if user_id == admin_user["id"] and (req.role != "admin" or not req.is_active):
-        raise HTTPException(status_code=400, detail="Administrators cannot deactivate or demote themselves to avoid lockouts.")
+    if user_id == admin_user["id"] and (req.role != "superadmin" or not req.is_active):
+        raise HTTPException(status_code=400, detail="Super Administrators cannot deactivate or demote themselves to avoid lockouts.")
         
     cur = conn.cursor()
     cur.execute("SELECT id FROM users WHERE id = ?", (user_id,))
@@ -145,7 +175,7 @@ def update_user(user_id: int, req: UserUpdate, admin_user: dict = Depends(requir
         
     if req.password:
         cur.execute(
-            "UPDATE users SET role = ?, is_active = ?, password_hash = ? WHERE id = ?",
+            "UPDATE users SET role = ?, is_active = ?, password_hash = ?, password_reset_required = 1 WHERE id = ?",
             (req.role, 1 if req.is_active else 0, hash_password(req.password), user_id)
         )
     else:
@@ -156,8 +186,30 @@ def update_user(user_id: int, req: UserUpdate, admin_user: dict = Depends(requir
     conn.commit()
     
     cur.execute("INSERT INTO audit_log (user_id, action, detail) VALUES (?, ?, ?)",
-                (admin_user["id"], "update_user", f"Updated user ID {user_id}: role={req.role}, active={req.is_active}"))
+                (admin_user["id"], "update_user", f"Updated user ID {user_id}: role={req.role}, active={req.is_active}, pw_reset={bool(req.password)}"))
     conn.commit()
     
-    logger.info(f"User ID {user_id} updated successfully by admin '{admin_user['username']}'")
+    logger.info(f"User ID {user_id} updated successfully by superadmin '{admin_user['username']}'")
     return {"status": "updated"}
+
+@router.delete("/users/{user_id}")
+def delete_user(user_id: int, admin_user: User = Depends(require_superadmin), conn: sqlite3.Connection = Depends(get_db)):
+    logger.info(f"Superadmin '{admin_user['username']}' is deleting user ID {user_id}")
+    
+    if user_id == admin_user["id"]:
+        raise HTTPException(status_code=400, detail="Super Administrators cannot delete their own account.")
+        
+    cur = conn.cursor()
+    cur.execute("SELECT id, username FROM users WHERE id = ?", (user_id,))
+    target_user = cur.fetchone()
+    if not target_user:
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    cur.execute("DELETE FROM user_sessions WHERE user_id = ?", (user_id,))
+    cur.execute("DELETE FROM users WHERE id = ?", (user_id,))
+    cur.execute("INSERT INTO audit_log (user_id, action, detail) VALUES (?, ?, ?)",
+                (admin_user["id"], "delete_user", f"Deleted user {target_user['username']} (ID {user_id})"))
+    conn.commit()
+    
+    logger.info(f"User ID {user_id} deleted successfully by superadmin '{admin_user['username']}'")
+    return {"status": "deleted"}
