@@ -10,20 +10,7 @@ def seed_database():
     conn.row_factory = sqlite3.Row
     cur = conn.cursor()
 
-    # 1. Default Users
-    cur.execute("""
-        INSERT INTO users (full_name, username, password_hash, role)
-        VALUES (?, ?, ?, ?)
-        ON CONFLICT(username) DO NOTHING
-    """, ("Laboratory Administrator", "admin", hash_password("amh_admin2026"), "admin"))
 
-    cur.execute("""
-        INSERT INTO users (full_name, username, password_hash, role)
-        VALUES (?, ?, ?, ?)
-        ON CONFLICT(username) DO NOTHING
-    """, ("Lab Technician", "tech1", hash_password("amh_tech2026"), "technician"))
-
-    conn.commit()
 
     # 2. Sections
     sections = ["Main", "Referrals", "Out-Reaches", "Self-Request"]
@@ -141,8 +128,9 @@ def seed_database():
     conn.commit()
 
     # 4. Seed Historical Daily Entries
-    cur.execute("SELECT id FROM users WHERE username = 'admin'")
-    admin_id = cur.fetchone()["id"]
+    cur.execute("SELECT id FROM users LIMIT 1")
+    user_row = cur.fetchone()
+    admin_id = user_row["id"] if user_row else None
 
     sample_dates = [
         ("2026-03-23", 146), ("2026-03-24", 50), ("2026-03-25", 16), ("2026-03-26", 41),
