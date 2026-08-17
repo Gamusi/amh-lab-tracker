@@ -129,7 +129,7 @@ python3 install.py
 
 While currently branded for Ahmadiyya Muslim Hospital, the system is designed to be highly portable for any Ugandan regional hospital or health center.
 
-Administrators can easily re-theme the entire application without touching code:
+Admins can easily re-theme the entire application without touching code:
 
 1. Replace `assets/branding/logo.png` with a new facility logo.
 2. Edit `assets/branding/theme.json` to update the facility name and inject custom CSS variables (Primary `#0B5FA5`, Accent `#2E8B57`).

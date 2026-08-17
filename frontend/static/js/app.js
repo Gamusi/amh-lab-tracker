@@ -233,9 +233,9 @@ const app = {
       if (res.ok) {
         const data = await res.json();
         if (data.is_active) {
-          successDiv.textContent = 'Super Administrator account registered successfully! Redirecting...';
+          successDiv.textContent = 'Super Admin account registered successfully! Redirecting...';
         } else {
-          successDiv.textContent = 'Registration submitted! Access is pending administrator approval.';
+          successDiv.textContent = 'Registration submitted! Access is pending Admin approval.';
         }
         successDiv.style.display = 'block';
         document.getElementById('register-form').reset();
@@ -349,8 +349,8 @@ const app = {
       tab.style.display = isPrivileged ? 'inline-block' : 'none';
     });
 
-    const roleLabel = this.currentUser.role === 'superadmin' ? 'Super Administrator'
-      : (this.currentUser.role === 'admin' ? 'Administrator'
+    const roleLabel = this.currentUser.role === 'superadmin' ? 'Super Admin'
+      : (this.currentUser.role === 'admin' ? 'Admin'
       : (this.currentUser.role === 'technologist' || this.currentUser.role === 'Laboratory Technologist' ? 'Laboratory Technologist'
       : 'Technician'));
 
@@ -1423,8 +1423,8 @@ const app = {
                   <select onchange="app.changeUserRole(${u.id}, this.value, true)" ${isSelf ? 'disabled' : ''} style="padding: 4px 8px; border-radius: 4px; border: 1px solid var(--border-color); font-size: 0.85rem;">
                     <option value="technician" ${u.role === 'technician' ? 'selected' : ''}>Technician</option>
                     <option value="Laboratory Technologist" ${u.role === 'Laboratory Technologist' ? 'selected' : ''}>Laboratory Technologist</option>
-                    <option value="admin" ${u.role === 'admin' ? 'selected' : ''}>Administrator</option>
-                    <option value="superadmin" ${u.role === 'superadmin' ? 'selected' : ''}>Super Administrator</option>
+                    <option value="admin" ${u.role === 'admin' ? 'selected' : ''}>Admin</option>
+                    <option value="superadmin" ${u.role === 'superadmin' ? 'selected' : ''}>Super Admin</option>
                   </select>
                 `;
 

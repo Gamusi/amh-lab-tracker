@@ -23,7 +23,7 @@ def login(req: LoginRequest, response: Response, conn: sqlite3.Connection = Depe
     
     if not user["is_active"]:
         logger.warning(f"Failed login attempt: account '{req.username}' is disabled or pending approval")
-        raise HTTPException(status_code=400, detail="Account is disabled or pending administrator approval")
+        raise HTTPException(status_code=400, detail="Account is disabled or pending admin approval")
     
     token = create_session(conn, user["id"])
     response.set_cookie(
@@ -166,7 +166,7 @@ def update_user(user_id: int, req: UserUpdate, admin_user: User = Depends(requir
     logger.info(f"Superadmin '{admin_user['username']}' is updating user ID {user_id}: role={req.role}, active={req.is_active}")
     
     if user_id == admin_user["id"] and (req.role != "superadmin" or not req.is_active):
-        raise HTTPException(status_code=400, detail="Super Administrators cannot deactivate or demote themselves to avoid lockouts.")
+        raise HTTPException(status_code=400, detail="Super Admins cannot deactivate or demote themselves to avoid lockouts.")
         
     cur = conn.cursor()
     cur.execute("SELECT id FROM users WHERE id = ?", (user_id,))
@@ -197,7 +197,7 @@ def delete_user(user_id: int, admin_user: User = Depends(require_superadmin), co
     logger.info(f"Superadmin '{admin_user['username']}' is deleting user ID {user_id}")
     
     if user_id == admin_user["id"]:
-        raise HTTPException(status_code=400, detail="Super Administrators cannot delete their own account.")
+        raise HTTPException(status_code=400, detail="Super Admins cannot delete their own account.")
         
     cur = conn.cursor()
     cur.execute("SELECT id, username FROM users WHERE id = ?", (user_id,))
