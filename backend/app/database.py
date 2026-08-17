@@ -60,7 +60,6 @@ SCHEMA_SQL = """
         test_id INTEGER NOT NULL REFERENCES tests(id),
         done INTEGER NOT NULL DEFAULT 0,
         positive INTEGER,
-        paper_register_tally INTEGER,
         entered_by_user_id INTEGER REFERENCES users(id),
         entered_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_by_user_id INTEGER REFERENCES users(id),
@@ -137,7 +136,6 @@ def init_db():
     migrations = [
         ("tests", "parent_rollup_id", "INTEGER REFERENCES tests(id)"),
         ("test_orders", "sample_id", "TEXT"),
-        ("daily_entries", "paper_register_tally", "INTEGER"),
         ("test_results", "parameter_id", "INTEGER REFERENCES test_parameters(id)"),
         ("users", "password_reset_required", "BOOLEAN NOT NULL DEFAULT 0")
     ]

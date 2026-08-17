@@ -103,20 +103,4 @@ def save_daily_log(req: DailyLogSaveRequest, conn: sqlite3.Connection = Depends(
 
     conn.commit()
 
-class VerifyShiftRequest(BaseModel):
-    entry_date: str
-    paper_register_tally: int
-    system_total: int
 
-@router.post("/verify")
-def verify_shift_tally(req: VerifyShiftRequest, conn: sqlite3.Connection = Depends(get_db), current_user: dict = Depends(get_current_user)):
-    cur = conn.cursor()
-    match_status = "MATCH" if req.paper_register_tally == req.system_total else "MISMATCH"
-    detail_msg = f"Shift verification for {req.entry_date}: Register Tally={req.paper_register_tally}, System Total={req.system_total} [{match_status}]"
-    
-    cur.execute(
-        "INSERT INTO audit_log (user_id, action, detail) VALUES (?, ?, ?)",
-        (current_user["id"], "verify_shift_tally", detail_msg)
-    )
-    conn.commit()
-    return {"status": "verified", "match": match_status, "detail": detail_msg}

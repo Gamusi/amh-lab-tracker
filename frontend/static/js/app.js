@@ -441,21 +441,7 @@ const app = {
           </div>
         </div>
 
-        <div class="audit-check-panel">
-          <div class="check-item">
-            <span class="label">System Total (Derived from Orders):</span>
-            <span class="val" id="sys-total-done">0</span>
-          </div>
-          <div class="check-item">
-            <label for="paper-register-input" style="font-weight:600; color:var(--text-muted);">Paper Register Total:</label>
-            <input type="number" id="paper-register-input" placeholder="Type register total" style="width: 140px; font-weight:700;" oninput="app.updateAuditCheck()">
-          </div>
-          <div class="check-item">
-            <span class="label">Register Check:</span>
-            <span class="val" id="audit-check-status">&mdash;</span>
-          </div>
-          <button class="btn btn-primary" onclick="app.submitShiftAudit()">${this.icon('save')} Verify Shift Audit</button>
-        </div>
+
 
         <div id="daily-sections-container">
           <p style="color: var(--text-muted);">Loading daily log...</p>
@@ -478,7 +464,7 @@ const app = {
         let rowsHtml = '';
         sec.tests.forEach(t => {
           const posCell = t.is_tracked 
-            ? `<input type="number" class="test-pos-input" data-test-id="${t.test_id}" min="0" value="${t.positive !== null ? t.positive : ''}" oninput="app.updateAuditCheck()">`
+            ? `<input type="number" class="test-pos-input" data-test-id="${t.test_id}" min="0" value="${t.positive !== null ? t.positive : ''}" oninput="app.updateSectionSubtotals()">`
             : `N/A`;
 
           rowsHtml += `
@@ -486,7 +472,7 @@ const app = {
               <td><strong>${this.escape(t.test_name)}</strong></td>
               <td>${t.is_tracked ? 'Tracked' : 'Standard'}</td>
               <td style="text-align: right;">
-                <input type="number" class="test-done-input" data-test-id="${t.test_id}" min="0" value="${t.done || ''}" oninput="app.updateAuditCheck()">
+                <input type="number" class="test-done-input" data-test-id="${t.test_id}" min="0" value="${t.done || ''}" oninput="app.updateSectionSubtotals()">
               </td>
               <td style="text-align: center;">${posCell}</td>
             </tr>
@@ -522,7 +508,7 @@ const app = {
         `;
       });
 
-      this.updateAuditCheck();
+      this.updateSectionSubtotals();
       this.setupKeyboardNavigation();
     } catch (e) {
       console.error('Error loading daily log:', e);
@@ -558,10 +544,8 @@ const app = {
     });
   },
 
-  updateAuditCheck() {
-    let sysDone = 0;
-
-    // Calculate overall system total and per-section subtotals
+  updateSectionSubtotals() {
+    // Calculate per-section subtotals
     document.querySelectorAll('table.data-table[data-section-id]').forEach(table => {
       const secId = table.getAttribute('data-section-id');
       let secDone = 0;
@@ -571,7 +555,6 @@ const app = {
         const v = parseInt(inp.value, 10);
         if (!isNaN(v) && v > 0) {
           secDone += v;
-          sysDone += v;
         }
       });
 
@@ -585,25 +568,6 @@ const app = {
       if (secDoneEl) secDoneEl.textContent = secDone;
       if (secPosEl) secPosEl.textContent = secPos;
     });
-
-    const sysTotalEl = document.getElementById('sys-total-done');
-    if (sysTotalEl) sysTotalEl.textContent = sysDone;
-
-    const paperVal = parseInt(document.getElementById('paper-register-input').value, 10);
-    const statusSpan = document.getElementById('audit-check-status');
-
-    if (statusSpan) {
-      if (isNaN(paperVal) || paperVal <= 0) {
-        statusSpan.textContent = '—';
-        statusSpan.className = 'val';
-      } else if (paperVal === sysDone) {
-        statusSpan.textContent = 'Match';
-        statusSpan.className = 'val status-match';
-      } else {
-        statusSpan.textContent = 'Mismatch';
-        statusSpan.className = 'val status-mismatch';
-      }
-    }
   },
 
   async saveDailyLogData() {
