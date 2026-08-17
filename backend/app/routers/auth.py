@@ -180,6 +180,10 @@ def update_user(user_id: int, req: UserUpdate, admin_user: User = Depends(requir
     if not target_user:
         raise HTTPException(status_code=404, detail="User not found")
         
+    # Prevent anyone from being promoted to superadmin
+    if target_user["role"] != "superadmin" and req.role == "superadmin":
+        raise HTTPException(status_code=403, detail="Cannot promote a user to Superadmin. Only one Superadmin is allowed.")
+        
     if admin_user["role"] == "admin" and (target_user["role"] == "superadmin" or req.role == "superadmin"):
         raise HTTPException(status_code=403, detail="Admins cannot modify or create Superadmin accounts.")
         

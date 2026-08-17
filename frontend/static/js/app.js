@@ -1392,11 +1392,13 @@ const app = {
                   ? 'Temporary (Reset Required)'
                   : 'Active';
 
+                const superAdminOption = u.role === 'superadmin' ? `<option value="superadmin" selected>Super Admin</option>` : '';
+
                 const roleSelect = `
                   <select id="role-select-${u.id}" onchange="app.changeUserFields(${u.id}, true)" ${!canEdit ? 'disabled' : ''} style="padding: 4px 8px; border-radius: 4px; border: 1px solid var(--border-color); font-size: 0.85rem;">
                     <option value="staff" ${u.role === 'staff' ? 'selected' : ''}>Staff</option>
                     <option value="admin" ${u.role === 'admin' ? 'selected' : ''}>Admin</option>
-                    <option value="superadmin" ${u.role === 'superadmin' ? 'selected' : ''} ${this.currentUser.role === 'admin' ? 'disabled' : ''}>Super Admin</option>
+                    ${superAdminOption}
                   </select>
                 `;
                 
