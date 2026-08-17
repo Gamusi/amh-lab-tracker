@@ -5,7 +5,8 @@ import datetime
 class UserBase(BaseModel):
     username: str
     full_name: str
-    role: str = "technician"
+    role: str = "staff"
+    cadre: Optional[str] = None
 
 class UserCreate(UserBase):
     password: str
@@ -99,8 +100,10 @@ class UserRegister(BaseModel):
     username: str
     full_name: str
     password: str
+    cadre: Optional[str] = None
 
 class UserUpdate(BaseModel):
     role: str
     is_active: bool
     password: Optional[str] = None
+    cadre: Optional[str] = None

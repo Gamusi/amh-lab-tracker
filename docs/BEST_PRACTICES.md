@@ -12,3 +12,11 @@ This document outlines the coding standards and design principles that all devel
 ## 2. General Guidelines
 
 *   *This document will be updated as the project evolves. Always refer back to this file for the latest coding and design standards.*
+
+## 3. Development Philosophy
+
+### Avoid Large Code Refactors
+Unless completely necessary and warranted, developers **must** avoid large code refactors. 
+
+### Small, Surgical Changes
+Always make small, targeted changes to implement new features, fix bugs, or modify an existing feature. Do not attempt a full rewrite of existing logic or UI components when a surgical insertion or removal will suffice.

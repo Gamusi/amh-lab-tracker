@@ -217,6 +217,7 @@ const app = {
     const fullname = document.getElementById('register-fullname').value;
     const username = document.getElementById('register-username').value;
     const password = document.getElementById('register-password').value;
+    const cadre = document.getElementById('register-cadre').value;
     const errDiv = document.getElementById('register-error');
     const successDiv = document.getElementById('register-success');
     
@@ -227,7 +228,7 @@ const app = {
       const res = await fetch('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ full_name: fullname, username: username, password: password })
+        body: JSON.stringify({ full_name: fullname, username: username, password: password, cadre: cadre })
       });
 
       if (res.ok) {
@@ -344,19 +345,24 @@ const app = {
     if (!this.currentUser) return;
 
     const isPrivileged = this.currentUser.role === 'admin' || this.currentUser.role === 'superadmin';
+    const isSuper = this.currentUser.role === 'superadmin';
+    
     const adminTabs = document.querySelectorAll('.admin-only');
     adminTabs.forEach(tab => {
       tab.style.display = isPrivileged ? 'inline-block' : 'none';
     });
+    
+    const superAdminTabs = document.querySelectorAll('.superadmin-only');
+    superAdminTabs.forEach(tab => {
+      tab.style.display = isSuper ? 'inline-block' : 'none';
+    });
 
     const roleLabel = this.currentUser.role === 'superadmin' ? 'Super Admin'
-      : (this.currentUser.role === 'admin' ? 'Admin'
-      : (this.currentUser.role === 'technologist' || this.currentUser.role === 'Laboratory Technologist' ? 'Laboratory Technologist'
-      : 'Technician'));
+      : (this.currentUser.role === 'admin' ? 'Admin' : 'Staff');
 
     nav.innerHTML = `
       <div class="user-badge">
-        ${this.icon('user')} <strong>${this.escape(this.currentUser.full_name)}</strong> (${this.escape(roleLabel)})
+        ${this.icon('user')} <strong>${this.escape(this.currentUser.full_name)}</strong> (${this.escape(roleLabel)}${this.currentUser.cadre ? ' - ' + this.escape(this.currentUser.cadre) : ''})
       </div>
       <button class="btn btn-secondary" style="padding: 4px 12px; font-size: 0.8rem;" onclick="app.handleLogout()">${this.icon('log-out')} Logout</button>
     `;
@@ -425,7 +431,7 @@ const app = {
     container.innerHTML = `
       <div class="card">
         <div class="card-header">
-          <span class="card-title">${this.icon('clipboard-list')} Daily Laboratory Entry Log</span>
+          <span class="card-title">${this.icon('clipboard-list')} Daily Laboratory Tests Log</span>
           <div class="controls-row">
             <div class="form-group" style="flex-direction: row; align-items: center; gap: 8px;">
               <label for="log-date">Entry Date:</label>
@@ -1318,8 +1324,8 @@ const app = {
         }
       }
 
-      // 2. Load user management for superadmin
-      if (this.currentUser && this.currentUser.role === 'superadmin') {
+      // 2. Load user management for admin/superadmin
+      if (this.currentUser && (this.currentUser.role === 'admin' || this.currentUser.role === 'superadmin')) {
         const userRes = await fetch('/api/auth/users');
         if (userRes.ok) {
           const users = await userRes.json();
@@ -1341,10 +1347,11 @@ const app = {
                   <tr>
                     <td><strong>${this.escape(u.full_name)}</strong></td>
                     <td><code>${this.escape(u.username)}</code></td>
+                    <td>${this.escape(u.cadre || 'None')}</td>
                     <td>${this.escape(formattedDate)}</td>
                     <td>
                       <div style="display: flex; gap: 8px; align-items: center;">
-                        <button class="btn btn-success" style="padding: 4px 10px; font-size: 0.8rem;" onclick="app.approveUser(${u.id}, '${this.escape(u.role)}')">Approve</button>
+                        <button class="btn btn-success" style="padding: 4px 10px; font-size: 0.8rem;" onclick="app.approveUser(${u.id}, '${this.escape(u.role)}', '${this.escape(u.cadre || '')}')">Approve</button>
                         <button class="btn btn-secondary" style="padding: 4px 10px; font-size: 0.8rem; background: var(--danger-color); color: white; border: none;" onclick="app.rejectUser(${u.id}, '${this.escape(u.username)}')">Reject</button>
                       </div>
                     </td>
@@ -1358,6 +1365,7 @@ const app = {
                     <tr>
                       <th>Full Name</th>
                       <th>Username</th>
+                      <th>Cadre</th>
                       <th>Registered On</th>
                       <th style="width: 180px;">Actions</th>
                     </tr>
@@ -1379,21 +1387,34 @@ const app = {
               let activeRows = '';
               activeUsers.forEach(u => {
                 const isSelf = u.id === this.currentUser.id;
+                const canEdit = !isSelf && !(this.currentUser.role === 'admin' && u.role === 'superadmin');
                 const statusBadge = u.password_reset_required
                   ? 'Temporary (Reset Required)'
                   : 'Active';
 
                 const roleSelect = `
-                  <select onchange="app.changeUserRole(${u.id}, this.value, true)" ${isSelf ? 'disabled' : ''} style="padding: 4px 8px; border-radius: 4px; border: 1px solid var(--border-color); font-size: 0.85rem;">
-                    <option value="technician" ${u.role === 'technician' ? 'selected' : ''}>Technician</option>
-                    <option value="Laboratory Technologist" ${u.role === 'Laboratory Technologist' ? 'selected' : ''}>Laboratory Technologist</option>
+                  <select id="role-select-${u.id}" onchange="app.changeUserFields(${u.id}, true)" ${!canEdit ? 'disabled' : ''} style="padding: 4px 8px; border-radius: 4px; border: 1px solid var(--border-color); font-size: 0.85rem;">
+                    <option value="staff" ${u.role === 'staff' ? 'selected' : ''}>Staff</option>
                     <option value="admin" ${u.role === 'admin' ? 'selected' : ''}>Admin</option>
-                    <option value="superadmin" ${u.role === 'superadmin' ? 'selected' : ''}>Super Admin</option>
+                    <option value="superadmin" ${u.role === 'superadmin' ? 'selected' : ''} ${this.currentUser.role === 'admin' ? 'disabled' : ''}>Super Admin</option>
+                  </select>
+                `;
+                
+                const cadreSelect = `
+                  <select id="cadre-select-${u.id}" onchange="app.changeUserFields(${u.id}, true)" ${!canEdit ? 'disabled' : ''} style="padding: 4px 8px; border-radius: 4px; border: 1px solid var(--border-color); font-size: 0.85rem; max-width: 200px;">
+                    <option value="">None</option>
+                    <option value="Medical Laboratory Assistant" ${u.cadre === 'Medical Laboratory Assistant' ? 'selected' : ''}>Medical Laboratory Assistant</option>
+                    <option value="Medical Laboratory Technician" ${u.cadre === 'Medical Laboratory Technician' ? 'selected' : ''}>Medical Laboratory Technician</option>
+                    <option value="Senior Medical Laboratory Technician" ${u.cadre === 'Senior Medical Laboratory Technician' ? 'selected' : ''}>Senior Medical Laboratory Technician</option>
+                    <option value="Principal Medical Laboratory Technician" ${u.cadre === 'Principal Medical Laboratory Technician' ? 'selected' : ''}>Principal Medical Laboratory Technician</option>
+                    <option value="Medical Laboratory Technologist / Scientist" ${u.cadre === 'Medical Laboratory Technologist / Scientist' ? 'selected' : ''}>Medical Laboratory Technologist / Scientist</option>
+                    <option value="Senior Medical Laboratory Technologist" ${u.cadre === 'Senior Medical Laboratory Technologist' ? 'selected' : ''}>Senior Medical Laboratory Technologist</option>
+                    <option value="Principal Medical Laboratory Technologist" ${u.cadre === 'Principal Medical Laboratory Technologist' ? 'selected' : ''}>Principal Medical Laboratory Technologist</option>
                   </select>
                 `;
 
-                const deactivateBtn = !isSelf
-                  ? `<button class="btn btn-secondary" style="padding: 4px 8px; font-size: 0.8rem; color: var(--danger-color); border-color: var(--danger-color);" onclick="app.deactivateUser(${u.id}, '${this.escape(u.role)}')">Deactivate</button>`
+                const deactivateBtn = canEdit
+                  ? `<button class="btn btn-secondary" style="padding: 4px 8px; font-size: 0.8rem; color: var(--danger-color); border-color: var(--danger-color);" onclick="app.deactivateUser(${u.id}, '${this.escape(u.role)}', '${this.escape(u.cadre || '')}')">Deactivate</button>`
                   : '';
 
                 activeRows += `
@@ -1401,10 +1422,11 @@ const app = {
                     <td><strong>${this.escape(u.full_name)}</strong> ${isSelf ? '<small style="color: var(--primary-color); font-weight: 600;">(You)</small>' : ''}</td>
                     <td><code>${this.escape(u.username)}</code></td>
                     <td>${roleSelect}</td>
+                    <td>${cadreSelect}</td>
                     <td>${statusBadge}</td>
                     <td>
                       <div style="display: flex; gap: 6px; align-items: center;">
-                        <button class="btn btn-secondary" style="padding: 4px 10px; font-size: 0.8rem;" onclick="app.promptResetPassword(${u.id}, '${this.escape(u.username)}', '${this.escape(u.role)}')">Reset Password</button>
+                        <button class="btn btn-secondary" style="padding: 4px 10px; font-size: 0.8rem;" onclick="app.promptResetPassword(${u.id}, '${this.escape(u.username)}', '${this.escape(u.role)}', '${this.escape(u.cadre || '')}')" ${!canEdit ? 'disabled' : ''}>Reset Password</button>
                         ${deactivateBtn}
                       </div>
                     </td>
@@ -1419,6 +1441,7 @@ const app = {
                       <th>Full Name</th>
                       <th>Username</th>
                       <th>Role</th>
+                      <th>Cadre</th>
                       <th>Status</th>
                       <th style="width: 220px;">Actions</th>
                     </tr>
@@ -1437,8 +1460,8 @@ const app = {
     }
   },
 
-  async approveUser(userId, role) {
-    await this.saveUserUpdate(userId, { role: role || 'technician', is_active: true });
+  async approveUser(userId, role, cadre) {
+    await this.saveUserUpdate(userId, { role: role || 'staff', cadre: cadre || null, is_active: true });
     this.showToast('User registration approved successfully!', 'success');
   },
 
@@ -1458,25 +1481,29 @@ const app = {
     }
   },
 
-  async deactivateUser(userId, role) {
+  async deactivateUser(userId, role, cadre) {
     if (!confirm('Are you sure you want to deactivate this account?')) return;
-    await this.saveUserUpdate(userId, { role: role, is_active: false });
+    await this.saveUserUpdate(userId, { role: role, cadre: cadre || null, is_active: false });
     this.showToast('User account deactivated.', 'success');
   },
 
-  async changeUserRole(userId, newRole, isActive) {
-    await this.saveUserUpdate(userId, { role: newRole, is_active: isActive });
-    this.showToast('Role updated successfully.', 'success');
+  async changeUserFields(userId, isActive) {
+    const roleEl = document.getElementById(`role-select-${userId}`);
+    const cadreEl = document.getElementById(`cadre-select-${userId}`);
+    if (!roleEl || !cadreEl) return;
+    
+    await this.saveUserUpdate(userId, { role: roleEl.value, cadre: cadreEl.value || null, is_active: isActive });
+    this.showToast('User details updated successfully.', 'success');
   },
 
-  async promptResetPassword(userId, username, role) {
+  async promptResetPassword(userId, username, role, cadre) {
     const tempPw = prompt(`Enter a new temporary password for user '${username}' (minimum 4 characters):`);
     if (tempPw === null) return; // user clicked Cancel
     if (tempPw.trim().length < 4) {
       this.showToast('Password must be at least 4 characters long.', 'error');
       return;
     }
-    await this.saveUserUpdate(userId, { role: role, is_active: true, password: tempPw.trim() });
+    await this.saveUserUpdate(userId, { role: role, cadre: cadre || null, is_active: true, password: tempPw.trim() });
     this.showToast(`Password reset for '${username}'. User will be required to change it on next login.`, 'success');
   },
 

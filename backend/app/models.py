@@ -8,7 +8,8 @@ class User:
     full_name: str
     username: str
     password_hash: str = ""
-    role: str = "technician"  # 'admin' or 'technician'
+    role: str = "staff"  # 'superadmin', 'admin', or 'staff'
+    cadre: Optional[str] = None
     is_active: bool = True
     password_reset_required: bool = False
     created_at: Optional[datetime.datetime] = None

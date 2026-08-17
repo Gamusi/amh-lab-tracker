@@ -14,7 +14,8 @@ SCHEMA_SQL = """
         full_name TEXT NOT NULL,
         username TEXT UNIQUE NOT NULL,
         password_hash TEXT NOT NULL,
-        role TEXT NOT NULL DEFAULT 'technician',
+        role TEXT NOT NULL DEFAULT 'staff',
+        cadre TEXT,
         is_active BOOLEAN NOT NULL DEFAULT 1,
         password_reset_required BOOLEAN NOT NULL DEFAULT 0,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
@@ -137,7 +138,8 @@ def init_db():
         ("tests", "parent_rollup_id", "INTEGER REFERENCES tests(id)"),
         ("test_orders", "sample_id", "TEXT"),
         ("test_results", "parameter_id", "INTEGER REFERENCES test_parameters(id)"),
-        ("users", "password_reset_required", "BOOLEAN NOT NULL DEFAULT 0")
+        ("users", "password_reset_required", "BOOLEAN NOT NULL DEFAULT 0"),
+        ("users", "cadre", "TEXT")
     ]
     for table, col, col_def in migrations:
         try:

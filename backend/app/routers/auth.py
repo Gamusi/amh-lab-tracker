@@ -14,7 +14,7 @@ router = APIRouter(prefix="/api/auth", tags=["Auth"])
 def login(req: LoginRequest, response: Response, conn: sqlite3.Connection = Depends(get_db)):
     logger.info(f"Login attempt for user: '{req.username}'")
     cur = conn.cursor()
-    cur.execute("SELECT id, username, full_name, password_hash, role, is_active, password_reset_required FROM users WHERE username = ?", (req.username,))
+    cur.execute("SELECT id, username, full_name, password_hash, role, cadre, is_active, password_reset_required FROM users WHERE username = ?", (req.username,))
     user = cur.fetchone()
     
     if not user or not verify_password(req.password, user["password_hash"]):
@@ -46,6 +46,7 @@ def login(req: LoginRequest, response: Response, conn: sqlite3.Connection = Depe
             "username": user["username"],
             "full_name": user["full_name"],
             "role": user["role"],
+            "cadre": user["cadre"],
             "password_reset_required": bool(user["password_reset_required"])
         }
     }
@@ -65,6 +66,7 @@ def get_me(current_user: User = Depends(get_current_user)):
         "username": current_user["username"],
         "full_name": current_user["full_name"],
         "role": current_user["role"],
+        "cadre": current_user["cadre"],
         "password_reset_required": bool(current_user["password_reset_required"])
     }
 
@@ -95,15 +97,19 @@ def change_password(req: ChangePasswordRequest, current_user: User = Depends(get
     return {"status": "success", "message": "Password changed successfully"}
 
 @router.get("/users")
-def list_users(admin_user: User = Depends(require_superadmin), conn: sqlite3.Connection = Depends(get_db)):
+def list_users(admin_user: User = Depends(require_admin), conn: sqlite3.Connection = Depends(get_db)):
     cur = conn.cursor()
-    cur.execute("SELECT id, username, full_name, role, is_active, password_reset_required, created_at FROM users")
+    cur.execute("SELECT id, username, full_name, role, cadre, is_active, password_reset_required, created_at FROM users")
     users = cur.fetchall()
     return [dict(u) for u in users]
 
 @router.post("/users")
-def create_user(req: UserCreate, admin_user: User = Depends(require_superadmin), conn: sqlite3.Connection = Depends(get_db)):
-    logger.info(f"Superadmin '{admin_user['username']}' is creating user: '{req.username}' (Role: {req.role})")
+def create_user(req: UserCreate, admin_user: User = Depends(require_admin), conn: sqlite3.Connection = Depends(get_db)):
+    logger.info(f"Admin '{admin_user['username']}' is creating user: '{req.username}' (Role: {req.role})")
+    
+    if admin_user["role"] == "admin" and req.role == "superadmin":
+        raise HTTPException(status_code=403, detail="Admins cannot create Superadmin accounts.")
+        
     cur = conn.cursor()
     cur.execute("SELECT id FROM users WHERE username = ?", (req.username,))
     if cur.fetchone():
@@ -111,8 +117,8 @@ def create_user(req: UserCreate, admin_user: User = Depends(require_superadmin),
         raise HTTPException(status_code=400, detail="Username already exists")
     
     cur.execute(
-        "INSERT INTO users (username, full_name, password_hash, role) VALUES (?, ?, ?, ?)",
-        (req.username, req.full_name, hash_password(req.password), req.role)
+        "INSERT INTO users (username, full_name, password_hash, role, cadre) VALUES (?, ?, ?, ?, ?)",
+        (req.username, req.full_name, hash_password(req.password), req.role, req.cadre)
     )
     uid = cur.lastrowid
     
@@ -140,13 +146,13 @@ def register(req: UserRegister, conn: sqlite3.Connection = Depends(get_db)):
         is_active = 1
         logger.info(f"First-run bootstrap: promoting first user '{req.username}' to active superadmin")
     else:
-        role = "technician"
+        role = "staff"
         is_active = 0
-        logger.info(f"Standard registration: user '{req.username}' registered as pending technician")
+        logger.info(f"Standard registration: user '{req.username}' registered as pending staff")
         
     cur.execute(
-        "INSERT INTO users (username, full_name, password_hash, role, is_active) VALUES (?, ?, ?, ?, ?)",
-        (req.username, req.full_name, hash_password(req.password), role, is_active)
+        "INSERT INTO users (username, full_name, password_hash, role, cadre, is_active) VALUES (?, ?, ?, ?, ?, ?)",
+        (req.username, req.full_name, hash_password(req.password), role, req.cadre, is_active)
     )
     uid = cur.lastrowid
     conn.commit()
@@ -162,48 +168,55 @@ def register(req: UserRegister, conn: sqlite3.Connection = Depends(get_db)):
     return {"status": "registered", "user_id": uid, "is_active": bool(is_active)}
 
 @router.put("/users/{user_id}")
-def update_user(user_id: int, req: UserUpdate, admin_user: User = Depends(require_superadmin), conn: sqlite3.Connection = Depends(get_db)):
-    logger.info(f"Superadmin '{admin_user['username']}' is updating user ID {user_id}: role={req.role}, active={req.is_active}")
+def update_user(user_id: int, req: UserUpdate, admin_user: User = Depends(require_admin), conn: sqlite3.Connection = Depends(get_db)):
+    logger.info(f"Admin '{admin_user['username']}' is updating user ID {user_id}: role={req.role}, active={req.is_active}")
     
-    if user_id == admin_user["id"] and (req.role != "superadmin" or not req.is_active):
-        raise HTTPException(status_code=400, detail="Super Admins cannot deactivate or demote themselves to avoid lockouts.")
+    if user_id == admin_user["id"] and (req.role != admin_user["role"] or not req.is_active):
+        raise HTTPException(status_code=400, detail="Admins cannot deactivate or demote themselves to avoid lockouts.")
         
     cur = conn.cursor()
-    cur.execute("SELECT id FROM users WHERE id = ?", (user_id,))
-    if not cur.fetchone():
+    cur.execute("SELECT id, role FROM users WHERE id = ?", (user_id,))
+    target_user = cur.fetchone()
+    if not target_user:
         raise HTTPException(status_code=404, detail="User not found")
+        
+    if admin_user["role"] == "admin" and (target_user["role"] == "superadmin" or req.role == "superadmin"):
+        raise HTTPException(status_code=403, detail="Admins cannot modify or create Superadmin accounts.")
         
     if req.password:
         cur.execute(
-            "UPDATE users SET role = ?, is_active = ?, password_hash = ?, password_reset_required = 1 WHERE id = ?",
-            (req.role, 1 if req.is_active else 0, hash_password(req.password), user_id)
+            "UPDATE users SET role = ?, cadre = ?, is_active = ?, password_hash = ?, password_reset_required = 1 WHERE id = ?",
+            (req.role, req.cadre, 1 if req.is_active else 0, hash_password(req.password), user_id)
         )
     else:
         cur.execute(
-            "UPDATE users SET role = ?, is_active = ? WHERE id = ?",
-            (req.role, 1 if req.is_active else 0, user_id)
+            "UPDATE users SET role = ?, cadre = ?, is_active = ? WHERE id = ?",
+            (req.role, req.cadre, 1 if req.is_active else 0, user_id)
         )
     conn.commit()
     
     cur.execute("INSERT INTO audit_log (user_id, action, detail) VALUES (?, ?, ?)",
-                (admin_user["id"], "update_user", f"Updated user ID {user_id}: role={req.role}, active={req.is_active}, pw_reset={bool(req.password)}"))
+                (admin_user["id"], "update_user", f"Updated user ID {user_id}: role={req.role}, cadre={req.cadre}, active={req.is_active}, pw_reset={bool(req.password)}"))
     conn.commit()
     
-    logger.info(f"User ID {user_id} updated successfully by superadmin '{admin_user['username']}'")
+    logger.info(f"User ID {user_id} updated successfully by admin '{admin_user['username']}'")
     return {"status": "updated"}
 
 @router.delete("/users/{user_id}")
-def delete_user(user_id: int, admin_user: User = Depends(require_superadmin), conn: sqlite3.Connection = Depends(get_db)):
-    logger.info(f"Superadmin '{admin_user['username']}' is deleting user ID {user_id}")
+def delete_user(user_id: int, admin_user: User = Depends(require_admin), conn: sqlite3.Connection = Depends(get_db)):
+    logger.info(f"Admin '{admin_user['username']}' is deleting user ID {user_id}")
     
     if user_id == admin_user["id"]:
-        raise HTTPException(status_code=400, detail="Super Admins cannot delete their own account.")
+        raise HTTPException(status_code=400, detail="Admins cannot delete their own account.")
         
     cur = conn.cursor()
-    cur.execute("SELECT id, username FROM users WHERE id = ?", (user_id,))
+    cur.execute("SELECT id, username, role FROM users WHERE id = ?", (user_id,))
     target_user = cur.fetchone()
     if not target_user:
         raise HTTPException(status_code=404, detail="User not found")
+        
+    if admin_user["role"] == "admin" and target_user["role"] == "superadmin":
+        raise HTTPException(status_code=403, detail="Admins cannot delete Superadmin accounts.")
         
     cur.execute("DELETE FROM user_sessions WHERE user_id = ?", (user_id,))
     cur.execute("DELETE FROM users WHERE id = ?", (user_id,))
@@ -211,5 +224,5 @@ def delete_user(user_id: int, admin_user: User = Depends(require_superadmin), co
                 (admin_user["id"], "delete_user", f"Deleted user {target_user['username']} (ID {user_id})"))
     conn.commit()
     
-    logger.info(f"User ID {user_id} deleted successfully by superadmin '{admin_user['username']}'")
+    logger.info(f"User ID {user_id} deleted successfully by admin '{admin_user['username']}'")
     return {"status": "deleted"}
