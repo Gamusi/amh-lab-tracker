@@ -1217,13 +1217,26 @@ const app = {
     }
   },
 
-  async showNewClientModal() {
-    const pnum = 'AMH-C' + Math.floor(1000 + Math.random() * 9000);
-    const pname = prompt('Enter Client Full Name:');
-    if (!pname) return;
-    const psex = prompt('Enter Client Gender (Male/Female):', 'Male') || 'Male';
-    const pphone = prompt('Enter Phone Number (Optional):', '') || '';
+  showNewClientModal() {
+    document.getElementById('new-client-form').reset();
+    document.getElementById('new-client-modal').style.display = 'flex';
+    document.getElementById('client-name').focus();
+  },
 
+  closeNewClientModal() {
+    document.getElementById('new-client-modal').style.display = 'none';
+  },
+
+  async handleRegisterClientSubmit(e) {
+    e.preventDefault();
+    const pname = document.getElementById('client-name').value.trim();
+    const psex = document.getElementById('client-sex').value;
+    const pphone = document.getElementById('client-phone').value.trim();
+    
+    if (!pname) return;
+    
+    const pnum = 'AMH-C' + Math.floor(1000 + Math.random() * 9000);
+    
     try {
       const res = await fetch('/api/clients', {
         method: 'POST',
@@ -1238,11 +1251,12 @@ const app = {
 
       if (res.ok) {
         this.showToast(`Client registered successfully! Assigned ID: ${pnum}`, 'success');
+        this.closeNewClientModal();
         this.searchClients('');
       } else {
         this.showToast('Error registering client.', 'error');
       }
-    } catch (e) {
+    } catch (error) {
       this.showToast('Connection error.', 'error');
     }
   },

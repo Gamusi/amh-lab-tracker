@@ -36,6 +36,37 @@
     <!-- View content dynamically rendered by app.js -->
   </main>
 
+  <!-- New Client Modal -->
+  <div class="modal-overlay" id="new-client-modal" style="display: none;">
+    <div class="modal-content">
+      <div style="text-align: center; margin-bottom: 20px;">
+        <h2 style="color: var(--primary-color);">Register New Client</h2>
+        <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 4px;">Enter the client's details.</p>
+      </div>
+      <form id="new-client-form" onsubmit="app.handleRegisterClientSubmit(event)">
+        <div class="form-group" style="margin-bottom: 16px;">
+          <label for="client-name">Full Name *</label>
+          <input type="text" id="client-name" required placeholder="Enter Client Full Name">
+        </div>
+        <div class="form-group" style="margin-bottom: 16px;">
+          <label for="client-sex">Gender *</label>
+          <select id="client-sex" required>
+            <option value="Male">Male</option>
+            <option value="Female">Female</option>
+          </select>
+        </div>
+        <div class="form-group" style="margin-bottom: 24px;">
+          <label for="client-phone">Phone Number (Optional)</label>
+          <input type="text" id="client-phone" placeholder="Enter Phone Number">
+        </div>
+        <div style="display: flex; gap: 12px; margin-top: 24px;">
+          <button type="button" class="btn btn-secondary" onclick="app.closeNewClientModal()" style="flex: 1; padding: 12px; font-weight: 500;">Cancel</button>
+          <button type="submit" class="btn btn-primary" style="flex: 1; padding: 12px; font-weight: 500;">Register Client</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <!-- Login Modal -->
   <div class="modal-overlay" id="login-modal" style="display: none;">
     <div class="modal-content">
