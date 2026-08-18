@@ -948,7 +948,7 @@ const app = {
         </div>
 
         <!-- Official PDF Report Iframe -->
-        <iframe id="report-frame" src="/api/reports/client/${pid}/pdf" width="100%" height="800px" style="border: none;"></iframe>
+        <iframe id="report-frame" src="" width="100%" height="800px" style="border: none;"></iframe>
       </div>
     `;
 
@@ -1103,8 +1103,7 @@ const app = {
       if (resRes.ok) {
         this.showToast('Result recorded successfully! Daily Log auto-incremented.', 'success');
         await this.loadClientOrders(pid);
-        const frame = document.getElementById('report-frame');
-        if(frame) frame.contentWindow.print();
+        // Print removed to avoid race conditions
       } else {
         this.showToast('Failed to record result.', 'error');
       }
