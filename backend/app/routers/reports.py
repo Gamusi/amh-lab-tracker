@@ -6,6 +6,7 @@ from typing import List, Dict, Any
 from ..database import get_db
 from ..auth import get_current_user
 from ..pdf_generator import generate_pdf
+from .. import evaluator
 
 router = APIRouter(prefix="/api/reports", tags=["Reports"])
 
@@ -188,4 +189,98 @@ def create_pdf_report(
     current_user: dict = Depends(get_current_user)
 ):
     pdf_bytes = generate_pdf(request.order_data, request.results_data)
+    return Response(content=pdf_bytes, media_type="application/pdf")
+
+@router.get("/client/{client_id}/pdf")
+def get_client_report_pdf(client_id: int, db: sqlite3.Connection = Depends(get_db)):
+    cur = db.cursor()
+    cur.execute("SELECT * FROM clients WHERE id = ?", (client_id,))
+    client_row = cur.fetchone()
+    if not client_row:
+        raise HTTPException(status_code=404, detail="Client not found")
+        
+    dob_str = client_row["date_of_birth"]
+    dob = datetime.datetime.strptime(dob_str, "%Y-%m-%d").date() if dob_str else None
+    sex = client_row["sex"] or "U"
+    
+    cur.execute("""
+        SELECT 
+            t.name AS test_name, 
+            tr.result_value, 
+            s.name AS section_name, 
+            to_ord.ordered_at, 
+            tr.entered_at,
+            u1.full_name AS ordered_by_name,
+            u2.full_name AS verified_by_name
+        FROM test_orders to_ord
+        JOIN test_results tr ON tr.order_id = to_ord.id
+        JOIN tests t ON to_ord.test_id = t.id
+        JOIN sections s ON t.section_id = s.id
+        LEFT JOIN users u1 ON to_ord.ordered_by_user_id = u1.id
+        LEFT JOIN users u2 ON tr.verified_by_user_id = u2.id
+        WHERE to_ord.client_id = ? AND to_ord.status != 'cancelled'
+        ORDER BY s.sort_order, t.sort_order
+    """, (client_id,))
+    
+    rows = cur.fetchall()
+    
+    results_by_section = {}
+    ordered_date = None
+    ordered_by = None
+    verified_by = None
+    
+    for row in rows:
+        test_name = row["test_name"]
+        result_value = row["result_value"]
+        section_name = row["section_name"]
+        entry_at_str = row["entered_at"] or row["ordered_at"]
+        entry_date = datetime.datetime.strptime(entry_at_str[:10], "%Y-%m-%d").date() if entry_at_str else datetime.date.today()
+        
+        if not ordered_date and row["ordered_at"]:
+            ordered_date = row["ordered_at"][:10]
+        if not ordered_by and row["ordered_by_name"]:
+            ordered_by = row["ordered_by_name"]
+        if not verified_by and row["verified_by_name"]:
+            verified_by = row["verified_by_name"]
+            
+        if dob:
+            eval_dict = evaluator.evaluate_result(test_name, result_value, dob, sex, entry_date)
+        else:
+            eval_dict = {"unit": None, "reference": None, "flag": None, "is_abnormal": False}
+            
+        test_data = {
+            "test_name": test_name,
+            "result": result_value,
+            "unit": eval_dict["unit"] or "",
+            "reference": eval_dict["reference"] or "",
+            "flag": eval_dict["flag"] or ""
+        }
+        
+        if section_name not in results_by_section:
+            results_by_section[section_name] = []
+        results_by_section[section_name].append(test_data)
+        
+    results_data = []
+    for sec_name, tests in results_by_section.items():
+        results_data.append({
+            "department": sec_name,
+            "tests": tests
+        })
+        
+    age_str = ""
+    if dob:
+        age_val = evaluator.calculate_age(dob, datetime.date.today())
+        age_str = str(age_val)
+        
+    order_data = {
+        "client_number": client_row["client_number"],
+        "full_name": client_row["full_name"],
+        "age": age_str,
+        "sex": sex,
+        "ordered_by": ordered_by or "",
+        "ordered_date": ordered_date or "",
+        "verified_by": verified_by or ""
+    }
+    
+    pdf_bytes = generate_pdf(order_data, results_data)
     return Response(content=pdf_bytes, media_type="application/pdf")
