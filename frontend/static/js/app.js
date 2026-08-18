@@ -905,30 +905,10 @@ const app = {
   async selectClient(pid, pnum, pname, psex) {
     const box = document.getElementById('client-detail-box');
     box.innerHTML = `
-      <div class="client-report-paper">
-        <!-- Official Hospital Header Banner -->
-        <div class="official-header-banner">
-          <img src="/assets/branding/logo.png" alt="Hospital Crest" style="height: 72px; width: auto; object-fit: contain;">
-          <div class="official-header-titles">
-            <h2>AHMADIYYA MUSLIM HOSPITAL</h2>
-            <p class="contact-line">P.O. BOX 982, MBALE, UGANDA &bull; TEL: +256 (0) 454 433 111</p>
-            <p class="dept-line">DEPARTMENT OF MEDICAL LABORATORY SCIENCES</p>
-          </div>
-          <img src="/assets/branding/header_banner.png" alt="AMH Banner" style="height: 72px; width: auto; object-fit: contain; max-width: 200px;" onerror="this.style.display='none'">
-        </div>
-
-        <div class="report-document-title">
-          <span>CLIENT DIAGNOSTIC LABORATORY REPORT</span>
-        </div>
-
-        <div class="report-watermark">AMH MBALE LAB</div>
-
-        <!-- Client Info Card -->
-        <div class="client-info-grid">
-          <div class="client-info-item"><span class="label">Client Full Name:</span> <span class="val">${pname}</span></div>
-          <div class="client-info-item"><span class="label">Hospital Client ID:</span> <span class="val">${pnum}</span></div>
-          <div class="client-info-item"><span class="label">Gender / Sex:</span> <span class="val">${psex}</span></div>
-          <div class="client-info-item"><span class="label">Date of Report:</span> <span class="val">${new Date().toLocaleDateString()}</span></div>
+      <div>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+          <h3 style="color: var(--primary-color);">Client: ${pname} (${pnum})</h3>
+          <button class="btn btn-primary" onclick="document.getElementById('report-frame').contentWindow.print()">${this.icon('printer')} Print Official Report</button>
         </div>
 
         <!-- Result Entry Form -->
@@ -967,25 +947,8 @@ const app = {
           <button class="btn btn-success" style="width: 100%; padding: 10px;" onclick="app.submitTestResult(${pid})">${this.icon('save')} Submit Result & Add to Report</button>
         </div>
 
-        <!-- Dynamic Results Table -->
-        <div id="client-orders-table-container">
-          <p style="color: var(--text-muted); padding: 12px;">Loading test results...</p>
-        </div>
-
-        <!-- Footer -->
-        <div class="report-footer-banner" style="margin-top: 32px;">
-          <div>
-            <p>Accredited Quality Laboratory Services</p>
-            <p>Report Generated: ${new Date().toLocaleString()}</p>
-          </div>
-          <div class="signature-block">
-            Medical Laboratory Analyst
-          </div>
-        </div>
-
-        <div style="margin-top: 20px; text-align: right;" class="no-print">
-          <button class="btn btn-primary" onclick="window.print()">${this.icon('printer')} Print Official Report</button>
-        </div>
+        <!-- Official PDF Report Iframe -->
+        <iframe id="report-frame" src="/api/reports/client/${pid}/pdf" width="100%" height="800px" style="border: none;"></iframe>
       </div>
     `;
 
@@ -1140,7 +1103,8 @@ const app = {
       if (resRes.ok) {
         this.showToast('Result recorded successfully! Daily Log auto-incremented.', 'success');
         await this.loadClientOrders(pid);
-        window.print();
+        const frame = document.getElementById('report-frame');
+        if(frame) frame.contentWindow.print();
       } else {
         this.showToast('Failed to record result.', 'error');
       }
@@ -1150,70 +1114,9 @@ const app = {
   },
 
   async loadClientOrders(pid) {
-    try {
-      const res = await fetch(`/api/clients/${pid}/orders`);
-      if (!res.ok) return;
-      const orders = await res.json();
-
-      const container = document.getElementById('client-orders-table-container');
-      if (!container) return;
-
-      if (orders.length === 0) {
-        container.innerHTML = `
-          <p style="padding: 16px; color: var(--text-muted); background: #F8FAFC; border-radius: 6px; text-align: center;">
-            No laboratory test results recorded yet for this client. Use the form above to log a diagnostic result.
-          </p>
-        `;
-        return;
-      }
-
-      let rows = '';
-      orders.forEach(o => {
-        if (o.results && o.results.length > 0) {
-          o.results.forEach((r, idx) => {
-            const isPos = r.is_positive;
-            const statusBadge = isPos 
-              ? `<span style="color: var(--danger-color); font-weight:700;">Positive / Abnormal</span>`
-              : `<span style="color: var(--accent-color); font-weight:700;">Normal / Negative</span>`;
-            
-            const testLabel = idx === 0 
-              ? `<strong>${this.escape(o.test_name)}</strong> ${o.sample_id ? `<br><small style="color:var(--text-muted);">Sample ID: ${this.escape(o.sample_id)}</small>` : ''}`
-              : '';
-
-            const paramName = r.parameter_name ? `↳ ${this.escape(r.parameter_name)}` : this.escape(o.test_name);
-            const refInterval = r.ref_range ? `${this.escape(r.ref_range)} ${this.escape(r.unit || '')}` : 'Standard';
-
-            rows += `
-              <tr>
-                <td>${testLabel}</td>
-                <td>${paramName}</td>
-                <td><strong>${this.escape(r.result_value || '')}</strong> ${r.unit ? this.escape(r.unit) : ''}</td>
-                <td>${refInterval}</td>
-                <td>${statusBadge}</td>
-              </tr>
-            `;
-          });
-        }
-      });
-
-      container.innerHTML = `
-        <table class="report-results-table">
-          <thead>
-            <tr>
-              <th>Investigation Panel</th>
-              <th>Parameter / Test</th>
-              <th>Observed Result</th>
-              <th>Reference Interval</th>
-              <th>Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${rows}
-          </tbody>
-        </table>
-      `;
-    } catch (e) {
-      console.error('Error loading client orders:', e);
+    const frame = document.getElementById('report-frame');
+    if (frame) {
+      frame.src = `/api/reports/client/${pid}/pdf?t=${Date.now()}`;
     }
   },
 
