@@ -20,3 +20,7 @@ Unless completely necessary and warranted, developers **must** avoid large code 
 
 ### Small, Surgical Changes
 Always make small, targeted changes to implement new features, fix bugs, or modify an existing feature. Do not attempt a full rewrite of existing logic or UI components when a surgical insertion or removal will suffice.
+
+## 4. Terminology
+
+*   **Client vs Patient:** Always use the term **'Client'**, never 'Patient'. This generalizes testing to include routine checkups and non-pathological testing, as not everyone in the lab is suffering from an illness.

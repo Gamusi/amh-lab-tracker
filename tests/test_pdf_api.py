@@ -41,7 +41,13 @@ def test_get_client_report_pdf():
     cur.execute("INSERT INTO clients (client_number, full_name, date_of_birth, sex) VALUES ('C001', 'Test Client', '1990-01-01', 'M')")
     client_id = cur.lastrowid
     
-    cur.execute("INSERT INTO test_orders (client_id, test_id, status) VALUES (?, ?, 'completed')", (client_id, test_id))
+    cur.execute("INSERT INTO clinicians (name) VALUES ('Dr. Test')")
+    clinician_id = cur.lastrowid
+    
+    cur.execute("INSERT INTO visits (client_id, clinician_id, ward_of_origin, lab_number) VALUES (?, ?, 'OPD', 'LAB-001')", (client_id, clinician_id))
+    visit_id = cur.lastrowid
+
+    cur.execute("INSERT INTO test_orders (visit_id, test_id, status) VALUES (?, ?, 'completed')", (visit_id, test_id))
     order_id = cur.lastrowid
     
     cur.execute("INSERT INTO test_results (order_id, result_value) VALUES (?, '12.5')", (order_id,))

@@ -86,9 +86,31 @@ SCHEMA_SQL = """
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
 
-    CREATE TABLE IF NOT EXISTS test_orders (
+    CREATE TABLE IF NOT EXISTS clinicians (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT UNIQUE NOT NULL,
+        is_active BOOLEAN NOT NULL DEFAULT 1,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS sequence_tracker (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        seq_name TEXT UNIQUE NOT NULL,
+        last_value INTEGER NOT NULL DEFAULT 0
+    );
+
+    CREATE TABLE IF NOT EXISTS visits (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         client_id INTEGER NOT NULL REFERENCES clients(id),
+        clinician_id INTEGER REFERENCES clinicians(id),
+        ward_of_origin TEXT,
+        lab_number TEXT UNIQUE,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS test_orders (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        visit_id INTEGER NOT NULL REFERENCES visits(id),
         test_id INTEGER NOT NULL REFERENCES tests(id),
         sample_id TEXT,
         ordered_by_user_id INTEGER REFERENCES users(id),
@@ -133,10 +155,17 @@ def init_db():
     cursor = conn.cursor()
     cursor.executescript(SCHEMA_SQL)
     
+    # Pre-seed clinicians with 'SELF REQUEST' if it doesn't exist
+    cursor.execute("SELECT id FROM clinicians WHERE name = 'SELF REQUEST'")
+    if not cursor.fetchone():
+        cursor.execute("INSERT INTO clinicians (name) VALUES ('SELF REQUEST')")
+        logger.info("Pre-seeded clinician 'SELF REQUEST'")
+
     # Safe Migrations for existing database columns
     migrations = [
         ("tests", "parent_rollup_id", "INTEGER REFERENCES tests(id)"),
         ("test_orders", "sample_id", "TEXT"),
+        ("test_orders", "visit_id", "INTEGER REFERENCES visits(id)"),
         ("test_results", "parameter_id", "INTEGER REFERENCES test_parameters(id)"),
         ("users", "password_reset_required", "BOOLEAN NOT NULL DEFAULT 0"),
         ("users", "cadre", "TEXT")

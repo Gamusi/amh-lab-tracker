@@ -74,10 +74,33 @@ class Client:
     created_at: Optional[datetime.datetime] = None
 
 @dataclass
-class TestOrder:
+class Clinician:
+    id: int
+    name: str
+    is_active: bool = True
+    created_at: Optional[datetime.datetime] = None
+
+@dataclass
+class SequenceTracker:
+    id: int
+    seq_name: str
+    last_value: int = 0
+
+@dataclass
+class Visit:
     id: int
     client_id: int
+    clinician_id: Optional[int] = None
+    ward_of_origin: Optional[str] = None
+    lab_number: Optional[str] = None
+    created_at: Optional[datetime.datetime] = None
+
+@dataclass
+class TestOrder:
+    id: int
+    visit_id: int
     test_id: int
+    sample_id: Optional[str] = None
     ordered_by_user_id: Optional[int] = None
     ordered_at: Optional[datetime.datetime] = None
     status: str = "pending"  # pending, completed, cancelled
