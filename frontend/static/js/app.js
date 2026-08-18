@@ -1115,7 +1115,7 @@ const app = {
   async loadClientOrders(pid) {
     const frame = document.getElementById('report-frame');
     if (frame) {
-      frame.src = `/api/reports/client/${pid}/pdf?t=${Date.now()}`;
+      frame.src = `/api/reports/client/${pid}/pdf`;
     }
   },
 

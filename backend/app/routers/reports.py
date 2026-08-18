@@ -192,7 +192,7 @@ def create_pdf_report(
     return Response(content=pdf_bytes, media_type="application/pdf")
 
 @router.get("/client/{client_id}/pdf")
-def get_client_report_pdf(client_id: int, db: sqlite3.Connection = Depends(get_db)):
+def get_client_report_pdf(client_id: int, db: sqlite3.Connection = Depends(get_db), current_user: dict = Depends(get_current_user)):
     cur = db.cursor()
     cur.execute("SELECT * FROM clients WHERE id = ?", (client_id,))
     client_row = cur.fetchone()

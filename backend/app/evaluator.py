@@ -27,8 +27,11 @@ def evaluate_result(test_name: str, result_value: str, dob: datetime.date, sex: 
     unit = test_config.get("unit")
     
     try:
-        val = float(result_value)
-    except ValueError:
+        if result_value is None:
+            val = None
+        else:
+            val = float(result_value)
+    except (ValueError, TypeError):
         val = None
     
     age = calculate_age(dob, entry_date)
@@ -40,7 +43,7 @@ def evaluate_result(test_name: str, result_value: str, dob: datetime.date, sex: 
         rule_sex = rule.get("sex")
         
         if age_min <= age <= age_max:
-            if not rule_sex or rule_sex.lower() == sex.lower():
+            if not rule_sex or (sex and rule_sex.lower() == sex.lower()):
                 matched_rule = rule
                 break
                 
