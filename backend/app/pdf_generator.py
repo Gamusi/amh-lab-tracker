@@ -1,7 +1,8 @@
 import os
 import io
 from reportlab.lib.pagesizes import A4
-from reportlab.platypus import SimpleDocTemplate, Spacer, Table, TableStyle
+from reportlab.platypus import SimpleDocTemplate, Spacer, Table, TableStyle, KeepTogether
+from reportlab.lib import colors
 
 PAGE_WIDTH, PAGE_HEIGHT = A4
 SAFE_MARGIN_X = 56.69
@@ -35,6 +36,36 @@ def _build_metadata_table(order_data: dict) -> Table:
     ]))
     return t
 
+def _build_department_table(dept_name: str, tests: list) -> KeepTogether:
+    # 5-column layout: Test (140), Result (80), Unit (60), Flag (60), Reference (140)
+    data = [
+        [dept_name, "", "", "", ""],
+        ["Test", "Result", "Unit", "Flag", "Reference"]
+    ]
+    
+    for t in tests:
+        data.append([
+            t.get("test_name", ""),
+            t.get("result", ""),
+            t.get("unit", ""),
+            t.get("flag", ""),
+            t.get("reference", "")
+        ])
+        
+    t = Table(data, colWidths=[140, 80, 60, 60, 140])
+    t.setStyle(TableStyle([
+        ('FONTNAME', (0,0), (-1,-1), 'Helvetica'),
+        ('FONTNAME', (0,0), (-1,1), 'Helvetica-Bold'), 
+        ('ALIGN', (0,0), (-1,-1), 'LEFT'),
+        ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#f0f0f0')), 
+        ('SPAN', (0,0), (-1,0)), 
+        ('BOTTOMPADDING', (0,0), (-1,-1), 4),
+        ('TOPPADDING', (0,0), (-1,-1), 4),
+        ('LINEBELOW', (0,1), (-1,1), 1, colors.black), 
+    ]))
+    
+    return KeepTogether([t, Spacer(1, 15)])
+
 def generate_pdf(order_data: dict, results_data: list) -> bytes:
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(
@@ -49,6 +80,11 @@ def generate_pdf(order_data: dict, results_data: list) -> bytes:
     flowables = []
     flowables.append(_build_metadata_table(order_data))
     flowables.append(Spacer(1, 20))
+    
+    for dept_data in results_data:
+        dept_name = dept_data.get("department", "UNKNOWN")
+        tests = dept_data.get("tests", [])
+        flowables.append(_build_department_table(dept_name, tests))
     
     doc.build(flowables, onFirstPage=_draw_background_hook, onLaterPages=_draw_background_hook)
     
