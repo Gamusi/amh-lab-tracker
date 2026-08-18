@@ -136,7 +136,11 @@ Admins can easily re-theme the entire application without touching code:
 
 ## Developer Guidelines
 
-For developers contributing to this project, please strictly adhere to our [Best Practices](docs/BEST_PRACTICES.md) which outline UI/UX constraints and coding standards.
+For developers contributing to this project, please strictly adhere to our foundational documents:
+1. **[Product Requirements Document (PRD)](docs/PRD.md)**: Outlines the product vision, personas, and feature epics.
+2. **[Software Requirements Specification (SRS)](docs/SRS.md)**: Details system architecture, database schema, and security protocols.
+3. **[Functional Specification Document (FSD)](docs/FSD.md)**: Details screen layouts, data entry workflows, and operational edge cases.
+4. **[Best Practices](docs/BEST_PRACTICES.md)**: Outlines UI/UX constraints and surgical coding standards.
 
 ---
 
