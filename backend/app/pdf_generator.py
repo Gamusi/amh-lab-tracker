@@ -1,9 +1,7 @@
 import os
 import io
 from reportlab.lib.pagesizes import A4
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
-from reportlab.lib.styles import getSampleStyleSheet
-from reportlab.lib import colors
+from reportlab.platypus import SimpleDocTemplate, Spacer, Table, TableStyle
 
 PAGE_WIDTH, PAGE_HEIGHT = A4
 SAFE_MARGIN_X = 56.69

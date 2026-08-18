@@ -22,3 +22,7 @@ def test_build_metadata_table():
     }
     table = _build_metadata_table(order_data)
     assert isinstance(table, Table)
+    assert table._cellvalues[0][1] == "LUCY KEMIGISHA"
+    assert table._cellvalues[0][3] == "AMH-26-8-001"
+    assert table._cellvalues[1][1] == "32"
+    assert table._cellvalues[1][3] == "F"
