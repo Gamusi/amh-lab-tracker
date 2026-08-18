@@ -1,7 +1,11 @@
 import datetime, sqlite3
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import Response
+from pydantic import BaseModel
+from typing import List, Dict, Any
 from ..database import get_db
 from ..auth import get_current_user
+from ..pdf_generator import generate_pdf
 
 router = APIRouter(prefix="/api/reports", tags=["Reports"])
 
@@ -173,3 +177,15 @@ def get_hmis105_report(
         "end_date": e_str,
         "surveillance_items": surveillance_items
     }
+
+class ReportRequest(BaseModel):
+    order_data: Dict[str, Any]
+    results_data: List[Dict[str, Any]]
+
+@router.post("/generate-pdf")
+def create_pdf_report(
+    request: ReportRequest,
+    current_user: dict = Depends(get_current_user)
+):
+    pdf_bytes = generate_pdf(request.order_data, request.results_data)
+    return Response(content=pdf_bytes, media_type="application/pdf")
