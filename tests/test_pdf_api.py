@@ -14,10 +14,11 @@ def test_generate_pdf_endpoint():
         "results_data": []
     }
     
-    response = client.post("/api/reports/generate-pdf", json=payload)
-    assert response.status_code == 200
-    assert response.headers["content-type"] == "application/pdf"
-    assert response.content.startswith(b'%PDF-')
-    
-    # Cleanup override
-    app.dependency_overrides.clear()
+    try:
+        response = client.post("/api/reports/generate-pdf", json=payload)
+        assert response.status_code == 200
+        assert response.headers["content-type"] == "application/pdf"
+        assert response.content.startswith(b'%PDF-')
+    finally:
+        # Cleanup override
+        app.dependency_overrides.clear()
