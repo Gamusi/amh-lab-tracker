@@ -1,6 +1,6 @@
 import os, datetime, sqlite3
 from .database import get_connection, init_db
-from .auth import hash_password
+import json
 
 def seed_database():
     print("Initializing database schema...")
@@ -10,10 +10,15 @@ def seed_database():
     conn.row_factory = sqlite3.Row
     cur = conn.cursor()
 
-
-
-    # 2. Sections
-    sections = ["Main", "Referrals", "Out-Reaches", "Self-Request"]
+    # 1. Sections
+    sections = [
+        "Hematology & Coagulation", 
+        "Serology & Clinical Immunology", 
+        "Clinical Biochemistry", 
+        "Parasitology & Stool Diagnostics", 
+        "Microbiology", 
+        "Blood Transfusion & Immunohematology"
+    ]
     sec_map = {}
     for idx, name in enumerate(sections, 1):
         cur.execute("SELECT id FROM sections WHERE name = ?", (name,))
@@ -23,7 +28,7 @@ def seed_database():
             sec_id = cur.lastrowid
         else:
             sec_id = row["id"]
-        sec_map[name.lower()] = sec_id
+        sec_map[name] = sec_id
     
     conn.commit()
 
@@ -34,85 +39,92 @@ def seed_database():
     conn.commit()
 
     # 3. Test Catalog
-    tracked_tests = {
-        "sickle cell test", "widal", "vdrl/rpr", "hts", "determine", "stat-pak", "sd-bioline",
-        "hepatitis b surface antigen", "brucella agglutination test", "mrdt",
-        "h. pylori antigen", "h. pylori antibody", "hcg", "rheumatoid factor",
-        "blood smear (hemoparasites)", "blood smear (malaria)", "self test"
-    }
-
-    default_tests = {
-        "main": [
-            ("Hemoglobin", False), ("CBC", False), ("ABO Blood Grouping", False), ("Sickle Cell Test", True),
-            ("ESR", False), ("Blood Smear (Hemoparasites)", True), ("Stool Analysis", False), ("Widal", True),
-            ("VDRL/RPR", True), ("HTS", True), ("Determine", True), ("STAT-PAK", True), ("SD-Bioline", True),
-            ("Hepatitis B surface Antigen", True), ("Brucella Agglutination Test", True), ("MRDT", True),
-            ("H. pylori Antigen", True), ("H. pylori Antibody", True), ("Rheumatoid Factor", True), ("HCG", True),
-            ("PSA", False), ("EID", False), ("Viral Load", False), ("Fasting Blood Sugar", False),
-            ("Random Blood Sugar", False), ("Gram Staining", False), ("ZN Staining", False), ("CSF Analysis", False),
-            ("Urinalysis", False), ("LFTs", False), ("RFTs", False), ("CD4", False), ("CRAG", False),
-            ("LAM", False), ("Lipids", False)
-        ],
-        "referrals": [
-            ("Alpha-Feto Protein", False), ("Thyroid Function Tests", False), ("Uric Acid", False),
-            ("Hb Electrophoresis", False), ("Serum HCG", False), ("FSH", False), ("LH", False),
-            ("Hepatitis Be Antigen", False), ("Lipase", False), ("HbA1c", False)
-        ],
-        "out-reaches": [
-            ("MRDT", True), ("Determine", True), ("STAT-PAK", True), ("SD-Bioline", True),
-            ("Hepatitis B surface Antigen", True), ("ZN Staining", False)
-        ],
-        "self-request": [
-            ("Self Test", True), ("Blood Smear (Malaria)", True)
-        ]
-    }
+    # Tuples: (name, section, is_tracked, result_type, default_unit, options_list)
+    tests = [
+        ("CBC", "Hematology & Coagulation", False, "quantitative", None, None),
+        ("Hemoglobin", "Hematology & Coagulation", False, "quantitative", "g/dL", None),
+        ("Blood Smear (Hemoparasites)", "Hematology & Coagulation", True, "qualitative", None, ["No hemoparasites seen", "Seen"]),
+        
+        ("Widal", "Serology & Clinical Immunology", True, "semi_quantitative", None, None),
+        ("VDRL/RPR", "Serology & Clinical Immunology", True, "qualitative", None, ["Reactive", "Non-Reactive"]),
+        ("MRDT", "Serology & Clinical Immunology", True, "qualitative", None, ["Positive", "Negative", "Invalid"]),
+        ("Determine", "Serology & Clinical Immunology", True, "qualitative", None, ["Reactive", "Non-Reactive", "Invalid"]),
+        ("STAT-PAK", "Serology & Clinical Immunology", True, "qualitative", None, ["Reactive", "Non-Reactive", "Invalid"]),
+        ("SD-Bioline", "Serology & Clinical Immunology", True, "qualitative", None, ["Reactive", "Non-Reactive", "Invalid"]),
+        ("HTS", "Serology & Clinical Immunology", True, "qualitative", None, ["Positive", "Negative"]),
+        ("Hepatitis B surface Antigen", "Serology & Clinical Immunology", True, "qualitative", None, ["Positive", "Negative", "Invalid"]),
+        ("Brucella Agglutination Test", "Serology & Clinical Immunology", True, "qualitative", None, ["Positive", "Negative"]),
+        ("H. pylori Antigen", "Serology & Clinical Immunology", True, "qualitative", None, ["Positive", "Negative", "Invalid"]),
+        ("H. pylori Antibody", "Serology & Clinical Immunology", True, "qualitative", None, ["Positive", "Negative", "Invalid"]),
+        ("Rheumatoid Factor", "Serology & Clinical Immunology", True, "qualitative", None, ["Positive", "Negative"]),
+        ("HCG Urine", "Serology & Clinical Immunology", True, "qualitative", None, ["Positive", "Negative", "Invalid"]),
+        
+        ("Urinalysis", "Clinical Biochemistry", False, "semi_quantitative", None, None),
+        ("LFTs", "Clinical Biochemistry", False, "quantitative", None, None),
+        ("RFTs", "Clinical Biochemistry", False, "quantitative", None, None),
+        ("Fasting Blood Sugar", "Clinical Biochemistry", False, "quantitative", "mg/dL", None),
+        ("Random Blood Sugar", "Clinical Biochemistry", False, "quantitative", "mg/dL", None),
+        
+        ("Blood smear for Malaria Parasites", "Parasitology & Stool Diagnostics", True, "qualitative", None, ["No malaria parasites seen", "+", "++", "+++", "++++"]),
+        ("Stool Analysis", "Parasitology & Stool Diagnostics", False, "qualitative", None, None),
+        
+        ("ZN Staining", "Microbiology", False, "qualitative", None, ["Negative", "Positive"]),
+        ("Gram Staining", "Microbiology", False, "qualitative", None, ["Negative", "Positive"]),
+        ("Culture & Sensitivity", "Microbiology", False, "qualitative", None, ["No growth", "Growth"]),
+        
+        ("Blood Grouping", "Blood Transfusion & Immunohematology", False, "qualitative", None, ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"]),
+        ("Cross-matching", "Blood Transfusion & Immunohematology", False, "qualitative", None, ["Compatible", "Incompatible"])
+    ]
 
     test_count = 0
     test_obj_map = {}
-    for sec_key, t_list in default_tests.items():
-        sec_id = sec_map[sec_key]
-        for sort_i, (t_name, default_tracked) in enumerate(t_list, 1):
-            cur.execute("SELECT id FROM tests WHERE name = ? AND section_id = ?", (t_name, sec_id))
-            r = cur.fetchone()
-            if not r:
-                is_tr = (t_name.lower() in tracked_tests) or default_tracked
-                cur.execute(
-                    "INSERT INTO tests (name, section_id, is_tracked, sort_order) VALUES (?, ?, ?, ?)",
-                    (t_name, sec_id, 1 if is_tr else 0, sort_i)
-                )
-                tid = cur.lastrowid
-            else:
-                tid = r["id"]
-            test_obj_map[(sec_key, t_name.lower())] = tid
-            test_count += 1
+    for t_name, sec_name, is_tracked, result_type, default_unit, options in tests:
+        sec_id = sec_map[sec_name]
+        cur.execute("SELECT id FROM tests WHERE name = ? AND section_id = ?", (t_name, sec_id))
+        r = cur.fetchone()
+        options_json = json.dumps(options) if options else None
+        
+        if not r:
+            cur.execute(
+                "INSERT INTO tests (name, section_id, is_tracked, sort_order, result_type, default_unit, options) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (t_name, sec_id, 1 if is_tracked else 0, 0, result_type, default_unit, options_json)
+            )
+            tid = cur.lastrowid
+        else:
+            tid = r["id"]
+            cur.execute(
+                "UPDATE tests SET result_type = ?, default_unit = ?, options = ? WHERE id = ?",
+                (result_type, default_unit, options_json, tid)
+            )
+        test_obj_map[t_name.lower()] = tid
+        test_count += 1
 
     conn.commit()
 
     # Link HIV Rapid Test Algorithm Rollup IDs (Determine, STAT-PAK, SD-Bioline -> HTS)
-    for sec_k in ["main", "out-reaches"]:
-        hts_id = test_obj_map.get((sec_k, "hts"))
-        if hts_id:
-            for kit_name in ["determine", "stat-pak", "sd-bioline"]:
-                kit_id = test_obj_map.get((sec_k, kit_name))
-                if kit_id:
-                    cur.execute("UPDATE tests SET parent_rollup_id = ? WHERE id = ?", (hts_id, kit_id))
+    hts_id = test_obj_map.get("hts")
+    if hts_id:
+        for kit_name in ["determine", "stat-pak", "sd-bioline"]:
+            kit_id = test_obj_map.get(kit_name)
+            if kit_id:
+                cur.execute("UPDATE tests SET parent_rollup_id = ? WHERE id = ?", (hts_id, kit_id))
 
     # Seed Multi-Parameter Test Panels
     panel_definitions = {
-        ("main", "cbc"): [
+        "cbc": [
             ("Hemoglobin (Hb)", "g/dL", "12.0 - 16.0", 1),
             ("White Blood Cells (WBC)", "x10^9/L", "4.0 - 10.0", 2),
             ("Red Blood Cells (RBC)", "x10^12/L", "3.8 - 5.5", 3),
             ("Platelets (PLT)", "x10^9/L", "150 - 450", 4),
             ("Hematocrit (HCT)", "%", "36.0 - 48.0", 5)
         ],
-        ("main", "lfts"): [
+        "lfts": [
             ("ALT (SGPT)", "U/L", "7 - 56", 1),
             ("AST (SGOT)", "U/L", "10 - 40", 2),
             ("Alkaline Phosphatase (ALP)", "U/L", "44 - 147", 3),
             ("Total Bilirubin", "mg/dL", "0.1 - 1.2", 4)
         ],
-        ("main", "rfts"): [
+        "rfts": [
             ("Serum Urea", "mmol/L", "2.5 - 7.8", 1),
             ("Serum Creatinine", "µmol/L", "62 - 115", 2),
             ("Sodium (Na+)", "mmol/L", "135 - 145", 3),
@@ -120,8 +132,8 @@ def seed_database():
         ]
     }
 
-    for (sec_k, t_k), params in panel_definitions.items():
-        tid = test_obj_map.get((sec_k, t_k))
+    for t_k, params in panel_definitions.items():
+        tid = test_obj_map.get(t_k)
         if tid:
             for pname, unit, ref_range, s_order in params:
                 cur.execute("SELECT id FROM test_parameters WHERE test_id = ? AND parameter_name = ?", (tid, pname))

@@ -42,6 +42,9 @@ class Test:
     is_tracked: bool = False
     is_active: bool = True
     sort_order: int = 0
+    result_type: str = "qualitative" # quantitative, qualitative, semi_quantitative
+    default_unit: Optional[str] = None
+    options: Optional[str] = None # JSON string array of options for qualitative/semi-quantitative
 
 @dataclass
 class DailyEntry:

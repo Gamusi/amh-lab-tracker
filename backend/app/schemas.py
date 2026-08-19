@@ -41,6 +41,9 @@ class TestBase(BaseModel):
     section_id: int
     is_tracked: bool = False
     sort_order: int = 0
+    result_type: str = "qualitative"
+    default_unit: Optional[str] = None
+    options: Optional[str] = None
 
 class TestCreate(TestBase):
     pass

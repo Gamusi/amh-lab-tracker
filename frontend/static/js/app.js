@@ -7,6 +7,9 @@ const app = {
   lastActivityTime: 0,
 
   icons: {
+      'building': `<svg class="lucide" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="16" height="20" x="4" y="2" rx="2" ry="2"/><path d="M9 22v-4h6v4"/><path d="M8 6h.01"/><path d="M16 6h.01"/><path d="M12 6h.01"/><path d="M12 10h.01"/><path d="M12 14h.01"/><path d="M16 10h.01"/><path d="M16 14h.01"/><path d="M8 10h.01"/><path d="M8 14h.01"/></svg>`,
+      'stethoscope': `<svg class="lucide" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 2v2"/><path d="M5 2v2"/><path d="M5 3H4a2 2 0 0 0-2 2v4a6 6 0 0 0 12 0V5a2 2 0 0 0-2-2h-1"/><path d="M8 15a6 6 0 0 0 12 0v-3"/><circle cx="20" cy="10" r="2"/></svg>`,
+
     'clipboard-list': `<svg class="lucide" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4"/><path d="M12 16h4"/><path d="M8 11h.01"/><path d="M8 16h.01"/></svg>`,
     'bar-chart-2': `<svg class="lucide" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" x2="18" y1="20" y2="10"/><line x1="12" x2="12" y1="20" y2="4"/><line x1="6" x2="6" y1="20" y2="14"/></svg>`,
     'trending-up': `<svg class="lucide" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>`,
@@ -1329,20 +1332,30 @@ const app = {
     }
   },
 
+
   async showEnterResultModal(orderId, testId, testName) {
     document.getElementById('result-entry-order-id').value = orderId;
     document.getElementById('result-entry-test-id').value = testId;
     document.getElementById('result-entry-test-name').textContent = testName;
     
+    // Ensure testCatalog is loaded
+    if (!this.testCatalog || this.testCatalog.length === 0) {
+      try {
+        const res = await fetch('/api/config/tests');
+        if (res.ok) this.testCatalog = await res.json();
+      } catch(e) {}
+    }
+    
     const singleContainer = document.getElementById('result-entry-single-container');
     const paramsContainer = document.getElementById('result-entry-params-container');
     const trackGroup = document.getElementById('result-entry-tracked-group');
-    if (trackGroup) trackGroup.style.display = 'none'; // REMOVED tracked logic from UI
+    if (trackGroup) trackGroup.style.display = 'none';
     
     paramsContainer.style.display = 'none';
     singleContainer.style.display = 'block';
     
     const nameLower = testName.toLowerCase();
+    const test = (this.testCatalog || []).find(t => t.id === testId) || {};
     
     // Tailored Forms
     if (nameLower.includes('urinalysis')) {
@@ -1384,34 +1397,40 @@ const app = {
            <input type="text" id="widal-tit-val" placeholder="e.g. TO 1:160, TH 1:80" style="width:100%; padding:8px;">
          </div>
        `;
-    } else if (nameLower.includes('hiv') || nameLower.includes('hts') || nameLower.includes('determine') || nameLower.includes('stat-pak') || nameLower.includes('sd-bioline') || nameLower.includes('vdrl') || nameLower.includes('rpr') || nameLower.includes('hepatitis') || nameLower.includes('brucella') || nameLower.includes('h. pylori') || nameLower.includes('hcg') || nameLower.includes('rheumatoid') || nameLower.includes('crag') || nameLower.includes('covid')) {
-       singleContainer.innerHTML = `
-         <label>Result:</label>
-         <select id="qual-res" style="width:100%; padding:8px;">
-           <option>Negative / Non-Reactive</option>
-           <option>Positive / Reactive</option>
-           <option>Inconclusive</option>
-         </select>
-       `;
-    } else if (nameLower.includes('malaria') || nameLower.includes('mrdt') || nameLower.includes('blood smear')) {
-       singleContainer.innerHTML = `
-         <label>Result:</label>
-         <select id="qual-res" style="width:100%; padding:8px;">
-           <option>No malaria parasites seen</option>
-           <option>Positive (1+)</option>
-           <option>Positive (2+)</option>
-           <option>Positive (3+)</option>
-           <option>Positive (4+)</option>
-         </select>
-       `;
     } else {
-       // Standard Numeric (or simple text)
-       singleContainer.innerHTML = `
-         <div class="form-group" style="margin-bottom: 16px;">
-           <label>Result Value:</label>
-           <input type="text" id="result-entry-value" placeholder="Enter Value" style="width: 100%; padding: 8px;">
-         </div>
-       `;
+        // Use the new dynamic system
+        let options = [];
+        try {
+            if (test.options) options = JSON.parse(test.options);
+        } catch (e) {}
+
+        if (test.result_type === 'qualitative' || test.result_type === 'semi_quantitative') {
+            if (options && options.length > 0) {
+                let optsHtml = options.map(o => `<option value="${this.escape(o)}">${this.escape(o)}</option>`).join('');
+                singleContainer.innerHTML = `
+                  <label>Result:</label>
+                  <select id="qual-res" style="width:100%; padding:8px;">
+                    ${optsHtml}
+                  </select>
+                `;
+            } else {
+                singleContainer.innerHTML = `
+                  <label>Result:</label>
+                  <input type="text" id="result-entry-value" placeholder="Enter text result" style="width:100%; padding:8px;">
+                `;
+            }
+        } else {
+            // quantitative
+            singleContainer.innerHTML = `
+              <div class="form-group" style="margin-bottom: 16px;">
+                <label>Result Value ${test.default_unit ? '(' + this.escape(test.default_unit) + ')' : ''}:</label>
+                <div style="display: flex; gap: 8px;">
+                    <input type="number" step="any" id="result-entry-value" placeholder="Enter Value" style="flex: 1; padding: 8px;">
+                    ${test.default_unit ? `<span style="padding: 8px; background: var(--bg-color); border: 1px solid var(--border-color); border-radius: 4px;">${this.escape(test.default_unit)}</span>` : ''}
+                </div>
+              </div>
+            `;
+        }
        
        // Load parameters if exist
        try {
@@ -1434,7 +1453,6 @@ const app = {
          }
        } catch(e) { console.error(e); }
     }
-    
     document.getElementById('result-entry-modal').style.display = 'flex';
     
     const form = document.getElementById('result-entry-form');
@@ -1789,7 +1807,7 @@ const app = {
                 <td>Section ${t.section_id}</td>
                 <td>${t.is_tracked ? 'Tracked (Positive Checked)' : 'Standard (Done Only)'}</td>
                 <td>
-                  <button class="btn btn-secondary" style="padding: 2px 8px; font-size: 0.8rem;" onclick="app.editTest(${t.id}, '${this.escape(t.name)}', ${t.section_id}, ${t.is_tracked})">Edit</button>
+                  <button class="btn btn-secondary" style="padding: 2px 8px; font-size: 0.8rem;" onclick="app.openTestConfigModal(${this.escape(JSON.stringify(t))})">Edit</button>
                   <button class="btn btn-secondary" style="padding: 2px 8px; font-size: 0.8rem; color: var(--danger-color);" onclick="app.deleteTest(${t.id})">Delete</button>
                 </td>
               </tr>
@@ -2059,7 +2077,121 @@ const app = {
   },
 
 
-  async editTest(testId, oldName, oldSection, oldTracked) {
+  
+  async openTestConfigModal(testRaw = null) {
+    let test = null;
+    if (typeof testRaw === 'string') {
+        try { test = JSON.parse(testRaw); } catch(e){}
+    } else if (testRaw) {
+        test = testRaw;
+    }
+    
+    // Load sections if not loaded
+    if (!this.sections) {
+      try {
+        const res = await fetch('/api/config/sections');
+        if (res.ok) this.sections = await res.json();
+        else this.sections = [];
+      } catch(e) { this.sections = []; }
+    }
+
+    const modal = document.getElementById('test-config-modal');
+    const form = document.getElementById('test-config-form');
+    form.reset();
+    
+    const secSelect = document.getElementById('test-config-section');
+    secSelect.innerHTML = '<option value="">-- Select Section --</option>';
+    this.sections.forEach(s => {
+      secSelect.innerHTML += `<option value="${s.id}">${this.escape(s.name)}</option>`;
+    });
+
+    if (test) {
+      document.getElementById('test-config-title').textContent = 'Edit Test';
+      document.getElementById('test-config-id').value = test.id;
+      document.getElementById('test-config-name').value = test.name;
+      document.getElementById('test-config-section').value = test.section_id;
+      document.getElementById('test-config-result-type').value = test.result_type || 'qualitative';
+      document.getElementById('test-config-unit').value = test.default_unit || '';
+      document.getElementById('test-config-options').value = test.options ? JSON.parse(test.options).join(', ') : '';
+      document.getElementById('test-config-tracked').checked = test.is_tracked;
+    } else {
+      document.getElementById('test-config-title').textContent = 'Add New Test';
+      document.getElementById('test-config-id').value = '';
+      document.getElementById('test-config-result-type').value = 'qualitative';
+      document.getElementById('test-config-unit').value = '';
+      document.getElementById('test-config-options').value = '';
+      document.getElementById('test-config-tracked').checked = false;
+    }
+    this.handleTestResultTypeChange();
+    modal.style.display = 'flex';
+    
+    form.onsubmit = async (e) => {
+      e.preventDefault();
+      await this.saveTestConfig();
+    };
+  },
+
+  handleTestResultTypeChange() {
+    const rType = document.getElementById('test-config-result-type').value;
+    const unitGroup = document.getElementById('test-config-unit-group');
+    const optionsGroup = document.getElementById('test-config-options-group');
+    
+    if (rType === 'quantitative') {
+      unitGroup.style.display = 'block';
+      optionsGroup.style.display = 'none';
+      document.getElementById('test-config-options').value = '';
+    } else if (rType === 'qualitative' || rType === 'semi_quantitative') {
+      unitGroup.style.display = 'none';
+      optionsGroup.style.display = 'block';
+      document.getElementById('test-config-unit').value = '';
+    }
+  },
+
+  async saveTestConfig() {
+    const id = document.getElementById('test-config-id').value;
+    const name = document.getElementById('test-config-name').value;
+    const section_id = parseInt(document.getElementById('test-config-section').value, 10);
+    const result_type = document.getElementById('test-config-result-type').value;
+    const default_unit = document.getElementById('test-config-unit').value.trim() || null;
+    const optionsRaw = document.getElementById('test-config-options').value;
+    const is_tracked = document.getElementById('test-config-tracked').checked;
+    
+    let options = null;
+    if (optionsRaw.trim() && (result_type === 'qualitative' || result_type === 'semi_quantitative')) {
+      options = JSON.stringify(optionsRaw.split(',').map(s => s.trim()).filter(s => s));
+    }
+
+    const payload = { name, section_id, is_tracked, result_type, default_unit, options, sort_order: 0 };
+    
+    try {
+      let res;
+      if (id) {
+        res = await fetch(`/api/config/tests/${id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+      } else {
+        res = await fetch(`/api/config/tests`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+      }
+      
+      if (res.ok) {
+        document.getElementById('test-config-modal').style.display = 'none';
+        this.showNotificationModal("Success", `Test ${id ? 'updated' : 'added'} successfully.`);
+        await this.loadConfigData();
+      } else {
+        const err = await res.json();
+        this.showNotificationModal("Error", err.detail || 'Failed to save test.', true);
+      }
+    } catch (e) {
+      this.showNotificationModal("Error", 'Connection error.', true);
+    }
+  },
+async editTest(testId, oldName, oldSection, oldTracked) {
     const name = prompt('Edit Test Name:', oldName);
     if (!name) return;
     const secStr = prompt('Edit Section ID (1-8):', oldSection);
@@ -2101,247 +2233,9 @@ const app = {
       }
     } catch (e) {
       this.showNotificationModal("Error", 'Connection error.', true);
-    }
-  },
+	}	
+   },
 
-  async loadCliniciansConfig() {
-    try {
-      const res = await fetch('/api/config/clinicians');
-      if (!res.ok) throw new Error('API returned ' + res.status);
-      const clinicians = await res.json();
-      const container = document.getElementById('clinicians-config-container');
-      if (!container) return;
-
-      if (clinicians.length === 0) {
-        container.innerHTML = '<p style="padding: 12px; color: var(--text-muted);">No clinicians configured.</p>';
-        return;
-      }
-
-      let rows = '';
-      clinicians.forEach(c => {
-        const isSelf = c.name === 'SELF REQUEST';
-        rows += `
-          <tr>
-            <td><strong>${this.escape(c.name)}</strong></td>
-            <td>
-              <span style="padding: 3px 8px; border-radius: 4px; font-size: 0.8rem; font-weight: 600; background: ${c.is_active ? '#DEF7EC; color: #03543F' : '#FDE8E8; color: #9B1C1C'};">
-                ${c.is_active ? 'Active' : 'Inactive'}
-              </span>
-            </td>
-            <td>
-              <div style="display: flex; gap: 6px; align-items: center;">
-                <button class="btn btn-secondary" style="padding: 2px 8px; font-size: 0.8rem;" onclick="app.editClinician(${c.id}, '${this.escape(c.name)}', ${c.is_active})">Edit</button>
-                ${!isSelf ? `
-                  <button class="btn btn-secondary" style="padding: 2px 8px; font-size: 0.8rem; color: var(--danger-color);" onclick="app.deleteClinician(${c.id})">${c.is_active ? 'Deactivate' : 'Delete'}</button>
-                ` : ''}
-              </div>
-            </td>
-          </tr>
-        `;
-      });
-
-      container.innerHTML = `
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th>Clinician Name</th>
-              <th style="width: 140px;">Status</th>
-              <th style="width: 160px;">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${rows}
-          </tbody>
-        </table>
-      `;
-    } catch (e) {
-      console.error('Error loading clinicians config:', e);
-    }
-  },
-
-  async showAddClinicianModal() {
-    const name = prompt('Enter Clinician Name (e.g. Dr. Jane Doe):');
-    if (!name || !name.trim()) return;
-
-    try {
-      const res = await fetch('/api/config/clinicians', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: name.trim() })
-      });
-      if (res.ok) {
-        this.showNotificationModal("Success", 'Clinician added successfully!', false);
-        await this.loadCliniciansConfig();
-        await this.loadClinicians();
-      } else {
-        const err = await res.json();
-        this.showNotificationModal("Error", err.detail || 'Failed to add clinician.', true);
-      }
-    } catch (e) {
-      this.showNotificationModal("Error", 'Connection error.', true);
-    }
-  },
-
-  async editClinician(id, oldName, oldActive) {
-    const name = prompt('Edit Clinician Name:', oldName);
-    if (!name || !name.trim()) return;
-
-    const isActive = confirm('Keep/Set Clinician as Active? (OK for Active, Cancel for Inactive)');
-
-    try {
-      const res = await fetch(`/api/config/clinicians/${id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: name.trim(), is_active: isActive })
-      });
-      if (res.ok) {
-        this.showNotificationModal("Success", 'Clinician updated successfully!', false);
-        await this.loadCliniciansConfig();
-        await this.loadClinicians();
-      } else {
-        const err = await res.json();
-        this.showNotificationModal("Error", err.detail || 'Failed to update clinician.', true);
-      }
-    } catch (e) {
-      this.showNotificationModal("Error", 'Connection error.', true);
-    }
-  },
-
-  async deleteClinician(id) {
-    if (!confirm('Are you sure you want to deactivate/delete this clinician?')) return;
-    try {
-      const res = await fetch(`/api/config/clinicians/${id}`, { method: 'DELETE' });
-      if (res.ok) {
-        this.showNotificationModal("Success", 'Clinician deactivated.', false);
-        await this.loadCliniciansConfig();
-        await this.loadClinicians();
-      } else {
-        const err = await res.json();
-        this.showNotificationModal("Error", err.detail || 'Failed to delete clinician.', true);
-      }
-    } catch (e) {
-      this.showNotificationModal("Error", 'Connection error.', true);
-    }
-  },
-
-  async loadWardsConfig() {
-    try {
-      const res = await fetch('/api/config/wards');
-      if (!res.ok) throw new Error('API returned ' + res.status);
-      const wards = await res.json();
-      const container = document.getElementById('wards-config-container');
-      if (!container) return;
-
-      if (wards.length === 0) {
-        container.innerHTML = '<p style="padding: 12px; color: var(--text-muted);">No wards configured.</p>';
-        return;
-      }
-
-      let rows = '';
-      wards.forEach(w => {
-        rows += `
-          <tr>
-            <td><strong>${this.escape(w.name)}</strong></td>
-            <td>
-              <span style="padding: 3px 8px; border-radius: 4px; font-size: 0.8rem; font-weight: 600; background: ${w.is_active ? '#DEF7EC; color: #03543F' : '#FDE8E8; color: #9B1C1C'};">
-                ${w.is_active ? 'Active' : 'Inactive'}
-              </span>
-            </td>
-            <td>
-              <div style="display: flex; gap: 6px; align-items: center;">
-                <button class="btn btn-secondary" style="padding: 2px 8px; font-size: 0.8rem;" onclick="app.editWard(${w.id}, '${this.escape(w.name)}', ${w.is_active})">Edit</button>
-                <button class="btn btn-secondary" style="padding: 2px 8px; font-size: 0.8rem; color: var(--danger-color);" onclick="app.deleteWard(${w.id})">${w.is_active ? 'Deactivate' : 'Delete'}</button>
-              </div>
-            </td>
-          </tr>
-        `;
-      });
-
-      container.innerHTML = `
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th>Ward Name</th>
-              <th style="width: 140px;">Status</th>
-              <th style="width: 160px;">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${rows}
-          </tbody>
-        </table>
-      `;
-    } catch (e) {
-      console.error('Error loading wards config:', e);
-    }
-  },
-
-  async showAddWardModal() {
-    const name = prompt('Enter Ward Name (e.g. OPD, Maternity, TB Clinic):');
-    if (!name || !name.trim()) return;
-
-    try {
-      const res = await fetch('/api/config/wards', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: name.trim() })
-      });
-      if (res.ok) {
-        this.showNotificationModal("Success", 'Ward added successfully!', false);
-        await this.loadWardsConfig();
-        await this.loadWards();
-      } else {
-        const err = await res.json();
-        this.showNotificationModal("Error", err.detail || 'Failed to add ward.', true);
-      }
-    } catch (e) {
-      this.showNotificationModal("Error", 'Connection error.', true);
-    }
-  },
-
-  async editWard(id, oldName, oldActive) {
-    const name = prompt('Edit Ward Name:', oldName);
-    if (!name || !name.trim()) return;
-
-    const isActive = confirm('Keep/Set Ward as Active? (OK for Active, Cancel for Inactive)');
-
-    try {
-      const res = await fetch(`/api/config/wards/${id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: name.trim(), is_active: isActive })
-      });
-      if (res.ok) {
-        this.showNotificationModal("Success", 'Ward updated successfully!', false);
-        await this.loadWardsConfig();
-        await this.loadWards();
-      } else {
-        const err = await res.json();
-        this.showNotificationModal("Error", err.detail || 'Failed to update ward.', true);
-      }
-    } catch (e) {
-      this.showNotificationModal("Error", 'Connection error.', true);
-    }
-  },
-
-  async deleteWard(id) {
-    if (!confirm('Are you sure you want to deactivate/delete this ward?')) return;
-    try {
-      const res = await fetch(`/api/config/wards/${id}`, { method: 'DELETE' });
-      if (res.ok) {
-        this.showNotificationModal("Success", 'Ward deactivated.', false);
-        await this.loadWardsConfig();
-        await this.loadWards();
-      } else {
-        const err = await res.json();
-        this.showNotificationModal("Error", err.detail || 'Failed to delete ward.', true);
-      }
-    } catch (e) {
-      this.showNotificationModal("Error", 'Connection error.', true);
-    }
-  },
-
-  // Audit Log View
   async renderAuditLog(container) {
     container.innerHTML = `
       <div class="card">
@@ -2396,6 +2290,8 @@ const app = {
   }
 };
 
-window.addEventListener('DOMContentLoaded', () => {
+
+
+window.onload = () => {
   app.init();
-});
+};

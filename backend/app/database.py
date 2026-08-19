@@ -43,6 +43,9 @@ SCHEMA_SQL = """
         parent_rollup_id INTEGER REFERENCES tests(id),
         is_active BOOLEAN NOT NULL DEFAULT 1,
         sort_order INTEGER DEFAULT 0,
+        result_type TEXT DEFAULT 'qualitative',
+        default_unit TEXT,
+        options TEXT,
         UNIQUE(name, section_id)
     );
 
@@ -176,7 +179,10 @@ def init_db():
         ("test_results", "parameter_id", "INTEGER REFERENCES test_parameters(id)"),
         ("users", "password_reset_required", "BOOLEAN NOT NULL DEFAULT 0"),
         ("users", "cadre", "TEXT"),
-        ("test_orders", "order_category", "TEXT DEFAULT 'in-house'")
+        ("test_orders", "order_category", "TEXT DEFAULT 'in-house'"),
+        ("tests", "result_type", "TEXT DEFAULT 'qualitative'"),
+        ("tests", "default_unit", "TEXT"),
+        ("tests", "options", "TEXT")
     ]
     for table, col, col_def in migrations:
         try:

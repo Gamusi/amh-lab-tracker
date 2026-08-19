@@ -26,8 +26,8 @@ def _build_metadata_table(order_data: dict) -> Table:
     ward = order_data.get("ward_of_origin", "")
     
     data = [
-        ["Patient Name:", str(order_data.get("full_name", "")), "Lab No:", str(lab_no)],
-        ["Age:", str(order_data.get("age", "")), "Sex:", str(order_data.get("sex", ""))],
+        ["Patient Name:", str(order_data.get("full_name") or ""), "Lab No:", str(lab_no)],
+        ["Age:", str(order_data.get("age") or ""), "Sex:", str(order_data.get("sex") or "")],
         ["Requested by:", str(requested_by), "Date:", str(date_val)],
         ["Ward / OPD:", str(ward), "", ""]
     ]
@@ -58,7 +58,7 @@ def _build_department_table(dept_name: str, tests: list) -> KeepTogether:
     result_style = ParagraphStyle(name="ResultStyle", fontName="Helvetica", fontSize=10, leading=12)
     
     for t in tests:
-        res_text = str(t.get("result", ""))
+        res_text = str(t.get("result") or "")
         res_para = Paragraph(res_text, result_style) if res_text else ""
         data.append([
             t.get("test_name", ""),
@@ -115,7 +115,7 @@ def _build_signatures_table(order_data: dict) -> KeepTogether:
 def _build_urinalysis_table(urinalysis_test: dict) -> KeepTogether:
     data = [["Urinalysis Parameters", "Result"]]
     
-    result_str = str(urinalysis_test.get("result", ""))
+    result_str = str(urinalysis_test.get("result") or "")
     
     # Try parsing result_str as a multiline or comma separated if it's plain text
     import json
@@ -206,7 +206,7 @@ def generate_pdf(order_data: dict, results_data: list) -> bytes:
             
         final_tests = []
         for t_name, orders in grouped_tests.items():
-            valid_orders = [o for o in orders if o.get("result", "").lower() != "invalid"]
+            valid_orders = [o for o in orders if str(o.get("result") or "").lower() != "invalid"]
             if valid_orders:
                 final_tests.extend(valid_orders)
             else:
@@ -217,7 +217,7 @@ def generate_pdf(order_data: dict, results_data: list) -> bytes:
         # Intercept Urinalysis
         tests_to_render = []
         for t in final_tests:
-            if t.get("test_name", "").lower() == "urinalysis":
+            if str(t.get("test_name") or "").lower() == "urinalysis":
                 urinalysis_test = t
             else:
                 tests_to_render.append(t)

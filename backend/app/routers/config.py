@@ -17,7 +17,7 @@ def get_sections(conn: sqlite3.Connection = Depends(get_db), current_user: dict 
 @router.get("/tests")
 def get_tests(conn: sqlite3.Connection = Depends(get_db), current_user: dict = Depends(get_current_user)):
     cur = conn.cursor()
-    cur.execute("SELECT id, name, section_id, is_tracked, parent_rollup_id, is_active, sort_order FROM tests WHERE is_active = 1 ORDER BY section_id, sort_order, id")
+    cur.execute("SELECT id, name, section_id, is_tracked, parent_rollup_id, is_active, sort_order, result_type, default_unit, options FROM tests WHERE is_active = 1 ORDER BY section_id, sort_order, id")
     return [dict(r) for r in cur.fetchall()]
 
 @router.get("/tests/{test_id}/parameters")
@@ -34,8 +34,8 @@ def create_test(req: TestCreate, admin_user: dict = Depends(require_admin), conn
         raise HTTPException(status_code=400, detail="Invalid section ID")
     
     cur.execute(
-        "INSERT INTO tests (name, section_id, is_tracked, sort_order) VALUES (?, ?, ?, ?)",
-        (req.name, req.section_id, 1 if req.is_tracked else 0, req.sort_order)
+        "INSERT INTO tests (name, section_id, is_tracked, sort_order, result_type, default_unit, options) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        (req.name, req.section_id, 1 if req.is_tracked else 0, req.sort_order, req.result_type, req.default_unit, req.options)
     )
     tid = cur.lastrowid
     conn.commit()
@@ -43,7 +43,7 @@ def create_test(req: TestCreate, admin_user: dict = Depends(require_admin), conn
     conn.execute("INSERT INTO audit_log (user_id, action, detail) VALUES (?, ?, ?)", (admin_user["id"], "create_test", f"Created test '{req.name}'"))
     conn.commit()
     
-    return {"id": tid, "name": req.name, "section_id": req.section_id, "is_tracked": req.is_tracked}
+    return {"id": tid, "name": req.name, "section_id": req.section_id, "is_tracked": req.is_tracked, "result_type": req.result_type, "default_unit": req.default_unit, "options": req.options}
     
 @router.post("/results")
 def enter_result(req: TestCreate, current_user: User = Depends(get_current_user)):
@@ -59,14 +59,15 @@ def update_test(test_id: int, req: TestCreate, conn: sqlite3.Connection = Depend
         
     cur.execute("""
         UPDATE tests
-        SET name = ?, section_id = ?, is_tracked = ?
+        SET name = ?, section_id = ?, is_tracked = ?, result_type = ?, default_unit = ?, options = ?
         WHERE id = ?
-    """, (req.name, req.section_id, 1 if req.is_tracked else 0, test_id))
+    """, (req.name, req.section_id, 1 if req.is_tracked else 0, req.result_type, req.default_unit, req.options, test_id))
     
     conn.commit()
     return TestResponse(
         id=test_id, name=req.name, section_id=req.section_id, 
-        is_tracked=req.is_tracked, sort_order=req.sort_order, is_active=True
+        is_tracked=req.is_tracked, sort_order=req.sort_order, is_active=True,
+        result_type=req.result_type, default_unit=req.default_unit, options=req.options
     )
 
 @router.delete("/tests/{test_id}")
