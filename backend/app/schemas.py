@@ -173,6 +173,7 @@ class TestResultCreate(BaseModel):
 class AddOrdersRequest(BaseModel):
     test_ids: List[int]
     sample_id: Optional[str] = None
+    order_category: Optional[str] = "in-house"
 
 
 

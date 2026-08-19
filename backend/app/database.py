@@ -121,7 +121,8 @@ SCHEMA_SQL = """
         sample_id TEXT,
         ordered_by_user_id INTEGER REFERENCES users(id),
         ordered_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        status TEXT DEFAULT 'pending'
+        status TEXT DEFAULT 'pending',
+        order_category TEXT DEFAULT 'in-house'
     );
 
     CREATE TABLE IF NOT EXISTS test_results (
@@ -174,7 +175,8 @@ def init_db():
         ("test_orders", "visit_id", "INTEGER REFERENCES visits(id)"),
         ("test_results", "parameter_id", "INTEGER REFERENCES test_parameters(id)"),
         ("users", "password_reset_required", "BOOLEAN NOT NULL DEFAULT 0"),
-        ("users", "cadre", "TEXT")
+        ("users", "cadre", "TEXT"),
+        ("test_orders", "order_category", "TEXT DEFAULT 'in-house'")
     ]
     for table, col, col_def in migrations:
         try:

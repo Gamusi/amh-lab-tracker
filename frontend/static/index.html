@@ -255,6 +255,15 @@
       <h3 style="margin-top: 0; color: var(--primary-color);">Add Test to Visit</h3>
       <input type="hidden" id="add-test-visit-id">
       <input type="text" id="add-test-search" placeholder="Search tests..." onkeyup="app.filterAddTests()" style="width: 100%; padding: 8px; margin-bottom: 12px; box-sizing: border-box;">
+      <div class="form-group" style="margin-bottom: 12px;">
+        <label for="add-test-order-category">Order Category</label>
+        <select id="add-test-order-category" style="width: 100%; padding: 8px; border: 1px solid var(--border-color); border-radius: 4px; box-sizing: border-box;">
+          <option value="in-house" selected>In-house</option>
+          <option value="referral">Referral</option>
+          <option value="outreach">Outreach</option>
+          <option value="self-request">Self-request</option>
+        </select>
+      </div>
       <div id="add-tests-container" style="max-height: 200px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 4px; padding: 8px; background: #fff; margin-bottom: 16px;">
         Loading...
       </div>

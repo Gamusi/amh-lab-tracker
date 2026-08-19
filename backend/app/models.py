@@ -104,6 +104,7 @@ class TestOrder:
     ordered_by_user_id: Optional[int] = None
     ordered_at: Optional[datetime.datetime] = None
     status: str = "pending"  # pending, completed, cancelled
+    order_category: str = "in-house"
 
 @dataclass
 class TestResult:

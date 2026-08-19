@@ -1190,6 +1190,7 @@ const app = {
             <td style="padding:8px; border-bottom:1px solid #ddd;">${o.ordered_at}</td>
             <td style="padding:8px; border-bottom:1px solid #ddd; text-align:right;">
               <button class="btn btn-primary btn-sm" onclick="app.showEnterResultModal(${o.order_id}, ${o.test_id}, '${this.escape(o.test_name)}')">Enter Result</button>
+              <button class="btn btn-secondary btn-sm" onclick="app.removeOrder(${o.order_id})" style="color: var(--danger-color); border-color: var(--danger-color); margin-left: 4px;">Remove</button>
             </td>
           </tr>
         `;
@@ -1279,6 +1280,7 @@ const app = {
 
   async submitAddTests() {
     const visitId = document.getElementById('add-test-visit-id').value;
+    const orderCat = document.getElementById('add-test-order-category').value;
     const checkboxes = document.querySelectorAll('input[name="add-test-cb"]:checked');
     const selectedTests = Array.from(checkboxes).map(cb => parseInt(cb.value, 10));
     
@@ -1291,7 +1293,7 @@ const app = {
       const res = await fetch(`/api/visits/${visitId}/orders`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ test_ids: selectedTests })
+        body: JSON.stringify({ test_ids: selectedTests, order_category: orderCat })
       });
       if (res.ok) {
         this.showNotificationModal("Success", "Tests added to visit successfully.", false);
@@ -1308,6 +1310,24 @@ const app = {
     }
   },
 
+
+  async removeOrder(orderId) {
+    if (!confirm('Are you sure you want to remove this pending test?')) return;
+    try {
+      const res = await fetch(`/api/orders/${orderId}`, { method: 'DELETE' });
+      if (res.ok) {
+        this.showNotificationModal("Success", "Test order removed.", false);
+        if (this.currentClientId) {
+          await this.loadPendingTests(this.currentClientId);
+        }
+      } else {
+        const err = await res.json();
+        this.showNotificationModal("Error", err.detail || "Failed to remove test order.", true);
+      }
+    } catch(e) {
+      this.showNotificationModal("Error", "Connection error.", true);
+    }
+  },
 
   async showEnterResultModal(orderId, testId, testName) {
     document.getElementById('result-entry-order-id').value = orderId;

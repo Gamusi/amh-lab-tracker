@@ -26,6 +26,7 @@ class TestOrderCreate(BaseModel):
     sample_id: Optional[str] = None
     sample_type: Optional[str] = "Venous Blood"
     ref_doctor_ward: Optional[str] = "OPD"
+    order_category: Optional[str] = "in-house"
 
 @router.get("/api/clinicians")
 def list_clinicians(conn: sqlite3.Connection = Depends(get_db), current_user: dict = Depends(get_current_user)):
@@ -100,8 +101,8 @@ def create_visit(req: VisitCreate, conn: sqlite3.Connection = Depends(get_db), c
     
     for tid in req.test_ids:
         cur.execute("""
-            INSERT INTO test_orders (visit_id, test_id, sample_id, ordered_by_user_id, status)
-            VALUES (?, ?, ?, ?, 'pending')
+            INSERT INTO test_orders (visit_id, test_id, sample_id, ordered_by_user_id, status, order_category)
+            VALUES (?, ?, ?, ?, 'pending', 'in-house')
         """, (visit_id, tid, req.sample_id, current_user["id"]))
         
     conn.commit()
@@ -127,17 +128,51 @@ def add_orders_to_visit(visit_id: int, req: AddOrdersRequest, conn: sqlite3.Conn
             logger.warning(f"Add orders failed: test ID {tid} not found")
             raise HTTPException(status_code=404, detail=f"Test ID {tid} not found")
             
+        # Enforce Single Order Logic
+        cur.execute("""
+            SELECT o.id, tr.result_value 
+            FROM test_orders o
+            LEFT JOIN test_results tr ON o.id = tr.order_id
+            WHERE o.visit_id = ? AND o.test_id = ?
+        """, (visit_id, tid))
+        previous_orders = cur.fetchall()
+        if previous_orders:
+            can_order = True
+            for r in previous_orders:
+                if r["result_value"] != "Invalid":
+                    can_order = False
+                    break
+            if not can_order:
+                raise HTTPException(status_code=400, detail=f"Test ID {tid} already ordered for this visit and is not Invalid.")
+            
     added_order_ids = []
+    order_cat = req.order_category if hasattr(req, 'order_category') and req.order_category else 'in-house'
     for tid in req.test_ids:
         cur.execute("""
-            INSERT INTO test_orders (visit_id, test_id, sample_id, ordered_by_user_id, status)
-            VALUES (?, ?, ?, ?, 'pending')
-        """, (visit_id, tid, req.sample_id, current_user["id"]))
+            INSERT INTO test_orders (visit_id, test_id, sample_id, ordered_by_user_id, status, order_category)
+            VALUES (?, ?, ?, ?, 'pending', ?)
+        """, (visit_id, tid, req.sample_id, current_user["id"], order_cat))
         added_order_ids.append(cur.lastrowid)
         
     conn.commit()
     logger.info(f"Successfully added orders {added_order_ids} to visit {visit_id}")
     return {"status": "orders_added", "visit_id": visit_id, "order_ids": added_order_ids}
+
+@router.delete("/api/orders/{order_id}")
+def delete_order(order_id: int, conn: sqlite3.Connection = Depends(get_db), current_user: dict = Depends(get_current_user)):
+    logger.info(f"User '{current_user['username']}' is deleting order ID {order_id}")
+    cur = conn.cursor()
+    cur.execute("SELECT status FROM test_orders WHERE id = ?", (order_id,))
+    row = cur.fetchone()
+    if not row:
+        raise HTTPException(status_code=404, detail="Order not found")
+    if row["status"] != "pending":
+        raise HTTPException(status_code=400, detail="Only pending orders can be removed")
+    
+    cur.execute("DELETE FROM test_orders WHERE id = ?", (order_id,))
+    conn.commit()
+    logger.info(f"Successfully deleted order {order_id}")
+    return {"status": "deleted", "order_id": order_id}
 
 @router.post("/api/clients/orders")
 @router.post("/api/orders")
@@ -163,11 +198,29 @@ def create_order(req: TestOrderCreate, conn: sqlite3.Connection = Depends(get_db
             VALUES (?, ?)
         """, (req.client_id, req.ref_doctor_ward))
         visit_id = cur.lastrowid
+    else:
+        # Enforce Single Order Logic
+        cur.execute("""
+            SELECT o.id, tr.result_value 
+            FROM test_orders o
+            LEFT JOIN test_results tr ON o.id = tr.order_id
+            WHERE o.visit_id = ? AND o.test_id = ?
+        """, (visit_id, req.test_id))
+        previous_orders = cur.fetchall()
+        if previous_orders:
+            can_order = True
+            for r in previous_orders:
+                if r["result_value"] != "Invalid":
+                    can_order = False
+                    break
+            if not can_order:
+                raise HTTPException(status_code=400, detail=f"Test ID {req.test_id} already ordered for this visit and is not Invalid.")
 
+    order_cat = req.order_category if hasattr(req, 'order_category') and req.order_category else 'in-house'
     cur.execute("""
-        INSERT INTO test_orders (visit_id, test_id, sample_id, ordered_by_user_id, status)
-        VALUES (?, ?, ?, ?, 'pending')
-    """, (visit_id, req.test_id, req.sample_id, current_user["id"]))
+        INSERT INTO test_orders (visit_id, test_id, sample_id, ordered_by_user_id, status, order_category)
+        VALUES (?, ?, ?, ?, 'pending', ?)
+    """, (visit_id, req.test_id, req.sample_id, current_user["id"], order_cat))
     
     oid = cur.lastrowid
     conn.commit()
