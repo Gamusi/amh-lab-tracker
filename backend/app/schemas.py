@@ -107,3 +107,31 @@ class UserUpdate(BaseModel):
     is_active: bool
     password: Optional[str] = None
     cadre: Optional[str] = None
+
+class ClinicianResponse(BaseModel):
+    id: int
+    name: str
+    is_active: bool = True
+    created_at: Optional[datetime.datetime] = None
+
+    class Config:
+        from_attributes = True
+
+class VisitCreate(BaseModel):
+    client_id: int
+    clinician_id: Optional[int] = None
+    ward_of_origin: Optional[str] = None
+    test_ids: List[int]
+    sample_id: Optional[str] = None
+
+class VisitResponse(BaseModel):
+    id: int
+    client_id: int
+    clinician_id: Optional[int] = None
+    ward_of_origin: Optional[str] = None
+    lab_number: Optional[str] = None
+    created_at: Optional[datetime.datetime] = None
+
+    class Config:
+        from_attributes = True
+

@@ -23,7 +23,7 @@ def test_generate_pdf_endpoint():
         # Cleanup override
         app.dependency_overrides.clear()
 
-def test_get_client_report_pdf():
+def test_get_visit_report_pdf():
     from backend.app.database import get_db, SCHEMA_SQL
     import sqlite3
     
@@ -44,7 +44,7 @@ def test_get_client_report_pdf():
     cur.execute("INSERT INTO clinicians (name) VALUES ('Dr. Test')")
     clinician_id = cur.lastrowid
     
-    cur.execute("INSERT INTO visits (client_id, clinician_id, ward_of_origin, lab_number) VALUES (?, ?, 'OPD', 'LAB-001')", (client_id, clinician_id))
+    cur.execute("INSERT INTO visits (client_id, clinician_id, ward_of_origin, lab_number) VALUES (?, ?, 'OPD', 'amh-26-08-1')", (client_id, clinician_id))
     visit_id = cur.lastrowid
 
     cur.execute("INSERT INTO test_orders (visit_id, test_id, status) VALUES (?, ?, 'completed')", (visit_id, test_id))
@@ -61,14 +61,21 @@ def test_get_client_report_pdf():
     app.dependency_overrides[get_current_user] = lambda: {"id": 1, "username": "testuser"}
     
     try:
-        response = client.get(f"/api/reports/client/{client_id}/pdf")
+        response = client.get(f"/api/reports/visit/{visit_id}/pdf")
         assert response.status_code == 200
         assert response.headers["content-type"] == "application/pdf"
         assert response.content.startswith(b'%PDF-')
         
+        # Test client backwards compatibility
+        response_client = client.get(f"/api/reports/client/{client_id}/pdf")
+        assert response_client.status_code == 200
+        assert response_client.headers["content-type"] == "application/pdf"
+        assert response_client.content.startswith(b'%PDF-')
+
         # Test 404 logic
-        response = client.get("/api/reports/client/9999/pdf")
+        response = client.get("/api/reports/visit/9999/pdf")
         assert response.status_code == 404
     finally:
         app.dependency_overrides.clear()
         conn.close()
+

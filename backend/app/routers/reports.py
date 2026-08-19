@@ -191,17 +191,34 @@ def create_pdf_report(
     pdf_bytes = generate_pdf(request.order_data, request.results_data)
     return Response(content=pdf_bytes, media_type="application/pdf")
 
-@router.get("/client/{client_id}/pdf")
-def get_client_report_pdf(client_id: int, db: sqlite3.Connection = Depends(get_db), current_user: dict = Depends(get_current_user)):
+@router.get("/visit/{visit_id}/pdf")
+def get_visit_report_pdf(visit_id: int, db: sqlite3.Connection = Depends(get_db), current_user: dict = Depends(get_current_user)):
     cur = db.cursor()
-    cur.execute("SELECT * FROM clients WHERE id = ?", (client_id,))
-    client_row = cur.fetchone()
-    if not client_row:
-        raise HTTPException(status_code=404, detail="Client not found")
+    cur.execute("""
+        SELECT 
+            v.id AS visit_id,
+            v.ward_of_origin,
+            v.lab_number,
+            v.created_at AS visit_created_at,
+            c.id AS client_id,
+            c.client_number,
+            c.full_name,
+            c.date_of_birth,
+            c.sex,
+            c.phone,
+            cl.name AS clinician_name
+        FROM visits v
+        JOIN clients c ON v.client_id = c.id
+        LEFT JOIN clinicians cl ON v.clinician_id = cl.id
+        WHERE v.id = ?
+    """, (visit_id,))
+    visit_row = cur.fetchone()
+    if not visit_row:
+        raise HTTPException(status_code=404, detail="Visit not found")
         
-    dob_str = client_row["date_of_birth"]
+    dob_str = visit_row["date_of_birth"]
     dob = datetime.datetime.strptime(dob_str, "%Y-%m-%d").date() if dob_str else None
-    sex = client_row["sex"] or "U"
+    sex = visit_row["sex"] or "U"
     
     cur.execute("""
         SELECT 
@@ -210,23 +227,25 @@ def get_client_report_pdf(client_id: int, db: sqlite3.Connection = Depends(get_d
             s.name AS section_name, 
             to_ord.ordered_at, 
             tr.entered_at,
-            u1.full_name AS ordered_by_name,
-            u2.full_name AS verified_by_name
+            u_enter.full_name AS entered_by_name,
+            u_ord.full_name AS ordered_by_name,
+            u_ver.full_name AS verified_by_name
         FROM test_orders to_ord
         JOIN test_results tr ON tr.order_id = to_ord.id
         JOIN tests t ON to_ord.test_id = t.id
         JOIN sections s ON t.section_id = s.id
-        LEFT JOIN users u1 ON to_ord.ordered_by_user_id = u1.id
-        LEFT JOIN users u2 ON tr.verified_by_user_id = u2.id
-        WHERE to_ord.client_id = ? AND to_ord.status != 'cancelled'
-        ORDER BY s.sort_order, t.sort_order
-    """, (client_id,))
+        LEFT JOIN users u_enter ON tr.entered_by_user_id = u_enter.id
+        LEFT JOIN users u_ord ON to_ord.ordered_by_user_id = u_ord.id
+        LEFT JOIN users u_ver ON tr.verified_by_user_id = u_ver.id
+        WHERE to_ord.visit_id = ? AND to_ord.status != 'cancelled'
+        ORDER BY s.sort_order, t.sort_order, tr.id
+    """, (visit_id,))
     
     rows = cur.fetchall()
     
     results_by_section = {}
     ordered_date = None
-    ordered_by = None
+    technician_name = None
     verified_by = None
     
     for row in rows:
@@ -238,8 +257,8 @@ def get_client_report_pdf(client_id: int, db: sqlite3.Connection = Depends(get_d
         
         if not ordered_date and row["ordered_at"]:
             ordered_date = row["ordered_at"][:10]
-        if not ordered_by and row["ordered_by_name"]:
-            ordered_by = row["ordered_by_name"]
+        if not technician_name:
+            technician_name = row["entered_by_name"] or row["ordered_by_name"]
         if not verified_by and row["verified_by_name"]:
             verified_by = row["verified_by_name"]
             
@@ -272,15 +291,31 @@ def get_client_report_pdf(client_id: int, db: sqlite3.Connection = Depends(get_d
         age_val = evaluator.calculate_age(dob, datetime.date.today())
         age_str = str(age_val)
         
+    clinician_name = visit_row["clinician_name"] or "SELF REQUEST"
+
     order_data = {
-        "client_number": client_row["client_number"],
-        "full_name": client_row["full_name"],
+        "client_number": visit_row["client_number"] or "",
+        "full_name": visit_row["full_name"] or "",
         "age": age_str,
         "sex": sex,
-        "ordered_by": ordered_by or "",
-        "ordered_date": ordered_date or "",
+        "lab_number": visit_row["lab_number"] or "",
+        "ward_of_origin": visit_row["ward_of_origin"] or "",
+        "requested_by": clinician_name,
+        "ordered_by": clinician_name,
+        "ordered_date": ordered_date or (visit_row["visit_created_at"][:10] if visit_row["visit_created_at"] else ""),
+        "technician_name": technician_name or "",
         "verified_by": verified_by or ""
     }
     
     pdf_bytes = generate_pdf(order_data, results_data)
     return Response(content=pdf_bytes, media_type="application/pdf")
+
+@router.get("/client/{client_id}/pdf")
+def get_client_report_pdf(client_id: int, db: sqlite3.Connection = Depends(get_db), current_user: dict = Depends(get_current_user)):
+    cur = db.cursor()
+    cur.execute("SELECT id FROM visits WHERE client_id = ? ORDER BY id DESC LIMIT 1", (client_id,))
+    v_row = cur.fetchone()
+    if not v_row:
+        raise HTTPException(status_code=404, detail="Client or visit not found")
+    return get_visit_report_pdf(visit_id=v_row["id"], db=db, current_user=current_user)
+

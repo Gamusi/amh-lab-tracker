@@ -1,7 +1,9 @@
 import os
 import io
 from reportlab.lib.pagesizes import A4
-from reportlab.platypus import SimpleDocTemplate, Spacer, Table, TableStyle, KeepTogether
+from reportlab.platypus import SimpleDocTemplate, Spacer, Table, TableStyle, KeepTogether, Paragraph
+from reportlab.lib.styles import ParagraphStyle
+from reportlab.lib.enums import TA_CENTER
 from reportlab.lib import colors
 
 PAGE_WIDTH, PAGE_HEIGHT = A4
@@ -18,21 +20,26 @@ def _draw_background_hook(canvas, doc):
     canvas.restoreState()
 
 def _build_metadata_table(order_data: dict) -> Table:
+    lab_no = order_data.get("lab_number") or order_data.get("client_number", "")
+    requested_by = order_data.get("requested_by") or order_data.get("ordered_by", "")
+    date_val = order_data.get("ordered_date") or order_data.get("date", "")
+    ward = order_data.get("ward_of_origin", "")
+    
     data = [
-        ["Patient Name:", order_data.get("full_name", ""), "Lab No:", order_data.get("client_number", "")],
-        ["Age:", order_data.get("age", ""), "Sex:", order_data.get("sex", "")],
-        ["Referred By:", order_data.get("ordered_by", ""), "Date:", order_data.get("ordered_date", "")],
-        ["Verified By:", order_data.get("verified_by", ""), " ", " "]
+        ["Patient Name:", str(order_data.get("full_name", "")), "Lab No:", str(lab_no)],
+        ["Age:", str(order_data.get("age", "")), "Sex:", str(order_data.get("sex", ""))],
+        ["Requested by:", str(requested_by), "Date:", str(date_val)],
+        ["Ward / OPD:", str(ward), "", ""]
     ]
     
-    t = Table(data, colWidths=[80, 160, 80, 160])
+    t = Table(data, colWidths=[90, 150, 80, 160])
     t.setStyle(TableStyle([
         ('FONTNAME', (0,0), (-1,-1), 'Helvetica'),
         ('FONTNAME', (0,0), (0,-1), 'Helvetica-Bold'), # Left labels
         ('FONTNAME', (2,0), (2,-1), 'Helvetica-Bold'), # Right labels
         ('ALIGN', (0,0), (-1,-1), 'LEFT'),
-        ('BOTTOMPADDING', (0,0), (-1,-1), 6),
-        ('TOPPADDING', (0,0), (-1,-1), 6),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 4),
+        ('TOPPADDING', (0,0), (-1,-1), 4),
     ]))
     return t
 
@@ -66,6 +73,28 @@ def _build_department_table(dept_name: str, tests: list) -> KeepTogether:
     
     return KeepTogether([t, Spacer(1, 15)])
 
+def _build_signatures_table(order_data: dict) -> KeepTogether:
+    tech = str(order_data.get("technician_name") or "").strip()
+    verified = str(order_data.get("verified_by") or "").strip()
+    
+    done_str = f"Done by: {tech} _______________" if tech else "Done by: _______________"
+    verified_str = f"Verified by: {verified} _______________" if verified else "Verified by: _______________"
+    
+    data = [
+        [done_str, verified_str]
+    ]
+    
+    t = Table(data, colWidths=[240, 240])
+    t.setStyle(TableStyle([
+        ('FONTNAME', (0,0), (-1,-1), 'Helvetica-Bold'),
+        ('ALIGN', (0,0), (0,-1), 'LEFT'),
+        ('ALIGN', (1,0), (1,-1), 'LEFT'),
+        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 6),
+        ('TOPPADDING', (0,0), (-1,-1), 6),
+    ]))
+    return KeepTogether([Spacer(1, 15), t])
+
 def generate_pdf(order_data: dict, results_data: list) -> bytes:
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(
@@ -77,15 +106,32 @@ def generate_pdf(order_data: dict, results_data: list) -> bytes:
         bottomMargin=120
     )
     
+    title_style = ParagraphStyle(
+        name='ReportTitle',
+        fontName='Helvetica-Bold',
+        fontSize=14,
+        leading=18,
+        alignment=TA_CENTER,
+        textColor=colors.black
+    )
+    
     flowables = []
+    flowables.append(Paragraph("Laboratory Report", title_style))
+    flowables.append(Spacer(1, 12))
+    
     flowables.append(_build_metadata_table(order_data))
-    flowables.append(Spacer(1, 20))
+    flowables.append(Spacer(1, 15))
     
     for dept_data in results_data:
         dept_name = dept_data.get("department", "UNKNOWN")
         tests = dept_data.get("tests", [])
         flowables.append(_build_department_table(dept_name, tests))
     
+    flowables.append(_build_signatures_table(order_data))
+    
     doc.build(flowables, onFirstPage=_draw_background_hook, onLaterPages=_draw_background_hook)
     
     return buffer.getvalue()
+
+generate_report_pdf = generate_pdf
+
