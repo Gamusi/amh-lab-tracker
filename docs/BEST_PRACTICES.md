@@ -24,3 +24,9 @@ Always make small, targeted changes to implement new features, fix bugs, or modi
 ## 4. Terminology
 
 *   **Client vs Patient:** Always use the term **'Client'**, never 'Patient'. This generalizes testing to include routine checkups and non-pathological testing, as not everyone in the lab is suffering from an illness.
+
+## 5. Additional Core Rules
+
+1. No toast notifications for anything in the app. Only use clean, uncluttered modals for success/error states and prompts.
+2. The frontend is the interaction layer for users to interact with the backend; it must not contain any business logic.
+
