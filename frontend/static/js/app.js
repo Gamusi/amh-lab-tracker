@@ -184,7 +184,7 @@ const app = {
         }
         document.getElementById('reset-password-modal').style.display = 'none';
         document.getElementById('reset-password-form').reset();
-        this.showToast('Password changed successfully!', 'success');
+        this.showNotificationModal("Success", 'Password changed successfully!', false);
         this.navigate('clients');
       } else {
         const err = await res.json();
@@ -390,21 +390,13 @@ const app = {
     else if (viewName === 'audit') this.renderAuditLog(container);
   },
 
-  showToast(message, type = 'success', duration = 3500) {
-    const container = document.getElementById('toast-container');
-    if (!container) return;
-
-    const toast = document.createElement('div');
-    toast.className = `toast toast-${type}`;
-    toast.innerHTML = `
-      <span>${this.escape(message)}</span>
-      <span style="cursor:pointer; opacity:0.8; font-weight:700;" onclick="this.parentElement.remove()">&times;</span>
-    `;
-
-    container.appendChild(toast);
-    setTimeout(() => {
-      if (toast.parentElement) toast.remove();
-    }, duration);
+  showNotificationModal(title, message, isError = false) {
+    const modal = document.getElementById('notification-modal');
+    if (!modal) return;
+    document.getElementById('notif-title').textContent = title;
+    document.getElementById('notif-title').style.color = isError ? 'var(--danger-color)' : 'var(--primary-color)';
+    document.getElementById('notif-message').textContent = message;
+    modal.style.display = 'flex';
   },
 
   shiftLogDate(offsetDays) {
@@ -600,13 +592,13 @@ const app = {
       });
 
       if (res.ok) {
-        this.showToast('Daily log entries saved successfully!', 'success');
+        this.showNotificationModal("Success", 'Daily log entries saved successfully!', false);
         this.loadDailyLogData(dateStr);
       } else {
-        this.showToast('Failed to save entries.', 'error');
+        this.showNotificationModal("Error", 'Failed to save entries.', true);
       }
     } catch (e) {
-      this.showToast('Error connecting to server.', 'error');
+      this.showNotificationModal("Error", 'Error connecting to server.', true);
     }
   },
 
@@ -677,7 +669,7 @@ const app = {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    this.showToast('Report CSV exported successfully!', 'success');
+    this.showNotificationModal("Success", 'Report CSV exported successfully!', false);
   },
 
   async loadReportData() {
@@ -794,7 +786,7 @@ const app = {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    this.showToast('Trends CSV exported successfully!', 'success');
+    this.showNotificationModal("Success", 'Trends CSV exported successfully!', false);
   },
 
   async loadTrendsData() {
@@ -1028,7 +1020,7 @@ const app = {
     const paperVal = parseInt(document.getElementById('paper-register-input').value, 10);
 
     if (isNaN(paperVal) || paperVal <= 0) {
-      this.showToast('Please type a valid Paper Register Total before submitting audit.', 'error');
+      this.showNotificationModal("Error", 'Please type a valid Paper Register Total before submitting audit.', true);
       return;
     }
 
@@ -1047,10 +1039,10 @@ const app = {
         const data = await res.json();
         this.showToast(`Shift audit recorded: ${data.match} (System: ${sysTotal}, Register: ${paperVal})`, data.match === 'MATCH' ? 'success' : 'error');
       } else {
-        this.showToast('Failed to record shift audit.', 'error');
+        this.showNotificationModal("Error", 'Failed to record shift audit.', true);
       }
     } catch (e) {
-      this.showToast('Error recording shift audit.', 'error');
+      this.showNotificationModal("Error", 'Error recording shift audit.', true);
     }
   },
 
@@ -1136,7 +1128,7 @@ const app = {
     const selectedTests = Array.from(checkboxes).map(cb => parseInt(cb.value, 10));
     
     if (selectedTests.length === 0) {
-      this.showToast('Select at least one test.', 'error');
+      this.showNotificationModal("Error", 'Select at least one test.', true);
       return;
     }
     
@@ -1154,16 +1146,16 @@ const app = {
         body: JSON.stringify(payload)
       });
       if (res.ok) {
-        this.showToast('Visit and orders created successfully!', 'success');
+        this.showNotificationModal("Success", 'Visit and orders created successfully!', false);
         // Uncheck all
         document.querySelectorAll('input[name="visit-test-cb"]').forEach(cb => cb.checked = false);
         await this.loadPendingTests(pid);
         await this.loadHistoricalVisits(pid);
       } else {
-        this.showToast('Failed to create visit.', 'error');
+        this.showNotificationModal("Error", 'Failed to create visit.', true);
       }
     } catch(e) {
-      this.showToast('Error creating visit.', 'error');
+      this.showNotificationModal("Error", 'Error creating visit.', true);
     }
   },
   async loadPendingTests(pid) {
@@ -1235,6 +1227,79 @@ const app = {
 
 
 
+
+  async showAddTestModal(visitId) {
+    document.getElementById('add-test-visit-id').value = visitId;
+    document.getElementById('add-test-search').value = '';
+    const container = document.getElementById('add-tests-container');
+    container.innerHTML = 'Loading...';
+    document.getElementById('add-test-modal').style.display = 'flex';
+
+    if (!this.testCatalog || this.testCatalog.length === 0) {
+      try {
+        const res = await fetch('/api/config/tests');
+        if (res.ok) this.testCatalog = await res.json();
+      } catch(e) {}
+    }
+    
+    if (this.testCatalog) {
+      let html = '';
+      this.testCatalog.forEach(t => {
+        html += `
+          <label class="add-test-row" data-name="${this.escape(t.name).toLowerCase()}" style="display: block; margin-bottom: 4px; cursor: pointer;">
+            <input type="checkbox" name="add-test-cb" value="${t.id}">
+            ${this.escape(t.name)}
+          </label>
+        `;
+      });
+      container.innerHTML = html;
+    }
+  },
+
+  filterAddTests() {
+    const query = document.getElementById('add-test-search').value.toLowerCase();
+    const rows = document.querySelectorAll('.add-test-row');
+    rows.forEach(row => {
+      if (row.getAttribute('data-name').includes(query)) {
+        row.style.display = 'block';
+      } else {
+        row.style.display = 'none';
+      }
+    });
+  },
+
+  async submitAddTests() {
+    const visitId = document.getElementById('add-test-visit-id').value;
+    const checkboxes = document.querySelectorAll('input[name="add-test-cb"]:checked');
+    const selectedTests = Array.from(checkboxes).map(cb => parseInt(cb.value, 10));
+    
+    if (selectedTests.length === 0) {
+      this.showNotificationModal("Notice", "Select at least one test to add.", false);
+      return;
+    }
+    
+    try {
+      const res = await fetch(`/api/visits/${visitId}/orders`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ test_ids: selectedTests })
+      });
+      if (res.ok) {
+        this.showNotificationModal("Success", "Tests added to visit successfully.", false);
+        document.getElementById('add-test-modal').style.display = 'none';
+        if (this.currentClientId) {
+           await this.loadPendingTests(this.currentClientId);
+        }
+      } else {
+        const err = await res.json();
+        this.showNotificationModal("Error", err.detail || "Failed to add tests.", true);
+      }
+    } catch(e) {
+      this.showNotificationModal("Error", "Connection error.", true);
+    }
+  },
+
+
   async showEnterResultModal(orderId, testId, testName) {
     document.getElementById('result-entry-order-id').value = orderId;
     document.getElementById('result-entry-test-id').value = testId;
@@ -1243,53 +1308,102 @@ const app = {
     const singleContainer = document.getElementById('result-entry-single-container');
     const paramsContainer = document.getElementById('result-entry-params-container');
     const trackGroup = document.getElementById('result-entry-tracked-group');
-    const posSelect = document.getElementById('result-entry-is-positive');
+    if (trackGroup) trackGroup.style.display = 'none'; // REMOVED tracked logic from UI
     
-    // Check if test is tracked
-    let isTracked = false;
-    if (this.testCatalog) {
-       const t = this.testCatalog.find(x => x.id === testId);
-       if (t && t.is_tracked) isTracked = true;
-    }
+    paramsContainer.style.display = 'none';
+    singleContainer.style.display = 'block';
     
-    if (isTracked) {
-       trackGroup.style.display = 'block';
-       posSelect.value = 'false';
+    const nameLower = testName.toLowerCase();
+    
+    // Tailored Forms
+    if (nameLower.includes('urinalysis')) {
+       // URINALYSIS FULL MODAL
+       singleContainer.innerHTML = `
+         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+           <div>
+             <h5 style="margin-top:0; color: var(--primary-color);">Macroscopy & Chemistry</h5>
+             <label>Appearance:</label> <select id="ua-app"><option>Clear</option><option>Slightly Turbid</option><option>Turbid</option></select><br>
+             <label>Color:</label> <select id="ua-col"><option>Yellow</option><option>Straw</option><option>Amber</option><option>Red</option><option>Brown</option></select><br>
+             <label>Specific Gravity:</label> <input type="number" step="0.005" id="ua-sg" value="1.015"><br>
+             <label>pH:</label> <input type="number" step="0.5" id="ua-ph" value="6.0"><br>
+             <label>Proteins:</label> <select id="ua-pro"><option>Nil</option><option>Trace</option><option>1+</option><option>2+</option><option>3+</option><option>4+</option></select><br>
+             <label>Glucose:</label> <select id="ua-glu"><option>Nil</option><option>Trace</option><option>1+</option><option>2+</option><option>3+</option><option>4+</option></select><br>
+             <label>Bilirubin:</label> <select id="ua-bil"><option>Nil</option><option>1+</option><option>2+</option><option>3+</option></select><br>
+             <label>Urobilinogen:</label> <select id="ua-uro"><option>Normal</option><option>1+</option><option>2+</option><option>3+</option></select><br>
+             <label>Ketones:</label> <select id="ua-ket"><option>Nil</option><option>Trace</option><option>1+</option><option>2+</option><option>3+</option></select><br>
+             <label>Blood:</label> <select id="ua-bld"><option>Nil</option><option>Trace</option><option>1+</option><option>2+</option><option>3+</option></select><br>
+             <label>Nitrites:</label> <select id="ua-nit"><option>Negative</option><option>Positive</option></select><br>
+             <label>Leukocytes:</label> <select id="ua-leu"><option>Nil</option><option>Trace</option><option>1+</option><option>2+</option><option>3+</option></select>
+           </div>
+           <div>
+             <h5 style="margin-top:0; color: var(--primary-color);">Microscopy</h5>
+             <label>Pus Cells (WBCs):</label> <input type="text" id="ua-pus" placeholder="e.g. 0-2 / hpf"><br>
+             <label>RBCs:</label> <input type="text" id="ua-rbc" placeholder="e.g. 0-1 / hpf"><br>
+             <label>Epithelial Cells:</label> <select id="ua-epi"><option>Few</option><option>Moderate</option><option>Plenty</option></select><br>
+             <label>Casts & Crystals:</label> <input type="text" id="ua-cas" placeholder="e.g. Calcium oxalate (++)">
+           </div>
+         </div>
+       `;
+    } else if (nameLower.includes('widal')) {
+       singleContainer.innerHTML = `
+         <label>Result:</label>
+         <select id="widal-res" onchange="document.getElementById('widal-titers').style.display = this.value==='Positive' ? 'block' : 'none'" style="width:100%; padding:8px; margin-bottom:8px;">
+           <option>Negative</option><option>Positive</option>
+         </select>
+         <div id="widal-titers" style="display:none;">
+           <label>Titers (if Positive):</label>
+           <input type="text" id="widal-tit-val" placeholder="e.g. TO 1:160, TH 1:80" style="width:100%; padding:8px;">
+         </div>
+       `;
+    } else if (nameLower.includes('hiv') || nameLower.includes('hts') || nameLower.includes('determine') || nameLower.includes('stat-pak') || nameLower.includes('sd-bioline') || nameLower.includes('vdrl') || nameLower.includes('rpr') || nameLower.includes('hepatitis') || nameLower.includes('brucella') || nameLower.includes('h. pylori') || nameLower.includes('hcg') || nameLower.includes('rheumatoid') || nameLower.includes('crag') || nameLower.includes('covid')) {
+       singleContainer.innerHTML = `
+         <label>Result:</label>
+         <select id="qual-res" style="width:100%; padding:8px;">
+           <option>Negative / Non-Reactive</option>
+           <option>Positive / Reactive</option>
+           <option>Inconclusive</option>
+         </select>
+       `;
+    } else if (nameLower.includes('malaria') || nameLower.includes('mrdt') || nameLower.includes('blood smear')) {
+       singleContainer.innerHTML = `
+         <label>Result:</label>
+         <select id="qual-res" style="width:100%; padding:8px;">
+           <option>No malaria parasites seen</option>
+           <option>Positive (1+)</option>
+           <option>Positive (2+)</option>
+           <option>Positive (3+)</option>
+           <option>Positive (4+)</option>
+         </select>
+       `;
     } else {
-       trackGroup.style.display = 'none';
-       posSelect.value = 'false';
-    }
-    
-    // Load parameters
-    try {
-      const res = await fetch(`/api/config/tests/${testId}/parameters`);
-      const params = res.ok ? await res.json() : [];
-      
-      if (params && params.length > 0) {
-        singleContainer.style.display = 'none';
-        paramsContainer.style.display = 'block';
-        
-        let html = '<h5 style="color: var(--primary-color); margin-bottom: 8px;">Panel Parameters:</h5>';
-        params.forEach(p => {
-          html += `
-            <div style="display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 8px; align-items: center; margin-bottom: 8px;" class="modal-param-row" data-param-id="${p.id}">
-              <div><strong style="font-size: 0.85rem;">${this.escape(p.parameter_name)}</strong></div>
-              <div><input type="text" class="modal-param-val" placeholder="Result" style="width: 100%; padding: 4px;"></div>
-              <div style="font-size: 0.8rem; color: var(--text-muted);">${p.ref_range ? this.escape(p.ref_range) : ''} ${p.unit ? this.escape(p.unit) : ''}</div>
-              <input type="hidden" class="modal-param-pos" value="false">
-            </div>
-          `;
-        });
-        paramsContainer.innerHTML = html;
-      } else {
-        paramsContainer.style.display = 'none';
-        paramsContainer.innerHTML = '';
-        singleContainer.style.display = 'block';
-        document.getElementById('result-entry-value').value = '';
-      }
-    } catch(e) {
-      console.error(e);
-      singleContainer.style.display = 'block';
+       // Standard Numeric (or simple text)
+       singleContainer.innerHTML = `
+         <div class="form-group" style="margin-bottom: 16px;">
+           <label>Result Value:</label>
+           <input type="text" id="result-entry-value" placeholder="Enter Value" style="width: 100%; padding: 8px;">
+         </div>
+       `;
+       
+       // Load parameters if exist
+       try {
+         const res = await fetch(`/api/config/tests/${testId}/parameters`);
+         const params = res.ok ? await res.json() : [];
+         if (params && params.length > 0) {
+           singleContainer.style.display = 'none';
+           paramsContainer.style.display = 'block';
+           let html = '<h5 style="color: var(--primary-color); margin-bottom: 8px;">Panel Parameters:</h5>';
+           params.forEach(p => {
+             html += `
+               <div style="display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 8px; align-items: center; margin-bottom: 8px;" class="modal-param-row" data-param-id="${p.id}">
+                 <div><strong style="font-size: 0.85rem;">${this.escape(p.parameter_name)}</strong></div>
+                 <div><input type="text" class="modal-param-val" placeholder="Value" style="width: 100%; padding: 4px;"></div>
+                 <div style="font-size: 0.8rem; color: var(--text-muted);">${p.ref_range ? this.escape(p.ref_range) : ''} ${p.unit ? this.escape(p.unit) : ''}</div>
+               </div>
+             `;
+           });
+           paramsContainer.innerHTML = html;
+         }
+       } catch(e) { console.error(e); }
     }
     
     document.getElementById('result-entry-modal').style.display = 'flex';
@@ -1298,8 +1412,7 @@ const app = {
     form.onsubmit = async (e) => {
        e.preventDefault();
        
-       const isPos = posSelect.value === 'true';
-       let mainVal = document.getElementById('result-entry-value').value.trim();
+       let finalVal = null;
        let paramResults = null;
        
        if (paramsContainer.style.display === 'block') {
@@ -1309,21 +1422,27 @@ const app = {
             const pid = parseInt(r.getAttribute('data-param-id'), 10);
             const pval = r.querySelector('.modal-param-val').value;
             if (pval) {
-              paramResults.push({ parameter_id: pid, result_value: pval, is_positive: false });
+              paramResults.push({ parameter_id: pid, result_value: pval });
             }
          });
-         mainVal = null;
+       } else if (nameLower.includes('urinalysis')) {
+         finalVal = `App: ${document.getElementById('ua-app').value}, Col: ${document.getElementById('ua-col').value}, SG: ${document.getElementById('ua-sg').value}, pH: ${document.getElementById('ua-ph').value}, Pro: ${document.getElementById('ua-pro').value}, Glu: ${document.getElementById('ua-glu').value}, Bil: ${document.getElementById('ua-bil').value}, Uro: ${document.getElementById('ua-uro').value}, Ket: ${document.getElementById('ua-ket').value}, Bld: ${document.getElementById('ua-bld').value}, Nit: ${document.getElementById('ua-nit').value}, Leu: ${document.getElementById('ua-leu').value} | Microscopy -> WBC: ${document.getElementById('ua-pus').value}, RBC: ${document.getElementById('ua-rbc').value}, Epi: ${document.getElementById('ua-epi').value}, Cas: ${document.getElementById('ua-cas').value}`;
+       } else if (nameLower.includes('widal')) {
+         const res = document.getElementById('widal-res').value;
+         const tit = document.getElementById('widal-tit-val').value;
+         finalVal = res === 'Positive' && tit ? `${res} (${tit})` : res;
+       } else if (document.getElementById('qual-res')) {
+         finalVal = document.getElementById('qual-res').value;
+       } else {
+         finalVal = document.getElementById('result-entry-value').value.trim();
        }
        
        try {
-         const payload = {
-           order_id: orderId,
-           is_positive: isTracked ? isPos : false
-         };
+         const payload = { order_id: orderId };
          if (paramResults) {
            payload.parameter_results = paramResults;
          } else {
-           payload.result_value = mainVal;
+           payload.result_value = finalVal;
          }
          
          const res = await fetch('/api/clients/results', {
@@ -1333,21 +1452,22 @@ const app = {
          });
          
          if (res.ok) {
-           this.showToast('Result saved successfully!', 'success');
+           this.showNotificationModal("Success", "Result saved successfully!", false);
            document.getElementById('result-entry-modal').style.display = 'none';
            if (this.currentClientId) {
               await this.loadPendingTests(this.currentClientId);
               await this.loadHistoricalVisits(this.currentClientId);
            }
          } else {
-           this.showToast('Failed to save result.', 'error');
+           const err = await res.json();
+           this.showNotificationModal("Error", err.detail || "Failed to save result.", true);
          }
        } catch(err) {
-         console.error(err);
-         this.showToast('Error saving result.', 'error');
+         this.showNotificationModal("Error", "Connection error saving result.", true);
        }
     };
   },
+
 
 
 
@@ -1371,13 +1491,13 @@ const app = {
         }
       });
       if (paramResults.length === 0) {
-        this.showToast('Please enter at least one parameter result for this panel.', 'error');
+        this.showNotificationModal("Error", 'Please enter at least one parameter result for this panel.', true);
         return;
       }
     } else {
       mainResultValue = document.getElementById('order-result-value').value;
       if (!mainResultValue) {
-        this.showToast('Please enter a result value.', 'error');
+        this.showNotificationModal("Error", 'Please enter a result value.', true);
         return;
       }
     }
@@ -1406,14 +1526,14 @@ const app = {
       });
 
       if (resRes.ok) {
-        this.showToast('Result recorded successfully! Daily Log auto-incremented.', 'success');
+        this.showNotificationModal("Success", 'Result recorded successfully! Daily Log auto-incremented.', false);
         await this.loadClientOrders(pid);
         // Print removed to avoid race conditions
       } else {
-        this.showToast('Failed to record result.', 'error');
+        this.showNotificationModal("Error", 'Failed to record result.', true);
       }
     } catch (e) {
-      this.showToast('Error submitting result.', 'error');
+      this.showNotificationModal("Error", 'Error submitting result.', true);
     }
   },
 
@@ -1457,14 +1577,14 @@ const app = {
       });
 
       if (res.ok) {
-        this.showToast(`Client registered successfully! Assigned ID: ${pnum}`, 'success');
+        this.showNotificationModal("Success", `Client registered successfully! Assigned ID: ${pnum}`, false);
         this.closeNewClientModal();
         this.searchClients('');
       } else {
-        this.showToast('Error registering client.', 'error');
+        this.showNotificationModal("Error", 'Error registering client.', true);
       }
     } catch (error) {
-      this.showToast('Connection error.', 'error');
+      this.showNotificationModal("Error", 'Connection error.', true);
     }
   },
 
@@ -1812,7 +1932,7 @@ const app = {
 
   async approveUser(userId, role, cadre) {
     await this.saveUserUpdate(userId, { role: role || 'staff', cadre: cadre || null, is_active: true });
-    this.showToast('User registration approved successfully!', 'success');
+    this.showNotificationModal("Success", 'User registration approved successfully!', false);
   },
 
   async rejectUser(userId, username) {
@@ -1820,21 +1940,21 @@ const app = {
     try {
       const res = await fetch(`/api/auth/users/${userId}`, { method: 'DELETE' });
       if (res.ok) {
-        this.showToast(`Registration for '${username}' rejected and removed.`, 'success');
+        this.showNotificationModal("Success", `Registration for '${username}' rejected and removed.`, false);
         await this.loadConfigData();
       } else {
         const err = await res.json();
-        this.showToast(err.detail || 'Failed to reject registration.', 'error');
+        this.showNotificationModal("Error", err.detail || 'Failed to reject registration.', true);
       }
     } catch (e) {
-      this.showToast('Connection error rejecting registration.', 'error');
+      this.showNotificationModal("Error", 'Connection error rejecting registration.', true);
     }
   },
 
   async deactivateUser(userId, role, cadre) {
     if (!confirm('Are you sure you want to deactivate this account?')) return;
     await this.saveUserUpdate(userId, { role: role, cadre: cadre || null, is_active: false });
-    this.showToast('User account deactivated.', 'success');
+    this.showNotificationModal("Success", 'User account deactivated.', false);
   },
 
   async changeUserFields(userId, isActive) {
@@ -1843,18 +1963,18 @@ const app = {
     if (!roleEl || !cadreEl) return;
     
     await this.saveUserUpdate(userId, { role: roleEl.value, cadre: cadreEl.value || null, is_active: isActive });
-    this.showToast('User details updated successfully.', 'success');
+    this.showNotificationModal("Success", 'User details updated successfully.', false);
   },
 
   async promptResetPassword(userId, username, role, cadre) {
     const tempPw = prompt(`Enter a new temporary password for user '${username}' (minimum 4 characters):`);
     if (tempPw === null) return; // user clicked Cancel
     if (tempPw.trim().length < 4) {
-      this.showToast('Password must be at least 4 characters long.', 'error');
+      this.showNotificationModal("Error", 'Password must be at least 4 characters long.', true);
       return;
     }
     await this.saveUserUpdate(userId, { role: role, cadre: cadre || null, is_active: true, password: tempPw.trim() });
-    this.showToast(`Password reset for '${username}'. User will be required to change it on next login.`, 'success');
+    this.showNotificationModal("Success", `Password reset for '${username}'. User will be required to change it on next login.`, false);
   },
 
   async saveUserUpdate(userId, updateBody) {
@@ -1872,10 +1992,10 @@ const app = {
         }
       } else {
         const err = await res.json();
-        this.showToast(err.detail || 'Failed to update user account.', 'error');
+        this.showNotificationModal("Error", err.detail || 'Failed to update user account.', true);
       }
     } catch (e) {
-      this.showToast('Connection error updating account.', 'error');
+      this.showNotificationModal("Error", 'Connection error updating account.', true);
     }
   },
 
@@ -1898,14 +2018,14 @@ const app = {
         })
       });
       if (res.ok) {
-        this.showToast('Test added successfully!', 'success');
+        this.showNotificationModal("Success", 'Test added successfully!', false);
         this.loadConfigData();
       } else {
         const err = await res.json();
-        this.showToast(err.detail || 'Failed to add test.', 'error');
+        this.showNotificationModal("Error", err.detail || 'Failed to add test.', true);
       }
     } catch (e) {
-      this.showToast('Connection error.', 'error');
+      this.showNotificationModal("Error", 'Connection error.', true);
     }
   },
 
@@ -1929,14 +2049,14 @@ const app = {
         })
       });
       if (res.ok) {
-        this.showToast('Test updated successfully!', 'success');
+        this.showNotificationModal("Success", 'Test updated successfully!', false);
         this.loadConfigData();
       } else {
         const err = await res.json();
-        this.showToast(err.detail || 'Failed to update test.', 'error');
+        this.showNotificationModal("Error", err.detail || 'Failed to update test.', true);
       }
     } catch (e) {
-      this.showToast('Connection error.', 'error');
+      this.showNotificationModal("Error", 'Connection error.', true);
     }
   },
 
@@ -1945,13 +2065,13 @@ const app = {
     try {
       const res = await fetch(`/api/config/tests/${testId}`, { method: 'DELETE' });
       if (res.ok) {
-        this.showToast('Test removed from catalog.', 'success');
+        this.showNotificationModal("Success", 'Test removed from catalog.', false);
         this.loadConfigData();
       } else {
-        this.showToast('Failed to delete test.', 'error');
+        this.showNotificationModal("Error", 'Failed to delete test.', true);
       }
     } catch (e) {
-      this.showToast('Connection error.', 'error');
+      this.showNotificationModal("Error", 'Connection error.', true);
     }
   },
 
@@ -2021,15 +2141,15 @@ const app = {
         body: JSON.stringify({ name: name.trim() })
       });
       if (res.ok) {
-        this.showToast('Clinician added successfully!', 'success');
+        this.showNotificationModal("Success", 'Clinician added successfully!', false);
         await this.loadCliniciansConfig();
         await this.loadClinicians();
       } else {
         const err = await res.json();
-        this.showToast(err.detail || 'Failed to add clinician.', 'error');
+        this.showNotificationModal("Error", err.detail || 'Failed to add clinician.', true);
       }
     } catch (e) {
-      this.showToast('Connection error.', 'error');
+      this.showNotificationModal("Error", 'Connection error.', true);
     }
   },
 
@@ -2046,15 +2166,15 @@ const app = {
         body: JSON.stringify({ name: name.trim(), is_active: isActive })
       });
       if (res.ok) {
-        this.showToast('Clinician updated successfully!', 'success');
+        this.showNotificationModal("Success", 'Clinician updated successfully!', false);
         await this.loadCliniciansConfig();
         await this.loadClinicians();
       } else {
         const err = await res.json();
-        this.showToast(err.detail || 'Failed to update clinician.', 'error');
+        this.showNotificationModal("Error", err.detail || 'Failed to update clinician.', true);
       }
     } catch (e) {
-      this.showToast('Connection error.', 'error');
+      this.showNotificationModal("Error", 'Connection error.', true);
     }
   },
 
@@ -2063,15 +2183,15 @@ const app = {
     try {
       const res = await fetch(`/api/config/clinicians/${id}`, { method: 'DELETE' });
       if (res.ok) {
-        this.showToast('Clinician deactivated.', 'success');
+        this.showNotificationModal("Success", 'Clinician deactivated.', false);
         await this.loadCliniciansConfig();
         await this.loadClinicians();
       } else {
         const err = await res.json();
-        this.showToast(err.detail || 'Failed to delete clinician.', 'error');
+        this.showNotificationModal("Error", err.detail || 'Failed to delete clinician.', true);
       }
     } catch (e) {
-      this.showToast('Connection error.', 'error');
+      this.showNotificationModal("Error", 'Connection error.', true);
     }
   },
 
@@ -2138,15 +2258,15 @@ const app = {
         body: JSON.stringify({ name: name.trim() })
       });
       if (res.ok) {
-        this.showToast('Ward added successfully!', 'success');
+        this.showNotificationModal("Success", 'Ward added successfully!', false);
         await this.loadWardsConfig();
         await this.loadWards();
       } else {
         const err = await res.json();
-        this.showToast(err.detail || 'Failed to add ward.', 'error');
+        this.showNotificationModal("Error", err.detail || 'Failed to add ward.', true);
       }
     } catch (e) {
-      this.showToast('Connection error.', 'error');
+      this.showNotificationModal("Error", 'Connection error.', true);
     }
   },
 
@@ -2163,15 +2283,15 @@ const app = {
         body: JSON.stringify({ name: name.trim(), is_active: isActive })
       });
       if (res.ok) {
-        this.showToast('Ward updated successfully!', 'success');
+        this.showNotificationModal("Success", 'Ward updated successfully!', false);
         await this.loadWardsConfig();
         await this.loadWards();
       } else {
         const err = await res.json();
-        this.showToast(err.detail || 'Failed to update ward.', 'error');
+        this.showNotificationModal("Error", err.detail || 'Failed to update ward.', true);
       }
     } catch (e) {
-      this.showToast('Connection error.', 'error');
+      this.showNotificationModal("Error", 'Connection error.', true);
     }
   },
 
@@ -2180,15 +2300,15 @@ const app = {
     try {
       const res = await fetch(`/api/config/wards/${id}`, { method: 'DELETE' });
       if (res.ok) {
-        this.showToast('Ward deactivated.', 'success');
+        this.showNotificationModal("Success", 'Ward deactivated.', false);
         await this.loadWardsConfig();
         await this.loadWards();
       } else {
         const err = await res.json();
-        this.showToast(err.detail || 'Failed to delete ward.', 'error');
+        this.showNotificationModal("Error", err.detail || 'Failed to delete ward.', true);
       }
     } catch (e) {
-      this.showToast('Connection error.', 'error');
+      this.showNotificationModal("Error", 'Connection error.', true);
     }
   },
 
