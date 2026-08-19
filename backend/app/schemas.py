@@ -108,9 +108,18 @@ class UserUpdate(BaseModel):
     password: Optional[str] = None
     cadre: Optional[str] = None
 
-class ClinicianResponse(BaseModel):
-    id: int
+class ClinicianBase(BaseModel):
     name: str
+
+class ClinicianCreate(ClinicianBase):
+    pass
+
+class ClinicianUpdate(BaseModel):
+    name: Optional[str] = None
+    is_active: Optional[bool] = None
+
+class ClinicianResponse(ClinicianBase):
+    id: int
     is_active: bool = True
     created_at: Optional[datetime.datetime] = None
 

@@ -57,6 +57,28 @@ def get_daily_log(date_str: str = Query(..., alias="date"), conn: sqlite3.Connec
             "tests": test_items
         })
 
+    # Fetch order stats for the date
+    cur.execute("""
+        SELECT status, COUNT(*) as count
+        FROM test_orders
+        WHERE date(ordered_at) = ?
+        GROUP BY status
+    """, (date_str,))
+    
+    order_stats = cur.fetchall()
+    total_orders = 0
+    pending_orders = 0
+    completed_orders = 0
+    
+    for stat in order_stats:
+        status = stat["status"].lower()
+        count = stat["count"]
+        total_orders += count
+        if status == "pending":
+            pending_orders += count
+        elif status == "completed":
+            completed_orders += count
+
     return {
         "entry_date": date_str,
         "sections": result_sections,
@@ -64,6 +86,11 @@ def get_daily_log(date_str: str = Query(..., alias="date"), conn: sqlite3.Connec
             "rows_logged": total_rows_today,
             "total_done": total_done_today,
             "total_positive": total_positive_today
+        },
+        "order_summary": {
+            "total": total_orders,
+            "pending": pending_orders,
+            "completed": completed_orders
         }
     }
 

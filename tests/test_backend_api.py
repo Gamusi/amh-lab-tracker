@@ -321,6 +321,52 @@ def test_wards_crud_endpoints(mock_db):
     res = client.delete("/api/config/wards/99999")
     assert res.status_code == 404
 
+def test_clinicians_crud_endpoints(mock_db):
+    # 1. GET clinicians list (contains pre-seeded SELF REQUEST)
+    res = client.get("/api/config/clinicians")
+    assert res.status_code == 200
+    names = [c["name"] for c in res.json()]
+    assert "SELF REQUEST" in names
+
+    # 2. POST create clinician
+    res = client.post("/api/config/clinicians", json={"name": "Dr. Sarah"})
+    assert res.status_code == 200
+    c1 = res.json()
+    assert c1["name"] == "Dr. Sarah"
+    assert c1["is_active"] is True
+
+    # Duplicate name validation
+    res = client.post("/api/config/clinicians", json={"name": "dr. sarah"})
+    assert res.status_code == 400
+    assert "already exists" in res.json()["detail"]
+
+    # Empty name validation
+    res = client.post("/api/config/clinicians", json={"name": "   "})
+    assert res.status_code == 400
+
+    # 3. PUT update clinician
+    res = client.put(f"/api/config/clinicians/{c1['id']}", json={"name": "Dr. Sarah Namubiru"})
+    assert res.status_code == 200
+    assert res.json()["name"] == "Dr. Sarah Namubiru"
+
+    # 4. DELETE soft-delete clinician
+    res = client.delete(f"/api/config/clinicians/{c1['id']}")
+    assert res.status_code == 200
+    assert res.json() == {"status": "deleted"}
+
+    # Verify active_only filter
+    res = client.get("/api/config/clinicians?active_only=true")
+    assert res.status_code == 200
+    active_names = [c["name"] for c in res.json()]
+    assert "Dr. Sarah Namubiru" not in active_names
+
+    # 5. Not found cases
+    res = client.put("/api/config/clinicians/99999", json={"name": "Ghost"})
+    assert res.status_code == 404
+    res = client.delete("/api/config/clinicians/99999")
+    assert res.status_code == 404
+
+
 def test_seed_database_wards(tmp_path, monkeypatch):
     from backend.app.seed import seed_database
     from backend.app.database import get_connection

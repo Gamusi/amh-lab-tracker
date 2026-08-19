@@ -435,11 +435,14 @@ const app = {
                 <button class="btn btn-secondary" style="padding: 4px 8px; font-size: 0.8rem;" onclick="app.shiftLogDate(1)">Next ${this.icon('chevron-right')}</button>
               </div>
             </div>
-            <button class="btn btn-success" onclick="app.saveDailyLogData()">${this.icon('save')} Save Entries</button>
           </div>
         </div>
 
-
+        <div id="daily-summary-container" style="background: var(--bg-color); padding: 12px; margin-bottom: 20px; border-radius: 6px; display: flex; gap: 32px; border: 1px solid var(--border-color);">
+          <div><strong>Total Tests:</strong> <span id="summary-total">0</span></div>
+          <div><strong>Pending:</strong> <span id="summary-pending">0</span></div>
+          <div><strong>Completed:</strong> <span id="summary-completed">0</span></div>
+        </div>
 
         <div id="daily-sections-container">
           <p style="color: var(--text-muted);">Loading daily log...</p>
@@ -454,6 +457,12 @@ const app = {
       const res = await fetch(`/api/daily-log?date=${dateStr}`);
       if (!res.ok) throw new Error('API returned ' + res.status);
       const data = await res.json();
+      
+      if (data.order_summary) {
+        document.getElementById('summary-total').textContent = data.order_summary.total;
+        document.getElementById('summary-pending').textContent = data.order_summary.pending;
+        document.getElementById('summary-completed').textContent = data.order_summary.completed;
+      }
 
       const secContainer = document.getElementById('daily-sections-container');
       secContainer.innerHTML = '';

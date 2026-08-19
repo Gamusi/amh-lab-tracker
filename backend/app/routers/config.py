@@ -2,7 +2,7 @@ import sqlite3
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException
 from ..database import get_db
-from ..schemas import TestCreate, TestResponse, WardCreate, WardUpdate, WardResponse
+from ..schemas import TestCreate, TestResponse, WardCreate, WardUpdate, WardResponse, ClinicianCreate, ClinicianUpdate, ClinicianResponse
 from ..models import User
 from ..auth import get_current_user, require_admin
 
@@ -146,4 +146,76 @@ def delete_ward(ward_id: int, conn: sqlite3.Connection = Depends(get_db), curren
         conn.execute("INSERT INTO audit_log (user_id, action, detail) VALUES (?, ?, ?)", (user_id, "delete_ward", f"Soft deleted ward ID {ward_id} ({existing['name']})"))
         conn.commit()
     return {"status": "deleted"}
+
+@router.get("/clinicians", response_model=List[ClinicianResponse])
+def get_clinicians(active_only: Optional[bool] = None, conn: sqlite3.Connection = Depends(get_db), current_user: dict = Depends(get_current_user)):
+    cur = conn.cursor()
+    if active_only is True:
+        cur.execute("SELECT id, name, is_active, created_at FROM clinicians WHERE is_active = 1 ORDER BY name ASC")
+    elif active_only is False:
+        cur.execute("SELECT id, name, is_active, created_at FROM clinicians WHERE is_active = 0 ORDER BY name ASC")
+    else:
+        cur.execute("SELECT id, name, is_active, created_at FROM clinicians ORDER BY name ASC")
+    return [dict(r) for r in cur.fetchall()]
+
+@router.post("/clinicians", response_model=ClinicianResponse)
+def create_clinician(req: ClinicianCreate, conn: sqlite3.Connection = Depends(get_db), current_user: dict = Depends(get_current_user)):
+    name = req.name.strip() if req.name else ""
+    if not name:
+        raise HTTPException(status_code=400, detail="Clinician name cannot be empty")
+    cur = conn.cursor()
+    cur.execute("SELECT id FROM clinicians WHERE LOWER(name) = LOWER(?)", (name,))
+    if cur.fetchone():
+        raise HTTPException(status_code=400, detail="Clinician already exists")
+    cur.execute("INSERT INTO clinicians (name, is_active) VALUES (?, 1)", (name,))
+    cid = cur.lastrowid
+    conn.commit()
+    user_id = current_user.get("id") if isinstance(current_user, dict) else getattr(current_user, "id", None)
+    if user_id:
+        conn.execute("INSERT INTO audit_log (user_id, action, detail) VALUES (?, ?, ?)", (user_id, "create_clinician", f"Created clinician '{name}'"))
+        conn.commit()
+    return ClinicianResponse(id=cid, name=name, is_active=True)
+
+@router.put("/clinicians/{clinician_id}", response_model=ClinicianResponse)
+def update_clinician(clinician_id: int, req: ClinicianUpdate, conn: sqlite3.Connection = Depends(get_db), current_user: dict = Depends(get_current_user)):
+    cur = conn.cursor()
+    cur.execute("SELECT id, name, is_active FROM clinicians WHERE id = ?", (clinician_id,))
+    existing = cur.fetchone()
+    if not existing:
+        raise HTTPException(status_code=404, detail="Clinician not found")
+    
+    new_name = req.name.strip() if req.name is not None else existing["name"]
+    if req.name is not None and not new_name:
+        raise HTTPException(status_code=400, detail="Clinician name cannot be empty")
+        
+    if req.name is not None and new_name.lower() != existing["name"].lower():
+        cur.execute("SELECT id FROM clinicians WHERE LOWER(name) = LOWER(?) AND id != ?", (new_name, clinician_id))
+        if cur.fetchone():
+            raise HTTPException(status_code=400, detail="Clinician with this name already exists")
+            
+    new_is_active = req.is_active if req.is_active is not None else bool(existing["is_active"])
+    
+    cur.execute("UPDATE clinicians SET name = ?, is_active = ? WHERE id = ?", (new_name, 1 if new_is_active else 0, clinician_id))
+    conn.commit()
+    user_id = current_user.get("id") if isinstance(current_user, dict) else getattr(current_user, "id", None)
+    if user_id:
+        conn.execute("INSERT INTO audit_log (user_id, action, detail) VALUES (?, ?, ?)", (user_id, "update_clinician", f"Updated clinician ID {clinician_id} ({new_name})"))
+        conn.commit()
+    return ClinicianResponse(id=clinician_id, name=new_name, is_active=new_is_active)
+
+@router.delete("/clinicians/{clinician_id}")
+def delete_clinician(clinician_id: int, conn: sqlite3.Connection = Depends(get_db), current_user: dict = Depends(get_current_user)):
+    cur = conn.cursor()
+    cur.execute("SELECT id, name FROM clinicians WHERE id = ?", (clinician_id,))
+    existing = cur.fetchone()
+    if not existing:
+        raise HTTPException(status_code=404, detail="Clinician not found")
+    cur.execute("UPDATE clinicians SET is_active = 0 WHERE id = ?", (clinician_id,))
+    conn.commit()
+    user_id = current_user.get("id") if isinstance(current_user, dict) else getattr(current_user, "id", None)
+    if user_id:
+        conn.execute("INSERT INTO audit_log (user_id, action, detail) VALUES (?, ?, ?)", (user_id, "delete_clinician", f"Soft deleted clinician ID {clinician_id} ({existing['name']})"))
+        conn.commit()
+    return {"status": "deleted"}
+
 

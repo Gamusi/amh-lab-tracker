@@ -45,31 +45,48 @@ def _build_metadata_table(order_data: dict) -> Table:
 
 def _build_department_table(dept_name: str, tests: list) -> KeepTogether:
     # 5-column layout: Test (140), Result (80), Unit (60), Flag (60), Reference (140)
-    data = [
-        [dept_name, "", "", "", ""],
-        ["Test", "Result", "Unit", "Flag", "Reference"]
-    ]
+    data = []
+    
+    internal_categories = ["Main", "Referrals", "Out-Reaches"]
+    show_dept = dept_name not in internal_categories
+    
+    if show_dept:
+        data.append([dept_name, "", "", "", ""])
+        
+    data.append(["Test", "Result", "Unit", "Flag", "Reference"])
+    
+    result_style = ParagraphStyle(name="ResultStyle", fontName="Helvetica", fontSize=10, leading=12)
     
     for t in tests:
+        res_text = str(t.get("result", ""))
+        res_para = Paragraph(res_text, result_style) if res_text else ""
         data.append([
             t.get("test_name", ""),
-            t.get("result", ""),
+            res_para,
             t.get("unit", ""),
             t.get("flag", ""),
             t.get("reference", "")
         ])
         
     t = Table(data, colWidths=[140, 80, 60, 60, 140])
-    t.setStyle(TableStyle([
+    
+    style_cmds = [
         ('FONTNAME', (0,0), (-1,-1), 'Helvetica'),
-        ('FONTNAME', (0,0), (-1,1), 'Helvetica-Bold'), 
         ('ALIGN', (0,0), (-1,-1), 'LEFT'),
-        ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#f0f0f0')), 
-        ('SPAN', (0,0), (-1,0)), 
         ('BOTTOMPADDING', (0,0), (-1,-1), 4),
         ('TOPPADDING', (0,0), (-1,-1), 4),
-        ('LINEBELOW', (0,1), (-1,1), 1, colors.black), 
-    ]))
+    ]
+    
+    header_row_idx = 1 if show_dept else 0
+    if show_dept:
+        style_cmds.append(('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'))
+        style_cmds.append(('BACKGROUND', (0,0), (-1,0), colors.HexColor('#f0f0f0')))
+        style_cmds.append(('SPAN', (0,0), (-1,0)))
+        
+    style_cmds.append(('FONTNAME', (0, header_row_idx), (-1, header_row_idx), 'Helvetica-Bold'))
+    style_cmds.append(('LINEBELOW', (0, header_row_idx), (-1, header_row_idx), 1, colors.black))
+    
+    t.setStyle(TableStyle(style_cmds))
     
     return KeepTogether([t, Spacer(1, 15)])
 
@@ -94,6 +111,57 @@ def _build_signatures_table(order_data: dict) -> KeepTogether:
         ('TOPPADDING', (0,0), (-1,-1), 6),
     ]))
     return KeepTogether([Spacer(1, 15), t])
+
+def _build_urinalysis_table(urinalysis_test: dict) -> KeepTogether:
+    data = [["Urinalysis Parameters", "Result"]]
+    
+    result_str = str(urinalysis_test.get("result", ""))
+    
+    # Try parsing result_str as a multiline or comma separated if it's plain text
+    import json
+    params = []
+    try:
+        parsed = json.loads(result_str)
+        if isinstance(parsed, dict):
+            for k, v in parsed.items():
+                params.append([k, v])
+        else:
+            params.append(["Result", result_str])
+    except Exception:
+        # Fallback if not JSON
+        if "\n" in result_str:
+            lines = result_str.split("\n")
+            for line in lines:
+                if ":" in line:
+                    k, v = line.split(":", 1)
+                    params.append([k.strip(), v.strip()])
+                else:
+                    params.append(["", line.strip()])
+        elif "," in result_str and ":" in result_str:
+            parts = result_str.split(",")
+            for p in parts:
+                if ":" in p:
+                    k, v = p.split(":", 1)
+                    params.append([k.strip(), v.strip()])
+        else:
+            params.append(["Result", result_str])
+            
+    if not params:
+        params.append(["Result", result_str])
+        
+    data.extend(params)
+    
+    t = Table(data, colWidths=[240, 240]) # Full width = 480
+    t.setStyle(TableStyle([
+        ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+        ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#f0f0f0')),
+        ('FONTNAME', (0,1), (-1,-1), 'Helvetica'),
+        ('ALIGN', (0,0), (-1,-1), 'LEFT'),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 4),
+        ('TOPPADDING', (0,0), (-1,-1), 4),
+        ('GRID', (0,0), (-1,-1), 0.5, colors.lightgrey),
+    ]))
+    return KeepTogether([t, Spacer(1, 15)])
 
 def generate_pdf(order_data: dict, results_data: list) -> bytes:
     buffer = io.BytesIO()
@@ -122,10 +190,43 @@ def generate_pdf(order_data: dict, results_data: list) -> bytes:
     flowables.append(_build_metadata_table(order_data))
     flowables.append(Spacer(1, 15))
     
+    urinalysis_test = None
+    
     for dept_data in results_data:
         dept_name = dept_data.get("department", "UNKNOWN")
         tests = dept_data.get("tests", [])
-        flowables.append(_build_department_table(dept_name, tests))
+        
+        # Group orders by test_name (proxy for test_id)
+        grouped_tests = {}
+        for t in tests:
+            t_name = t.get("test_name", "")
+            if t_name not in grouped_tests:
+                grouped_tests[t_name] = []
+            grouped_tests[t_name].append(t)
+            
+        final_tests = []
+        for t_name, orders in grouped_tests.items():
+            valid_orders = [o for o in orders if o.get("result", "").lower() != "invalid"]
+            if valid_orders:
+                final_tests.extend(valid_orders)
+            else:
+                first_order = orders[0].copy()
+                first_order["result"] = "Not done"
+                final_tests.append(first_order)
+                
+        # Intercept Urinalysis
+        tests_to_render = []
+        for t in final_tests:
+            if t.get("test_name", "").lower() == "urinalysis":
+                urinalysis_test = t
+            else:
+                tests_to_render.append(t)
+                
+        if tests_to_render:
+            flowables.append(_build_department_table(dept_name, tests_to_render))
+            
+    if urinalysis_test:
+        flowables.append(_build_urinalysis_table(urinalysis_test))
     
     flowables.append(_build_signatures_table(order_data))
     
