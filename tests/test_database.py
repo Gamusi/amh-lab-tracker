@@ -9,11 +9,20 @@ def test_schema_creates_all_required_tables(db_connection):
     
     expected_tables = {
         "users", "user_sessions", "sections", "tests", "test_parameters",
-        "daily_entries", "audit_log", "clients", "clinicians",
+        "daily_entries", "audit_log", "clients", "clinicians", "wards",
         "sequence_tracker", "visits", "test_orders", "test_results"
     }
     for table in expected_tables:
         assert table in tables, f"Expected table '{table}' not found in database"
+
+def test_wards_table_columns(db_connection):
+    cur = db_connection.cursor()
+    cur.execute("PRAGMA table_info(wards)")
+    columns = {row["name"]: row["type"] for row in cur.fetchall()}
+    
+    assert "id" in columns
+    assert "name" in columns
+    assert "is_active" in columns
 
 def test_clinicians_table_columns_and_preseed(db_connection):
     cur = db_connection.cursor()

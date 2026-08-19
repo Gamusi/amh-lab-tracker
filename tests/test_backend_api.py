@@ -258,3 +258,88 @@ def test_visit_pdf_report_generation(mock_db):
     # 404 for non-existent visit
     not_found_res = client.get("/api/reports/visit/99999/pdf")
     assert not_found_res.status_code == 404
+
+def test_wards_crud_endpoints(mock_db):
+    # 1. GET empty wards list
+    res = client.get("/api/config/wards")
+    assert res.status_code == 200
+    assert res.json() == []
+
+    # 2. POST create ward
+    res = client.post("/api/config/wards", json={"name": "Maternity"})
+    assert res.status_code == 200
+    w1 = res.json()
+    assert w1["name"] == "Maternity"
+    assert w1["is_active"] is True
+    assert "id" in w1
+
+    # Create second ward
+    res = client.post("/api/config/wards", json={"name": "Emergency"})
+    assert res.status_code == 200
+    w2 = res.json()
+    assert w2["name"] == "Emergency"
+
+    # Validation: Duplicate name
+    res = client.post("/api/config/wards", json={"name": "maternity"})
+    assert res.status_code == 400
+    assert "already exists" in res.json()["detail"]
+
+    # Validation: Empty name
+    res = client.post("/api/config/wards", json={"name": "   "})
+    assert res.status_code == 400
+
+    # 3. GET list wards (alphabetical order)
+    res = client.get("/api/config/wards")
+    assert res.status_code == 200
+    ward_names = [w["name"] for w in res.json()]
+    assert ward_names == ["Emergency", "Maternity"]
+
+    # 4. PUT update ward name
+    res = client.put(f"/api/config/wards/{w1['id']}", json={"name": "Maternity Ward"})
+    assert res.status_code == 200
+    assert res.json()["name"] == "Maternity Ward"
+
+    # PUT validation: duplicate name
+    res = client.put(f"/api/config/wards/{w1['id']}", json={"name": "Emergency"})
+    assert res.status_code == 400
+
+    # 5. DELETE ward (soft delete is_active=0)
+    res = client.delete(f"/api/config/wards/{w2['id']}")
+    assert res.status_code == 200
+    assert res.json() == {"status": "deleted"}
+
+    # Verify soft delete in active_only query
+    res = client.get("/api/config/wards?active_only=true")
+    assert res.status_code == 200
+    active_names = [w["name"] for w in res.json()]
+    assert active_names == ["Maternity Ward"]
+
+    # 6. Not found cases
+    res = client.put("/api/config/wards/99999", json={"name": "Ghost Ward"})
+    assert res.status_code == 404
+
+    res = client.delete("/api/config/wards/99999")
+    assert res.status_code == 404
+
+def test_seed_database_wards(tmp_path, monkeypatch):
+    from backend.app.seed import seed_database
+    from backend.app.database import get_connection
+
+    test_db_file = str(tmp_path / "seed_test.db")
+    monkeypatch.setattr("backend.app.database.DB_PATH", test_db_file)
+
+    seed_database()
+
+    conn = get_connection()
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+    cur.execute("SELECT name, is_active FROM wards ORDER BY name ASC")
+    rows = cur.fetchall()
+    conn.close()
+
+    seeded_wards = {r["name"] for r in rows}
+    expected_wards = {"ANC", "MCH", "Emergency", "Theater", "Labour", "OPD", "IPD", "Pediatrics", "TB Clinic"}
+    assert expected_wards.issubset(seeded_wards)
+    for r in rows:
+        assert r["is_active"] == 1
+

@@ -135,3 +135,21 @@ class VisitResponse(BaseModel):
     class Config:
         from_attributes = True
 
+class WardBase(BaseModel):
+    name: str
+
+class WardCreate(WardBase):
+    pass
+
+class WardUpdate(BaseModel):
+    name: Optional[str] = None
+    is_active: Optional[bool] = None
+
+class WardResponse(WardBase):
+    id: int
+    is_active: bool
+
+    class Config:
+        from_attributes = True
+
+

@@ -27,6 +27,12 @@ def seed_database():
     
     conn.commit()
 
+    # Wards
+    wards = ["ANC", "MCH", "Emergency", "Theater", "Labour", "OPD", "IPD", "Pediatrics", "TB Clinic"]
+    for w_name in wards:
+        cur.execute("INSERT OR IGNORE INTO wards (name) VALUES (?)", (w_name,))
+    conn.commit()
+
     # 3. Test Catalog
     tracked_tests = {
         "sickle cell test", "widal", "vdrl/rpr", "hts", "determine", "stat-pak", "sd-bioline",

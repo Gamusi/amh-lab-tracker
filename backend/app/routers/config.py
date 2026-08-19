@@ -1,7 +1,8 @@
 import sqlite3
+from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException
 from ..database import get_db
-from ..schemas import TestCreate
+from ..schemas import TestCreate, TestResponse, WardCreate, WardUpdate, WardResponse
 from ..models import User
 from ..auth import get_current_user, require_admin
 
@@ -49,8 +50,8 @@ def enter_result(req: TestCreate, current_user: User = Depends(get_current_user)
     print(current_user.full_name)
 
 
-@router.put("/tests/{test_id}", response_model=schemas.TestResponse)
-def update_test(test_id: int, req: schemas.TestCreate, conn: sqlite3.Connection = Depends(get_db), current_user: dict = Depends(get_current_user)):
+@router.put("/tests/{test_id}", response_model=TestResponse)
+def update_test(test_id: int, req: TestCreate, conn: sqlite3.Connection = Depends(get_db), current_user: dict = Depends(get_current_user)):
     cur = conn.cursor()
     cur.execute("SELECT id FROM tests WHERE id = ?", (test_id,))
     if not cur.fetchone():
@@ -63,15 +64,86 @@ def update_test(test_id: int, req: schemas.TestCreate, conn: sqlite3.Connection 
     """, (req.name, req.section_id, 1 if req.is_tracked else 0, test_id))
     
     conn.commit()
-    return schemas.TestResponse(
+    return TestResponse(
         id=test_id, name=req.name, section_id=req.section_id, 
         is_tracked=req.is_tracked, sort_order=req.sort_order, is_active=True
     )
 
 @router.delete("/tests/{test_id}")
-
 def delete_test(test_id: int, admin_user: dict = Depends(require_admin), conn: sqlite3.Connection = Depends(get_db)):
     conn.execute("UPDATE tests SET is_active = 0 WHERE id = ?", (test_id,))
     conn.execute("INSERT INTO audit_log (user_id, action, detail) VALUES (?, ?, ?)", (admin_user["id"], "delete_test", f"Soft deleted test ID {test_id}"))
     conn.commit()
     return {"status": "deleted"}
+
+@router.get("/wards", response_model=List[WardResponse])
+def get_wards(active_only: Optional[bool] = None, conn: sqlite3.Connection = Depends(get_db), current_user: dict = Depends(get_current_user)):
+    cur = conn.cursor()
+    if active_only is True:
+        cur.execute("SELECT id, name, is_active FROM wards WHERE is_active = 1 ORDER BY name ASC")
+    elif active_only is False:
+        cur.execute("SELECT id, name, is_active FROM wards WHERE is_active = 0 ORDER BY name ASC")
+    else:
+        cur.execute("SELECT id, name, is_active FROM wards ORDER BY name ASC")
+    return [dict(r) for r in cur.fetchall()]
+
+@router.post("/wards", response_model=WardResponse)
+def create_ward(req: WardCreate, conn: sqlite3.Connection = Depends(get_db), current_user: dict = Depends(get_current_user)):
+    name = req.name.strip() if req.name else ""
+    if not name:
+        raise HTTPException(status_code=400, detail="Ward name cannot be empty")
+    cur = conn.cursor()
+    cur.execute("SELECT id FROM wards WHERE LOWER(name) = LOWER(?)", (name,))
+    if cur.fetchone():
+        raise HTTPException(status_code=400, detail="Ward already exists")
+    cur.execute("INSERT INTO wards (name, is_active) VALUES (?, 1)", (name,))
+    wid = cur.lastrowid
+    conn.commit()
+    user_id = current_user.get("id") if isinstance(current_user, dict) else getattr(current_user, "id", None)
+    if user_id:
+        conn.execute("INSERT INTO audit_log (user_id, action, detail) VALUES (?, ?, ?)", (user_id, "create_ward", f"Created ward '{name}'"))
+        conn.commit()
+    return WardResponse(id=wid, name=name, is_active=True)
+
+@router.put("/wards/{ward_id}", response_model=WardResponse)
+def update_ward(ward_id: int, req: WardUpdate, conn: sqlite3.Connection = Depends(get_db), current_user: dict = Depends(get_current_user)):
+    cur = conn.cursor()
+    cur.execute("SELECT id, name, is_active FROM wards WHERE id = ?", (ward_id,))
+    existing = cur.fetchone()
+    if not existing:
+        raise HTTPException(status_code=404, detail="Ward not found")
+    
+    new_name = req.name.strip() if req.name is not None else existing["name"]
+    if req.name is not None and not new_name:
+        raise HTTPException(status_code=400, detail="Ward name cannot be empty")
+        
+    if req.name is not None and new_name.lower() != existing["name"].lower():
+        cur.execute("SELECT id FROM wards WHERE LOWER(name) = LOWER(?) AND id != ?", (new_name, ward_id))
+        if cur.fetchone():
+            raise HTTPException(status_code=400, detail="Ward with this name already exists")
+            
+    new_is_active = req.is_active if req.is_active is not None else bool(existing["is_active"])
+    
+    cur.execute("UPDATE wards SET name = ?, is_active = ? WHERE id = ?", (new_name, 1 if new_is_active else 0, ward_id))
+    conn.commit()
+    user_id = current_user.get("id") if isinstance(current_user, dict) else getattr(current_user, "id", None)
+    if user_id:
+        conn.execute("INSERT INTO audit_log (user_id, action, detail) VALUES (?, ?, ?)", (user_id, "update_ward", f"Updated ward ID {ward_id} ({new_name})"))
+        conn.commit()
+    return WardResponse(id=ward_id, name=new_name, is_active=new_is_active)
+
+@router.delete("/wards/{ward_id}")
+def delete_ward(ward_id: int, conn: sqlite3.Connection = Depends(get_db), current_user: dict = Depends(get_current_user)):
+    cur = conn.cursor()
+    cur.execute("SELECT id, name FROM wards WHERE id = ?", (ward_id,))
+    existing = cur.fetchone()
+    if not existing:
+        raise HTTPException(status_code=404, detail="Ward not found")
+    cur.execute("UPDATE wards SET is_active = 0 WHERE id = ?", (ward_id,))
+    conn.commit()
+    user_id = current_user.get("id") if isinstance(current_user, dict) else getattr(current_user, "id", None)
+    if user_id:
+        conn.execute("INSERT INTO audit_log (user_id, action, detail) VALUES (?, ?, ?)", (user_id, "delete_ward", f"Soft deleted ward ID {ward_id} ({existing['name']})"))
+        conn.commit()
+    return {"status": "deleted"}
+

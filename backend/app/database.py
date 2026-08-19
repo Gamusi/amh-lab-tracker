@@ -93,6 +93,12 @@ SCHEMA_SQL = """
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
 
+    CREATE TABLE IF NOT EXISTS wards (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL UNIQUE,
+        is_active INTEGER DEFAULT 1
+    );
+
     CREATE TABLE IF NOT EXISTS sequence_tracker (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         seq_name TEXT UNIQUE NOT NULL,
