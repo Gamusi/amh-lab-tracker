@@ -329,6 +329,21 @@ def get_client_orders(client_id: int, conn: sqlite3.Connection = Depends(get_db)
         
     return orders
 
+@router.get("/api/clients/{client_id}/visits")
+def get_client_visits(client_id: int, conn: sqlite3.Connection = Depends(get_db), current_user: dict = Depends(get_current_user)):
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT 
+            v.id as visit_id, v.ward_of_origin, v.lab_number, v.created_at,
+            cl.name as clinician_name
+        FROM visits v
+        LEFT JOIN clinicians cl ON v.clinician_id = cl.id
+        WHERE v.client_id = ?
+        ORDER BY v.id DESC
+    """, (client_id,))
+    return [dict(r) for r in cur.fetchall()]
+
+
 @router.get("/api/visits/{visit_id}")
 def get_visit_details(visit_id: int, conn: sqlite3.Connection = Depends(get_db), current_user: dict = Depends(get_current_user)):
     cur = conn.cursor()
