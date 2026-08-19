@@ -918,11 +918,7 @@ const app = {
             <div class="form-group">
               <label>Ward of Origin:</label>
               <select id="visit-ward">
-                <option value="OPD">OPD</option>
-                <option value="IPD">IPD</option>
-                <option value="Maternity">Maternity</option>
-                <option value="Pediatrics">Pediatrics</option>
-                <option value="TB Clinic">TB Clinic</option>
+                <option value="">Loading wards...</option>
               </select>
             </div>
             <div class="form-group">
@@ -932,7 +928,8 @@ const app = {
               </select>
             </div>
             <div class="form-group">
-              <label>Select Tests (Ctrl+Click for multiple):</label>
+              <label>Select Test(s):</label>
+              <input type="text" id="visit-test-search" placeholder="Search tests..." onkeyup="app.filterVisitTests()" style="width: 100%; padding: 8px; margin-bottom: 8px;">
               <div id="visit-tests-container">Loading tests...</div>
             </div>
           </div>
@@ -960,6 +957,7 @@ const app = {
       </div>
     `;
 
+    await this.loadWards();
     await this.loadClinicians();
     await this.loadTestOptionsMulti();
     await this.loadPendingTests(pid);
@@ -1056,6 +1054,25 @@ const app = {
     }
   },
 
+  async loadWards() {
+    try {
+      const res = await fetch('/api/config/wards?active_only=true');
+      if (!res.ok) return;
+      const wards = await res.json();
+      const sel = document.getElementById('visit-ward');
+      if (!sel) return;
+      sel.innerHTML = '';
+      if (wards.length === 0) {
+        sel.innerHTML = '<option value="OPD">OPD</option>';
+      } else {
+        wards.forEach(w => {
+          sel.innerHTML += `<option value="${this.escape(w.name)}">${this.escape(w.name)}</option>`;
+        });
+      }
+    } catch (e) {
+      console.error('Error loading wards', e);
+    }
+  },
 
   async loadClinicians() {
     try {
@@ -1080,17 +1097,15 @@ const app = {
       if (!res.ok) return;
       const tests = await res.json();
       
-      // We will store tests in a class variable to check is_tracked later
       this.testCatalog = tests;
       
       const container = document.getElementById('visit-tests-container');
       if (!container) return;
-      container.innerHTML = '';
       
       let html = '<div style="max-height: 150px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 4px; padding: 8px; background: #fff;">';
       tests.forEach(t => {
         html += `
-          <label style="display: block; margin-bottom: 4px; cursor: pointer;">
+          <label class="visit-test-row" data-name="${this.escape(t.name).toLowerCase()}" style="display: block; margin-bottom: 4px; cursor: pointer;">
             <input type="checkbox" name="visit-test-cb" value="${t.id}">
             ${this.escape(t.name)}
           </label>
@@ -1103,6 +1118,17 @@ const app = {
     }
   },
 
+  filterVisitTests() {
+    const query = document.getElementById('visit-test-search').value.toLowerCase();
+    const rows = document.querySelectorAll('.visit-test-row');
+    rows.forEach(row => {
+      if (row.getAttribute('data-name').includes(query)) {
+        row.style.display = 'block';
+      } else {
+        row.style.display = 'none';
+      }
+    });
+  },
   async createVisit(pid) {
     const ward = document.getElementById('visit-ward').value;
     const clinician = document.getElementById('visit-clinician').value;
@@ -1443,41 +1469,161 @@ const app = {
   },
 
   // Configuration View
+
   async renderConfig(container) {
     const isSuperAdmin = this.currentUser && this.currentUser.role === 'superadmin';
 
     container.innerHTML = `
-      <div class="card" style="margin-bottom: 24px;">
-        <div class="card-header">
+      <details class="card" style="margin-bottom: 16px;" open>
+        <summary class="card-header" style="cursor: pointer; list-style: none;">
           <span class="card-title">${this.icon('settings')} Test Catalog & Section Configuration</span>
-          <button class="btn btn-primary" onclick="app.showAddTestModal()">${this.icon('plus')} Add New Test</button>
+        </summary>
+        <div style="padding: 16px;">
+          <button class="btn btn-primary" onclick="app.showAddTestModal()" style="margin-bottom: 12px;">${this.icon('plus')} Add New Test</button>
+          <div id="config-table-container">
+            <p style="color: var(--text-muted);">Loading configuration...</p>
+          </div>
         </div>
-        <div id="config-table-container">
-          <p style="color: var(--text-muted);">Loading configuration...</p>
+      </details>
+
+      <details class="card" style="margin-bottom: 16px;">
+        <summary class="card-header" style="cursor: pointer; list-style: none;">
+          <span class="card-title">${this.icon('building')} Wards Configuration</span>
+        </summary>
+        <div style="padding: 16px;">
+          <button class="btn btn-primary" onclick="app.showAddWardModal()" style="margin-bottom: 12px;">${this.icon('plus')} Add Ward</button>
+          <div id="wards-table-container">
+            <p style="color: var(--text-muted);">Loading wards...</p>
+          </div>
         </div>
-      </div>
+      </details>
+      
+      <details class="card" style="margin-bottom: 16px;">
+        <summary class="card-header" style="cursor: pointer; list-style: none;">
+          <span class="card-title">${this.icon('stethoscope')} Clinicians Configuration</span>
+        </summary>
+        <div style="padding: 16px;">
+          <button class="btn btn-primary" onclick="app.showAddClinicianModal()" style="margin-bottom: 12px;">${this.icon('plus')} Add Clinician</button>
+          <div id="clinicians-table-container">
+            <p style="color: var(--text-muted);">Loading clinicians...</p>
+          </div>
+        </div>
+      </details>
 
       ${isSuperAdmin ? `
-      <div class="card" id="pending-users-card" style="margin-bottom: 24px;">
-        <div class="card-header">
+      <details class="card" style="margin-bottom: 16px;">
+        <summary class="card-header" style="cursor: pointer; list-style: none;">
           <span class="card-title">${this.icon('user-plus')} Pending Registration Requests</span>
-        </div>
-        <div id="pending-users-container">
+        </summary>
+        <div id="pending-users-container" style="padding: 16px;">
           <p style="color: var(--text-muted);">Loading pending requests...</p>
         </div>
-      </div>
+      </details>
 
-      <div class="card" id="active-users-card">
-        <div class="card-header">
+      <details class="card" style="margin-bottom: 16px;">
+        <summary class="card-header" style="cursor: pointer; list-style: none;">
           <span class="card-title">${this.icon('users')} Active Lab Staff Accounts</span>
-        </div>
-        <div id="active-users-container">
+        </summary>
+        <div id="active-users-container" style="padding: 16px;">
           <p style="color: var(--text-muted);">Loading accounts...</p>
         </div>
-      </div>
+      </details>
       ` : ''}
     `;
     await this.loadConfigData();
+    await this.loadWardsConfig();
+    await this.loadCliniciansConfig();
+  },
+
+
+  
+  async loadWardsConfig() {
+    try {
+      const res = await fetch('/api/config/wards');
+      if (!res.ok) return;
+      const wards = await res.json();
+      let rows = '';
+      wards.forEach(w => {
+        rows += `
+          <tr>
+            <td><strong>${this.escape(w.name)}</strong></td>
+            <td>${w.is_active ? '<span style="color:green;">Active</span>' : '<span style="color:red;">Inactive</span>'}</td>
+            <td>
+              <button class="btn btn-secondary" style="padding: 2px 8px; font-size: 0.8rem;" onclick="app.editWard(${w.id}, '${this.escape(w.name)}', ${w.is_active})">Edit</button>
+              ${w.is_active ? `<button class="btn btn-secondary" style="padding: 2px 8px; font-size: 0.8rem; color: var(--danger-color);" onclick="app.deleteWard(${w.id})">Deactivate</button>` : ''}
+            </td>
+          </tr>
+        `;
+      });
+      document.getElementById('wards-table-container').innerHTML = `
+        <table class="data-table">
+          <thead><tr><th>Ward Name</th><th>Status</th><th>Actions</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      `;
+    } catch(e) { console.error(e); }
+  },
+
+  async showAddWardModal() {
+    const name = prompt("Enter Ward Name:");
+    if (!name) return;
+    try {
+      await fetch('/api/config/wards', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: name.trim() })
+      });
+      this.loadWardsConfig();
+    } catch(e) { console.error(e); }
+  },
+
+  async editWard(id, oldName, isActive) {
+    const name = prompt("Edit Ward Name:", oldName);
+    if (!name) return;
+    try {
+      await fetch(`/api/config/wards/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: name.trim(), is_active: isActive })
+      });
+      this.loadWardsConfig();
+    } catch(e) { console.error(e); }
+  },
+
+  async deleteWard(id) {
+    if(!confirm("Are you sure you want to deactivate this ward?")) return;
+    try {
+      await fetch(`/api/config/wards/${id}`, { method: 'DELETE' });
+      this.loadWardsConfig();
+    } catch(e) { console.error(e); }
+  },
+
+  async loadCliniciansConfig() {
+    try {
+      const res = await fetch('/api/clinicians');
+      if (!res.ok) return;
+      const clinicians = await res.json();
+      let rows = '';
+      clinicians.forEach(c => {
+        rows += `
+          <tr>
+            <td><strong>${this.escape(c.name)}</strong></td>
+            <td>Active</td>
+          </tr>
+        `;
+      });
+      document.getElementById('clinicians-table-container').innerHTML = `
+        <table class="data-table">
+          <thead><tr><th>Clinician Name</th><th>Status</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+        <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 8px;">(Note: Clinicians are currently automatically tracked via Orders, but can be viewed here).</p>
+      `;
+    } catch(e) { console.error(e); }
+  },
+  
+  async showAddClinicianModal() {
+     alert("Currently, new clinicians are added by simply typing their name in the Create Visit form. The backend will automatically track them.");
   },
 
   async loadConfigData() {
@@ -1489,7 +1635,6 @@ const app = {
         let rows = '';
         tests.forEach(t => {
           rows += `
-            
               <tr>
                 <td><strong>${this.escape(t.name)}</strong></td>
                 <td>Section ${t.section_id}</td>
@@ -1499,7 +1644,6 @@ const app = {
                   <button class="btn btn-secondary" style="padding: 2px 8px; font-size: 0.8rem; color: var(--danger-color);" onclick="app.deleteTest(${t.id})">Delete</button>
                 </td>
               </tr>
-
           `;
         });
         const catalogContainer = document.getElementById('config-table-container');
@@ -1522,7 +1666,13 @@ const app = {
         }
       }
 
-      // 2. Load user management for admin/superadmin
+      // 2. Load clinicians config
+      await this.loadCliniciansConfig();
+
+      // 3. Load wards config
+      await this.loadWardsConfig();
+
+      // 4. Load user management for admin/superadmin
       if (this.currentUser && (this.currentUser.role === 'admin' || this.currentUser.role === 'superadmin')) {
         const userRes = await fetch('/api/auth/users');
         if (userRes.ok) {
@@ -1791,7 +1941,6 @@ const app = {
   },
 
   async deleteTest(testId) {
-
     if (!confirm('Are you sure you want to deactivate/delete this test from the catalog?')) return;
     try {
       const res = await fetch(`/api/config/tests/${testId}`, { method: 'DELETE' });
@@ -1800,6 +1949,243 @@ const app = {
         this.loadConfigData();
       } else {
         this.showToast('Failed to delete test.', 'error');
+      }
+    } catch (e) {
+      this.showToast('Connection error.', 'error');
+    }
+  },
+
+  async loadCliniciansConfig() {
+    try {
+      const res = await fetch('/api/config/clinicians');
+      if (!res.ok) return;
+      const clinicians = await res.json();
+      const container = document.getElementById('clinicians-config-container');
+      if (!container) return;
+
+      if (clinicians.length === 0) {
+        container.innerHTML = '<p style="padding: 12px; color: var(--text-muted);">No clinicians configured.</p>';
+        return;
+      }
+
+      let rows = '';
+      clinicians.forEach(c => {
+        const isSelf = c.name === 'SELF REQUEST';
+        rows += `
+          <tr>
+            <td><strong>${this.escape(c.name)}</strong></td>
+            <td>
+              <span style="padding: 3px 8px; border-radius: 4px; font-size: 0.8rem; font-weight: 600; background: ${c.is_active ? '#DEF7EC; color: #03543F' : '#FDE8E8; color: #9B1C1C'};">
+                ${c.is_active ? 'Active' : 'Inactive'}
+              </span>
+            </td>
+            <td>
+              <div style="display: flex; gap: 6px; align-items: center;">
+                <button class="btn btn-secondary" style="padding: 2px 8px; font-size: 0.8rem;" onclick="app.editClinician(${c.id}, '${this.escape(c.name)}', ${c.is_active})">Edit</button>
+                ${!isSelf ? `
+                  <button class="btn btn-secondary" style="padding: 2px 8px; font-size: 0.8rem; color: var(--danger-color);" onclick="app.deleteClinician(${c.id})">${c.is_active ? 'Deactivate' : 'Delete'}</button>
+                ` : ''}
+              </div>
+            </td>
+          </tr>
+        `;
+      });
+
+      container.innerHTML = `
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Clinician Name</th>
+              <th style="width: 140px;">Status</th>
+              <th style="width: 160px;">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rows}
+          </tbody>
+        </table>
+      `;
+    } catch (e) {
+      console.error('Error loading clinicians config:', e);
+    }
+  },
+
+  async showAddClinicianModal() {
+    const name = prompt('Enter Clinician Name (e.g. Dr. Jane Doe):');
+    if (!name || !name.trim()) return;
+
+    try {
+      const res = await fetch('/api/config/clinicians', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: name.trim() })
+      });
+      if (res.ok) {
+        this.showToast('Clinician added successfully!', 'success');
+        await this.loadCliniciansConfig();
+        await this.loadClinicians();
+      } else {
+        const err = await res.json();
+        this.showToast(err.detail || 'Failed to add clinician.', 'error');
+      }
+    } catch (e) {
+      this.showToast('Connection error.', 'error');
+    }
+  },
+
+  async editClinician(id, oldName, oldActive) {
+    const name = prompt('Edit Clinician Name:', oldName);
+    if (!name || !name.trim()) return;
+
+    const isActive = confirm('Keep/Set Clinician as Active? (OK for Active, Cancel for Inactive)');
+
+    try {
+      const res = await fetch(`/api/config/clinicians/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: name.trim(), is_active: isActive })
+      });
+      if (res.ok) {
+        this.showToast('Clinician updated successfully!', 'success');
+        await this.loadCliniciansConfig();
+        await this.loadClinicians();
+      } else {
+        const err = await res.json();
+        this.showToast(err.detail || 'Failed to update clinician.', 'error');
+      }
+    } catch (e) {
+      this.showToast('Connection error.', 'error');
+    }
+  },
+
+  async deleteClinician(id) {
+    if (!confirm('Are you sure you want to deactivate/delete this clinician?')) return;
+    try {
+      const res = await fetch(`/api/config/clinicians/${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        this.showToast('Clinician deactivated.', 'success');
+        await this.loadCliniciansConfig();
+        await this.loadClinicians();
+      } else {
+        const err = await res.json();
+        this.showToast(err.detail || 'Failed to delete clinician.', 'error');
+      }
+    } catch (e) {
+      this.showToast('Connection error.', 'error');
+    }
+  },
+
+  async loadWardsConfig() {
+    try {
+      const res = await fetch('/api/config/wards');
+      if (!res.ok) return;
+      const wards = await res.json();
+      const container = document.getElementById('wards-config-container');
+      if (!container) return;
+
+      if (wards.length === 0) {
+        container.innerHTML = '<p style="padding: 12px; color: var(--text-muted);">No wards configured.</p>';
+        return;
+      }
+
+      let rows = '';
+      wards.forEach(w => {
+        rows += `
+          <tr>
+            <td><strong>${this.escape(w.name)}</strong></td>
+            <td>
+              <span style="padding: 3px 8px; border-radius: 4px; font-size: 0.8rem; font-weight: 600; background: ${w.is_active ? '#DEF7EC; color: #03543F' : '#FDE8E8; color: #9B1C1C'};">
+                ${w.is_active ? 'Active' : 'Inactive'}
+              </span>
+            </td>
+            <td>
+              <div style="display: flex; gap: 6px; align-items: center;">
+                <button class="btn btn-secondary" style="padding: 2px 8px; font-size: 0.8rem;" onclick="app.editWard(${w.id}, '${this.escape(w.name)}', ${w.is_active})">Edit</button>
+                <button class="btn btn-secondary" style="padding: 2px 8px; font-size: 0.8rem; color: var(--danger-color);" onclick="app.deleteWard(${w.id})">${w.is_active ? 'Deactivate' : 'Delete'}</button>
+              </div>
+            </td>
+          </tr>
+        `;
+      });
+
+      container.innerHTML = `
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Ward Name</th>
+              <th style="width: 140px;">Status</th>
+              <th style="width: 160px;">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rows}
+          </tbody>
+        </table>
+      `;
+    } catch (e) {
+      console.error('Error loading wards config:', e);
+    }
+  },
+
+  async showAddWardModal() {
+    const name = prompt('Enter Ward Name (e.g. OPD, Maternity, TB Clinic):');
+    if (!name || !name.trim()) return;
+
+    try {
+      const res = await fetch('/api/config/wards', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: name.trim() })
+      });
+      if (res.ok) {
+        this.showToast('Ward added successfully!', 'success');
+        await this.loadWardsConfig();
+        await this.loadWards();
+      } else {
+        const err = await res.json();
+        this.showToast(err.detail || 'Failed to add ward.', 'error');
+      }
+    } catch (e) {
+      this.showToast('Connection error.', 'error');
+    }
+  },
+
+  async editWard(id, oldName, oldActive) {
+    const name = prompt('Edit Ward Name:', oldName);
+    if (!name || !name.trim()) return;
+
+    const isActive = confirm('Keep/Set Ward as Active? (OK for Active, Cancel for Inactive)');
+
+    try {
+      const res = await fetch(`/api/config/wards/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: name.trim(), is_active: isActive })
+      });
+      if (res.ok) {
+        this.showToast('Ward updated successfully!', 'success');
+        await this.loadWardsConfig();
+        await this.loadWards();
+      } else {
+        const err = await res.json();
+        this.showToast(err.detail || 'Failed to update ward.', 'error');
+      }
+    } catch (e) {
+      this.showToast('Connection error.', 'error');
+    }
+  },
+
+  async deleteWard(id) {
+    if (!confirm('Are you sure you want to deactivate/delete this ward?')) return;
+    try {
+      const res = await fetch(`/api/config/wards/${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        this.showToast('Ward deactivated.', 'success');
+        await this.loadWardsConfig();
+        await this.loadWards();
+      } else {
+        const err = await res.json();
+        this.showToast(err.detail || 'Failed to delete ward.', 'error');
       }
     } catch (e) {
       this.showToast('Connection error.', 'error');

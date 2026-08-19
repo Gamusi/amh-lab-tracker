@@ -137,6 +137,22 @@ body {
   border-bottom: 1px solid var(--border-color);
 }
 
+details.card > summary.card-header {
+  cursor: pointer;
+  user-select: none;
+  list-style: none;
+}
+
+details.card > summary.card-header::-webkit-details-marker {
+  display: none;
+}
+
+details.card:not([open]) > summary.card-header {
+  margin-bottom: 0;
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
 .card-title {
   font-size: 1.1rem;
   font-weight: 700;
