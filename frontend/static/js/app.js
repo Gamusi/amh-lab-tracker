@@ -281,7 +281,7 @@ const app = {
       this.inactivityTimer = setTimeout(() => {
         console.log("Inactivity timeout reached. Logging out...");
         this.handleLogout();
-        this.showToast("Logged out automatically due to inactivity.", "error");
+        this.showNotificationModal("Notice", "Logged out automatically due to inactivity.", true);
       }, this.inactivityTimeout);
     }
   },
@@ -452,7 +452,7 @@ const app = {
   async loadDailyLogData(dateStr) {
     try {
       const res = await fetch(`/api/daily-log?date=${dateStr}`);
-      if (!res.ok) return;
+      if (!res.ok) throw new Error('API returned ' + res.status);
       const data = await res.json();
 
       const secContainer = document.getElementById('daily-sections-container');
@@ -678,7 +678,7 @@ const app = {
 
     try {
       const res = await fetch(`/api/reports?period_type=${pType}&reference_date=${rDate}`);
-      if (!res.ok) return;
+      if (!res.ok) throw new Error('API returned ' + res.status);
       const data = await res.json();
 
       const rContainer = document.getElementById('report-content-container');
@@ -795,7 +795,7 @@ const app = {
 
     try {
       const res = await fetch(`/api/trends?from_year=${fy}&to_year=${ty}`);
-      if (!res.ok) return;
+      if (!res.ok) throw new Error('API returned ' + res.status);
       const data = await res.json();
 
       let headers = '<th>Month</th>';
@@ -868,7 +868,7 @@ const app = {
   async searchClients(q) {
     try {
       const res = await fetch(`/api/clients?query=${encodeURIComponent(q || '')}`);
-      if (!res.ok) return;
+      if (!res.ok) throw new Error('API returned ' + res.status);
       const clients = await res.json();
 
       const box = document.getElementById('client-list-box');
@@ -959,7 +959,7 @@ const app = {
   async loadTestOptions() {
     try {
       const res = await fetch('/api/config/tests');
-      if (!res.ok) return;
+      if (!res.ok) throw new Error('API returned ' + res.status);
       const tests = await res.json();
 
       const selectEl = document.getElementById('order-test-select');
@@ -982,7 +982,7 @@ const app = {
     if (!testId) return;
     try {
       const res = await fetch(`/api/config/tests/${testId}/parameters`);
-      if (!res.ok) return;
+      if (!res.ok) throw new Error('API returned ' + res.status);
       const params = await res.json();
 
       const container = document.getElementById('test-parameters-container');
@@ -1037,7 +1037,7 @@ const app = {
 
       if (res.ok) {
         const data = await res.json();
-        this.showToast(`Shift audit recorded: ${data.match} (System: ${sysTotal}, Register: ${paperVal})`, data.match === 'MATCH' ? 'success' : 'error');
+        this.showNotificationModal('Audit Recorded', `Shift audit recorded: ${data.match} (System: ${sysTotal}, Register: ${paperVal})`, data.match !== 'MATCH');
       } else {
         this.showNotificationModal("Error", 'Failed to record shift audit.', true);
       }
@@ -1049,7 +1049,7 @@ const app = {
   async loadWards() {
     try {
       const res = await fetch('/api/config/wards?active_only=true');
-      if (!res.ok) return;
+      if (!res.ok) throw new Error('API returned ' + res.status);
       const wards = await res.json();
       const sel = document.getElementById('visit-ward');
       if (!sel) return;
@@ -1068,8 +1068,8 @@ const app = {
 
   async loadClinicians() {
     try {
-      const res = await fetch('/api/clinicians');
-      if (!res.ok) return;
+      const res = await fetch('/api/config/clinicians');
+      if (!res.ok) throw new Error('API returned ' + res.status);
       const clinicians = await res.json();
       const sel = document.getElementById('visit-clinician');
       if (!sel) return;
@@ -1086,7 +1086,7 @@ const app = {
   async loadTestOptionsMulti() {
     try {
       const res = await fetch('/api/config/tests');
-      if (!res.ok) return;
+      if (!res.ok) throw new Error('API returned ' + res.status);
       const tests = await res.json();
       
       this.testCatalog = tests;
@@ -1163,7 +1163,7 @@ const app = {
     if (!container) return;
     try {
       const res = await fetch(`/api/clients/${pid}/orders`);
-      if (!res.ok) return;
+      if (!res.ok) throw new Error('API returned ' + res.status);
       const orders = await res.json();
       const pending = orders.filter(o => o.status === 'pending');
       
@@ -1177,10 +1177,10 @@ const app = {
       pending.forEach(o => {
         html += `
           <tr>
-            <td style="padding:8px; border-bottom:1px solid #ddd;"><strong>${this.escape(o.test_name)}</strong><br><small style="color:var(--text-muted);">Order ID: ${o.id}</small></td>
+            <td style="padding:8px; border-bottom:1px solid #ddd;"><strong>${this.escape(o.test_name)}</strong><br><small style="color:var(--text-muted);">Order ID: ${o.order_id}</small></td>
             <td style="padding:8px; border-bottom:1px solid #ddd;">${o.ordered_at}</td>
             <td style="padding:8px; border-bottom:1px solid #ddd; text-align:right;">
-              <button class="btn btn-primary btn-sm" onclick="app.showEnterResultModal(${o.id}, ${o.test_id}, '${this.escape(o.test_name)}')">Enter Result</button>
+              <button class="btn btn-primary btn-sm" onclick="app.showEnterResultModal(${o.order_id}, ${o.test_id}, '${this.escape(o.test_name)}')">Enter Result</button>
             </td>
           </tr>
         `;
@@ -1198,7 +1198,7 @@ const app = {
     if (!container) return;
     try {
       const res = await fetch(`/api/clients/${pid}/visits`);
-      if (!res.ok) return;
+      if (!res.ok) throw new Error('API returned ' + res.status);
       const visits = await res.json();
       if (visits.length === 0) {
         container.innerHTML = '<div style="color:var(--text-muted);">No historical visits found.</div>';
@@ -1660,7 +1660,7 @@ const app = {
   async loadWardsConfig() {
     try {
       const res = await fetch('/api/config/wards');
-      if (!res.ok) return;
+      if (!res.ok) throw new Error('API returned ' + res.status);
       const wards = await res.json();
       let rows = '';
       wards.forEach(w => {
@@ -1720,8 +1720,8 @@ const app = {
 
   async loadCliniciansConfig() {
     try {
-      const res = await fetch('/api/clinicians');
-      if (!res.ok) return;
+      const res = await fetch('/api/config/clinicians');
+      if (!res.ok) throw new Error('API returned ' + res.status);
       const clinicians = await res.json();
       let rows = '';
       clinicians.forEach(c => {
@@ -2078,7 +2078,7 @@ const app = {
   async loadCliniciansConfig() {
     try {
       const res = await fetch('/api/config/clinicians');
-      if (!res.ok) return;
+      if (!res.ok) throw new Error('API returned ' + res.status);
       const clinicians = await res.json();
       const container = document.getElementById('clinicians-config-container');
       if (!container) return;
@@ -2198,7 +2198,7 @@ const app = {
   async loadWardsConfig() {
     try {
       const res = await fetch('/api/config/wards');
-      if (!res.ok) return;
+      if (!res.ok) throw new Error('API returned ' + res.status);
       const wards = await res.json();
       const container = document.getElementById('wards-config-container');
       if (!container) return;
@@ -2326,7 +2326,7 @@ const app = {
     `;
     try {
       const res = await fetch('/api/audit-log');
-      if (!res.ok) return;
+      if (!res.ok) throw new Error('API returned ' + res.status);
       const logs = await res.json();
 
       let rows = '';
