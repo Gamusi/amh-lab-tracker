@@ -903,57 +903,69 @@ const app = {
   },
 
   async selectClient(pid, pnum, pname, psex) {
+    this.currentClientId = pid;
     const box = document.getElementById('client-detail-box');
     box.innerHTML = `
       <div>
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
           <h3 style="color: var(--primary-color);">Client: ${pname} (${pnum})</h3>
-          <button class="btn btn-primary" onclick="document.getElementById('report-frame').contentWindow.print()">${this.icon('printer')} Print Official Report</button>
         </div>
 
-        <!-- Result Entry Form -->
+        <!-- Section A: Create Visit -->
         <div class="no-print" style="margin-bottom: 20px; background: #EFF6FF; padding: 16px; border-radius: 6px; border: 1px solid #BFDBFE;">
-          <h4 style="font-size: 0.95rem; color: var(--primary-color); margin-bottom: 12px;">Order & Log Diagnostic Result</h4>
-          
-          <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+          <h4 style="font-size: 0.95rem; color: var(--primary-color); margin-bottom: 12px;">Create Visit & Order Tests</h4>
+          <div style="display: grid; grid-template-columns: 1fr 1fr 2fr; gap: 12px; margin-bottom: 12px;">
             <div class="form-group">
-              <label>Select Test / Panel:</label>
-              <select id="order-test-select" onchange="app.onTestSelectChange(this.value)">
-                <option value="">Loading test catalog...</option>
+              <label>Ward of Origin:</label>
+              <select id="visit-ward">
+                <option value="OPD">OPD</option>
+                <option value="IPD">IPD</option>
+                <option value="Maternity">Maternity</option>
+                <option value="Pediatrics">Pediatrics</option>
+                <option value="TB Clinic">TB Clinic</option>
               </select>
             </div>
             <div class="form-group">
-              <label>Sample / Tube ID (Optional):</label>
-              <input type="text" id="order-sample-id" placeholder="e.g. LAB-1042">
+              <label>Requested By (Clinician):</label>
+              <select id="visit-clinician">
+                <option value="">Loading...</option>
+              </select>
             </div>
-            <div class="form-group" id="single-status-group">
-              <label>Surveillance Status:</label>
-              <select id="order-result-pos">
-                <option value="false">Normal / Negative</option>
-                <option value="true">Positive / Abnormal</option>
+            <div class="form-group">
+              <label>Select Tests (Ctrl+Click for multiple):</label>
+              <select id="visit-tests" multiple style="height: 80px;">
+                <option value="">Loading tests...</option>
               </select>
             </div>
           </div>
+          <button class="btn btn-success" style="width: 100%; padding: 10px;" onclick="app.createVisit(${pid})">${this.icon('plus')} Create Visit & Orders</button>
+        </div>
 
-          <div class="form-group" id="single-result-group" style="margin-bottom: 12px;">
-            <label>Observed Result Value:</label>
-            <input type="text" id="order-result-value" placeholder="e.g. 13.5 g/dL or Positive">
+        <!-- Section B: Pending Tests -->
+        <div class="no-print" style="margin-bottom: 20px;">
+          <h4 style="font-size: 0.95rem; color: var(--primary-color); margin-bottom: 12px;">Pending Tests</h4>
+          <div id="pending-tests-container" style="background: #fff; border: 1px solid var(--border-color); border-radius: 4px; padding: 12px;">
+            Loading pending tests...
           </div>
+        </div>
 
-          <!-- Dynamic Panel Parameters Container -->
-          <div id="test-parameters-container" style="display: none; margin-bottom: 12px; background: #FFFFFF; padding: 12px; border-radius: 6px; border: 1px solid #BFDBFE;">
+        <!-- Section C: Historical Reports -->
+        <div class="no-print" style="margin-bottom: 20px;">
+          <h4 style="font-size: 0.95rem; color: var(--primary-color); margin-bottom: 12px;">Historical Reports</h4>
+          <div id="historical-visits-container" style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px;">
+            Loading visits...
           </div>
-
-          <button class="btn btn-success" style="width: 100%; padding: 10px;" onclick="app.submitTestResult(${pid})">${this.icon('save')} Submit Result & Add to Report</button>
         </div>
 
         <!-- Official PDF Report Iframe -->
-        <iframe id="report-frame" src="" width="100%" height="800px" style="border: none;"></iframe>
+        <iframe id="report-frame" src="" width="100%" height="800px" style="border: none; display: none;"></iframe>
       </div>
     `;
 
-    await this.loadTestOptions();
-    await this.loadClientOrders(pid);
+    await this.loadClinicians();
+    await this.loadTestOptionsMulti();
+    await this.loadPendingTests(pid);
+    await this.loadHistoricalVisits(pid);
   },
 
   async loadTestOptions() {
@@ -1043,6 +1055,174 @@ const app = {
       }
     } catch (e) {
       this.showToast('Error recording shift audit.', 'error');
+    }
+  },
+
+
+  async loadClinicians() {
+    try {
+      const res = await fetch('/api/clinicians');
+      if (!res.ok) return;
+      const clinicians = await res.json();
+      const sel = document.getElementById('visit-clinician');
+      if (!sel) return;
+      sel.innerHTML = '<option value="">(None)</option>';
+      clinicians.forEach(c => {
+        sel.innerHTML += `<option value="${c.id}">${this.escape(c.name)}</option>`;
+      });
+    } catch (e) {
+      console.error('Error loading clinicians', e);
+    }
+  },
+
+  async loadTestOptionsMulti() {
+    try {
+      const res = await fetch('/api/config/tests');
+      if (!res.ok) return;
+      const tests = await res.json();
+      const sel = document.getElementById('visit-tests');
+      if (!sel) return;
+      sel.innerHTML = '';
+      tests.forEach(t => {
+        sel.innerHTML += `<option value="${t.id}">${this.escape(t.name)}</option>`;
+      });
+    } catch (e) {
+      console.error('Error loading tests', e);
+    }
+  },
+
+  async createVisit(pid) {
+    const ward = document.getElementById('visit-ward').value;
+    const clinician = document.getElementById('visit-clinician').value;
+    const testSel = document.getElementById('visit-tests');
+    const selectedTests = Array.from(testSel.selectedOptions).map(o => parseInt(o.value, 10));
+    
+    if (selectedTests.length === 0) {
+      this.showToast('Select at least one test.', 'error');
+      return;
+    }
+    
+    try {
+      const payload = {
+        client_id: pid,
+        ward_of_origin: ward,
+        test_ids: selectedTests
+      };
+      if (clinician) payload.clinician_id = parseInt(clinician, 10);
+      
+      const res = await fetch('/api/visits', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (res.ok) {
+        this.showToast('Visit and orders created successfully!', 'success');
+        await this.loadPendingTests(pid);
+        await this.loadHistoricalVisits(pid);
+      } else {
+        this.showToast('Failed to create visit.', 'error');
+      }
+    } catch(e) {
+      this.showToast('Error creating visit.', 'error');
+    }
+  },
+
+  async loadPendingTests(pid) {
+    const container = document.getElementById('pending-tests-container');
+    if (!container) return;
+    try {
+      const res = await fetch(`/api/clients/${pid}/orders`);
+      if (!res.ok) return;
+      const orders = await res.json();
+      const pending = orders.filter(o => o.status === 'pending');
+      
+      if (pending.length === 0) {
+        container.innerHTML = '<div style="color:var(--text-muted);">No pending tests.</div>';
+        return;
+      }
+      
+      let html = '<table style="width:100%; border-collapse:collapse; font-size:0.9rem;">';
+      html += '<tr><th style="text-align:left; padding:8px; border-bottom:1px solid #ddd;">Test</th><th style="text-align:left; padding:8px; border-bottom:1px solid #ddd;">Ordered At</th><th style="text-align:right; padding:8px; border-bottom:1px solid #ddd;">Action</th></tr>';
+      pending.forEach(o => {
+        html += `
+          <tr>
+            <td style="padding:8px; border-bottom:1px solid #ddd;"><strong>${this.escape(o.test_name)}</strong><br><small style="color:var(--text-muted);">Order ID: ${o.id}</small></td>
+            <td style="padding:8px; border-bottom:1px solid #ddd;">${o.ordered_at}</td>
+            <td style="padding:8px; border-bottom:1px solid #ddd; text-align:right;">
+              <button class="btn btn-primary btn-sm" onclick="app.showEnterResultModal(${o.id}, ${o.test_id}, '${this.escape(o.test_name)}')">Enter Result</button>
+            </td>
+          </tr>
+        `;
+      });
+      html += '</table>';
+      container.innerHTML = html;
+    } catch (e) {
+      console.error(e);
+      container.innerHTML = 'Error loading pending tests.';
+    }
+  },
+
+  async loadHistoricalVisits(pid) {
+    const container = document.getElementById('historical-visits-container');
+    if (!container) return;
+    try {
+      const res = await fetch(`/api/clients/${pid}/visits`);
+      if (!res.ok) return;
+      const visits = await res.json();
+      if (visits.length === 0) {
+        container.innerHTML = '<div style="color:var(--text-muted);">No historical visits found.</div>';
+        return;
+      }
+      
+      let html = '';
+      visits.forEach(v => {
+        const labNumStr = v.lab_number ? `(${this.escape(v.lab_number)})` : '(Pending Lab No)';
+        html += `<button class="btn btn-secondary btn-sm" onclick="app.viewReport(${v.visit_id})">Visit ${v.visit_id} ${labNumStr} - ${v.created_at.split(' ')[0]}</button>`;
+      });
+      container.innerHTML = html;
+    } catch(e) {
+      console.error(e);
+      container.innerHTML = 'Error loading visits.';
+    }
+  },
+
+  viewReport(visitId) {
+    const frame = document.getElementById('report-frame');
+    if (frame) {
+      frame.style.display = 'block';
+      frame.src = `/api/reports/visit/${visitId}/pdf`;
+    }
+  },
+
+  async showEnterResultModal(orderId, testId, testName) {
+    // Basic inline prompt for now, can be a real modal.
+    const val = prompt(`Enter result for ${testName}:`);
+    if (val === null || val.trim() === '') return;
+    
+    // Check if it's positive
+    const isPos = confirm(`Is the result for ${testName} considered POSITIVE/ABNORMAL? (Cancel for No/Normal)`);
+    
+    try {
+      const res = await fetch('/api/clients/results', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          order_id: orderId,
+          result_value: val,
+          is_positive: isPos
+        })
+      });
+      if (res.ok) {
+        this.showToast('Result saved!', 'success');
+        if (this.currentClientId) {
+           await this.loadPendingTests(this.currentClientId);
+           await this.loadHistoricalVisits(this.currentClientId);
+        }
+      } else {
+        this.showToast('Failed to save result.', 'error');
+      }
+    } catch(e) {
+      console.error(e);
     }
   },
 
