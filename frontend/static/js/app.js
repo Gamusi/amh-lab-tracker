@@ -933,9 +933,7 @@ const app = {
             </div>
             <div class="form-group">
               <label>Select Tests (Ctrl+Click for multiple):</label>
-              <select id="visit-tests" multiple style="height: 80px;">
-                <option value="">Loading tests...</option>
-              </select>
+              <div id="visit-tests-container">Loading tests...</div>
             </div>
           </div>
           <button class="btn btn-success" style="width: 100%; padding: 10px;" onclick="app.createVisit(${pid})">${this.icon('plus')} Create Visit & Orders</button>
@@ -1075,17 +1073,31 @@ const app = {
     }
   },
 
+
   async loadTestOptionsMulti() {
     try {
       const res = await fetch('/api/config/tests');
       if (!res.ok) return;
       const tests = await res.json();
-      const sel = document.getElementById('visit-tests');
-      if (!sel) return;
-      sel.innerHTML = '';
+      
+      // We will store tests in a class variable to check is_tracked later
+      this.testCatalog = tests;
+      
+      const container = document.getElementById('visit-tests-container');
+      if (!container) return;
+      container.innerHTML = '';
+      
+      let html = '<div style="max-height: 150px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 4px; padding: 8px; background: #fff;">';
       tests.forEach(t => {
-        sel.innerHTML += `<option value="${t.id}">${this.escape(t.name)}</option>`;
+        html += `
+          <label style="display: block; margin-bottom: 4px; cursor: pointer;">
+            <input type="checkbox" name="visit-test-cb" value="${t.id}">
+            ${this.escape(t.name)}
+          </label>
+        `;
       });
+      html += '</div>';
+      container.innerHTML = html;
     } catch (e) {
       console.error('Error loading tests', e);
     }
@@ -1094,8 +1106,8 @@ const app = {
   async createVisit(pid) {
     const ward = document.getElementById('visit-ward').value;
     const clinician = document.getElementById('visit-clinician').value;
-    const testSel = document.getElementById('visit-tests');
-    const selectedTests = Array.from(testSel.selectedOptions).map(o => parseInt(o.value, 10));
+    const checkboxes = document.querySelectorAll('input[name="visit-test-cb"]:checked');
+    const selectedTests = Array.from(checkboxes).map(cb => parseInt(cb.value, 10));
     
     if (selectedTests.length === 0) {
       this.showToast('Select at least one test.', 'error');
@@ -1117,6 +1129,8 @@ const app = {
       });
       if (res.ok) {
         this.showToast('Visit and orders created successfully!', 'success');
+        // Uncheck all
+        document.querySelectorAll('input[name="visit-test-cb"]').forEach(cb => cb.checked = false);
         await this.loadPendingTests(pid);
         await this.loadHistoricalVisits(pid);
       } else {
@@ -1126,7 +1140,6 @@ const app = {
       this.showToast('Error creating visit.', 'error');
     }
   },
-
   async loadPendingTests(pid) {
     const container = document.getElementById('pending-tests-container');
     if (!container) return;
@@ -1194,37 +1207,123 @@ const app = {
     }
   },
 
+
+
   async showEnterResultModal(orderId, testId, testName) {
-    // Basic inline prompt for now, can be a real modal.
-    const val = prompt(`Enter result for ${testName}:`);
-    if (val === null || val.trim() === '') return;
+    document.getElementById('result-entry-order-id').value = orderId;
+    document.getElementById('result-entry-test-id').value = testId;
+    document.getElementById('result-entry-test-name').textContent = testName;
     
-    // Check if it's positive
-    const isPos = confirm(`Is the result for ${testName} considered POSITIVE/ABNORMAL? (Cancel for No/Normal)`);
+    const singleContainer = document.getElementById('result-entry-single-container');
+    const paramsContainer = document.getElementById('result-entry-params-container');
+    const trackGroup = document.getElementById('result-entry-tracked-group');
+    const posSelect = document.getElementById('result-entry-is-positive');
     
+    // Check if test is tracked
+    let isTracked = false;
+    if (this.testCatalog) {
+       const t = this.testCatalog.find(x => x.id === testId);
+       if (t && t.is_tracked) isTracked = true;
+    }
+    
+    if (isTracked) {
+       trackGroup.style.display = 'block';
+       posSelect.value = 'false';
+    } else {
+       trackGroup.style.display = 'none';
+       posSelect.value = 'false';
+    }
+    
+    // Load parameters
     try {
-      const res = await fetch('/api/clients/results', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          order_id: orderId,
-          result_value: val,
-          is_positive: isPos
-        })
-      });
-      if (res.ok) {
-        this.showToast('Result saved!', 'success');
-        if (this.currentClientId) {
-           await this.loadPendingTests(this.currentClientId);
-           await this.loadHistoricalVisits(this.currentClientId);
-        }
+      const res = await fetch(`/api/config/tests/${testId}/parameters`);
+      const params = res.ok ? await res.json() : [];
+      
+      if (params && params.length > 0) {
+        singleContainer.style.display = 'none';
+        paramsContainer.style.display = 'block';
+        
+        let html = '<h5 style="color: var(--primary-color); margin-bottom: 8px;">Panel Parameters:</h5>';
+        params.forEach(p => {
+          html += `
+            <div style="display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 8px; align-items: center; margin-bottom: 8px;" class="modal-param-row" data-param-id="${p.id}">
+              <div><strong style="font-size: 0.85rem;">${this.escape(p.parameter_name)}</strong></div>
+              <div><input type="text" class="modal-param-val" placeholder="Result" style="width: 100%; padding: 4px;"></div>
+              <div style="font-size: 0.8rem; color: var(--text-muted);">${p.ref_range ? this.escape(p.ref_range) : ''} ${p.unit ? this.escape(p.unit) : ''}</div>
+              <input type="hidden" class="modal-param-pos" value="false">
+            </div>
+          `;
+        });
+        paramsContainer.innerHTML = html;
       } else {
-        this.showToast('Failed to save result.', 'error');
+        paramsContainer.style.display = 'none';
+        paramsContainer.innerHTML = '';
+        singleContainer.style.display = 'block';
+        document.getElementById('result-entry-value').value = '';
       }
     } catch(e) {
       console.error(e);
+      singleContainer.style.display = 'block';
     }
+    
+    document.getElementById('result-entry-modal').style.display = 'flex';
+    
+    const form = document.getElementById('result-entry-form');
+    form.onsubmit = async (e) => {
+       e.preventDefault();
+       
+       const isPos = posSelect.value === 'true';
+       let mainVal = document.getElementById('result-entry-value').value.trim();
+       let paramResults = null;
+       
+       if (paramsContainer.style.display === 'block') {
+         paramResults = [];
+         const rows = paramsContainer.querySelectorAll('.modal-param-row');
+         rows.forEach(r => {
+            const pid = parseInt(r.getAttribute('data-param-id'), 10);
+            const pval = r.querySelector('.modal-param-val').value;
+            if (pval) {
+              paramResults.push({ parameter_id: pid, result_value: pval, is_positive: false });
+            }
+         });
+         mainVal = null;
+       }
+       
+       try {
+         const payload = {
+           order_id: orderId,
+           is_positive: isTracked ? isPos : false
+         };
+         if (paramResults) {
+           payload.parameter_results = paramResults;
+         } else {
+           payload.result_value = mainVal;
+         }
+         
+         const res = await fetch('/api/clients/results', {
+           method: 'POST',
+           headers: { 'Content-Type': 'application/json' },
+           body: JSON.stringify(payload)
+         });
+         
+         if (res.ok) {
+           this.showToast('Result saved successfully!', 'success');
+           document.getElementById('result-entry-modal').style.display = 'none';
+           if (this.currentClientId) {
+              await this.loadPendingTests(this.currentClientId);
+              await this.loadHistoricalVisits(this.currentClientId);
+           }
+         } else {
+           this.showToast('Failed to save result.', 'error');
+         }
+       } catch(err) {
+         console.error(err);
+         this.showToast('Error saving result.', 'error');
+       }
+    };
   },
+
+
 
   async submitTestResult(pid) {
     const tid = parseInt(document.getElementById('order-test-select').value, 10);
@@ -1390,14 +1489,17 @@ const app = {
         let rows = '';
         tests.forEach(t => {
           rows += `
-            <tr>
-              <td><strong>${this.escape(t.name)}</strong></td>
-              <td>Section ${t.section_id}</td>
-              <td>${t.is_tracked ? 'Tracked (Positive Checked)' : 'Standard (Done Only)'}</td>
-              <td>
-                <button class="btn btn-secondary" style="padding: 2px 8px; font-size: 0.8rem;" onclick="app.deleteTest(${t.id})">Delete</button>
-              </td>
-            </tr>
+            
+              <tr>
+                <td><strong>${this.escape(t.name)}</strong></td>
+                <td>Section ${t.section_id}</td>
+                <td>${t.is_tracked ? 'Tracked (Positive Checked)' : 'Standard (Done Only)'}</td>
+                <td>
+                  <button class="btn btn-secondary" style="padding: 2px 8px; font-size: 0.8rem;" onclick="app.editTest(${t.id}, '${this.escape(t.name)}', ${t.section_id}, ${t.is_tracked})">Edit</button>
+                  <button class="btn btn-secondary" style="padding: 2px 8px; font-size: 0.8rem; color: var(--danger-color);" onclick="app.deleteTest(${t.id})">Delete</button>
+                </td>
+              </tr>
+
           `;
         });
         const catalogContainer = document.getElementById('config-table-container');
@@ -1657,7 +1759,39 @@ const app = {
     }
   },
 
+
+  async editTest(testId, oldName, oldSection, oldTracked) {
+    const name = prompt('Edit Test Name:', oldName);
+    if (!name) return;
+    const secStr = prompt('Edit Section ID (1-8):', oldSection);
+    if (!secStr) return;
+    const isTracked = confirm('Enable Surveillance Tracking (Positives) for this test? (OK for Yes, Cancel for No)');
+
+    try {
+      const res = await fetch(`/api/config/tests/${testId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: name.trim(),
+          section_id: parseInt(secStr, 10),
+          is_tracked: isTracked,
+          sort_order: 0
+        })
+      });
+      if (res.ok) {
+        this.showToast('Test updated successfully!', 'success');
+        this.loadConfigData();
+      } else {
+        const err = await res.json();
+        this.showToast(err.detail || 'Failed to update test.', 'error');
+      }
+    } catch (e) {
+      this.showToast('Connection error.', 'error');
+    }
+  },
+
   async deleteTest(testId) {
+
     if (!confirm('Are you sure you want to deactivate/delete this test from the catalog?')) return;
     try {
       const res = await fetch(`/api/config/tests/${testId}`, { method: 'DELETE' });

@@ -48,7 +48,28 @@ def create_test(req: TestCreate, admin_user: dict = Depends(require_admin), conn
 def enter_result(req: TestCreate, current_user: User = Depends(get_current_user)):
     print(current_user.full_name)
 
+
+@router.put("/tests/{test_id}", response_model=schemas.TestResponse)
+def update_test(test_id: int, req: schemas.TestCreate, conn: sqlite3.Connection = Depends(get_db), current_user: dict = Depends(get_current_user)):
+    cur = conn.cursor()
+    cur.execute("SELECT id FROM tests WHERE id = ?", (test_id,))
+    if not cur.fetchone():
+        raise HTTPException(status_code=404, detail="Test not found")
+        
+    cur.execute("""
+        UPDATE tests
+        SET name = ?, section_id = ?, is_tracked = ?
+        WHERE id = ?
+    """, (req.name, req.section_id, 1 if req.is_tracked else 0, test_id))
+    
+    conn.commit()
+    return schemas.TestResponse(
+        id=test_id, name=req.name, section_id=req.section_id, 
+        is_tracked=req.is_tracked, sort_order=req.sort_order, is_active=True
+    )
+
 @router.delete("/tests/{test_id}")
+
 def delete_test(test_id: int, admin_user: dict = Depends(require_admin), conn: sqlite3.Connection = Depends(get_db)):
     conn.execute("UPDATE tests SET is_active = 0 WHERE id = ?", (test_id,))
     conn.execute("INSERT INTO audit_log (user_id, action, detail) VALUES (?, ?, ?)", (admin_user["id"], "delete_test", f"Soft deleted test ID {test_id}"))
