@@ -4,7 +4,8 @@ from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from ..database import get_db
 from ..auth import get_current_user
-from ..schemas import VisitCreate
+from ..schemas import VisitCreate, TestResultCreate, ParameterResultItem, AddOrdersRequest
+from ..evaluator import evaluate_result
 
 logger = logging.getLogger("amh_clients")
 
@@ -25,17 +26,6 @@ class TestOrderCreate(BaseModel):
     sample_id: Optional[str] = None
     sample_type: Optional[str] = "Venous Blood"
     ref_doctor_ward: Optional[str] = "OPD"
-
-class ParameterResultItem(BaseModel):
-    parameter_id: int
-    result_value: str
-    is_positive: Optional[bool] = False
-
-class TestResultCreate(BaseModel):
-    order_id: int
-    result_value: Optional[str] = None
-    is_positive: Optional[bool] = False
-    parameter_results: Optional[List[ParameterResultItem]] = None
 
 @router.get("/api/clinicians")
 def list_clinicians(conn: sqlite3.Connection = Depends(get_db), current_user: dict = Depends(get_current_user)):
@@ -118,6 +108,37 @@ def create_visit(req: VisitCreate, conn: sqlite3.Connection = Depends(get_db), c
     logger.info(f"Visit created successfully: visit_id={visit_id}")
     return {"status": "created", "visit_id": visit_id}
 
+@router.post("/api/visits/{visit_id}/orders")
+def add_orders_to_visit(visit_id: int, req: AddOrdersRequest, conn: sqlite3.Connection = Depends(get_db), current_user: dict = Depends(get_current_user)):
+    logger.info(f"User '{current_user['username']}' is adding {len(req.test_ids)} orders to visit ID {visit_id}")
+    cur = conn.cursor()
+    
+    cur.execute("SELECT id FROM visits WHERE id = ?", (visit_id,))
+    if not cur.fetchone():
+        logger.warning(f"Add orders failed: visit ID {visit_id} not found")
+        raise HTTPException(status_code=404, detail="Visit not found")
+        
+    if not req.test_ids:
+        raise HTTPException(status_code=400, detail="At least one test ID must be provided")
+        
+    for tid in req.test_ids:
+        cur.execute("SELECT id FROM tests WHERE id = ?", (tid,))
+        if not cur.fetchone():
+            logger.warning(f"Add orders failed: test ID {tid} not found")
+            raise HTTPException(status_code=404, detail=f"Test ID {tid} not found")
+            
+    added_order_ids = []
+    for tid in req.test_ids:
+        cur.execute("""
+            INSERT INTO test_orders (visit_id, test_id, sample_id, ordered_by_user_id, status)
+            VALUES (?, ?, ?, ?, 'pending')
+        """, (visit_id, tid, req.sample_id, current_user["id"]))
+        added_order_ids.append(cur.lastrowid)
+        
+    conn.commit()
+    logger.info(f"Successfully added orders {added_order_ids} to visit {visit_id}")
+    return {"status": "orders_added", "visit_id": visit_id, "order_ids": added_order_ids}
+
 @router.post("/api/clients/orders")
 @router.post("/api/orders")
 def create_order(req: TestOrderCreate, conn: sqlite3.Connection = Depends(get_db), current_user: dict = Depends(get_current_user)):
@@ -193,27 +214,80 @@ def increment_daily_entry(cur: sqlite3.Cursor, entry_date: str, test_id: int, is
 def enter_result(req: TestResultCreate, conn: sqlite3.Connection = Depends(get_db), current_user: dict = Depends(get_current_user)):
     logger.info(f"User '{current_user['username']}' is entering result for order ID {req.order_id}")
     cur = conn.cursor()
-    cur.execute("SELECT id, visit_id, test_id FROM test_orders WHERE id = ?", (req.order_id,))
+    cur.execute("""
+        SELECT 
+            o.id as order_id, o.visit_id, o.test_id,
+            t.name as test_name, t.is_tracked,
+            c.date_of_birth, c.sex
+        FROM test_orders o
+        JOIN tests t ON o.test_id = t.id
+        LEFT JOIN visits v ON o.visit_id = v.id
+        LEFT JOIN clients c ON v.client_id = c.id
+        WHERE o.id = ?
+    """, (req.order_id,))
     order = cur.fetchone()
     if not order:
         logger.warning(f"Result entry failed: order ID {req.order_id} not found")
         raise HTTPException(status_code=404, detail="Order not found")
 
     now_str = datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
-    today_str = datetime.date.today().strftime("%Y-%m-%d")
+    today = datetime.date.today()
+    today_str = today.strftime("%Y-%m-%d")
 
-    overall_positive = req.is_positive or False
+    dob_str = order["date_of_birth"]
+    dob = None
+    if dob_str:
+        try:
+            dob = datetime.datetime.strptime(dob_str[:10], "%Y-%m-%d").date()
+        except ValueError:
+            dob = None
+    sex = order["sex"] or ""
+    test_name = order["test_name"] or ""
+
+    overall_positive = False
 
     # Insert main result or parameter results with verified_at and verified_by_user_id
     if req.parameter_results:
         for pr in req.parameter_results:
-            if pr.is_positive:
+            cur.execute("SELECT parameter_name FROM test_parameters WHERE id = ?", (pr.parameter_id,))
+            param_row = cur.fetchone()
+            param_name = param_row["parameter_name"] if param_row else ""
+
+            eval_dict = evaluate_result(param_name, pr.result_value, dob, sex, today)
+            pr_is_positive = eval_dict.get("is_abnormal", False)
+
+            if pr.result_value:
+                pr_val_lower = pr.result_value.strip().lower()
+                if pr_val_lower in ["positive", "abnormal", "reactive"] or pr_val_lower.startswith("positive") or pr_val_lower.startswith("reactive"):
+                    pr_is_positive = True
+
+            if pr_is_positive:
                 overall_positive = True
-            cur.execute("""
-                INSERT INTO test_results (order_id, parameter_id, result_value, is_positive, entered_by_user_id, entered_at, verified_by_user_id, verified_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            """, (req.order_id, pr.parameter_id, pr.result_value, pr.is_positive, current_user["id"], now_str, current_user["id"], now_str))
+
+            cur.execute("SELECT id FROM test_results WHERE order_id = ? AND parameter_id = ?", (req.order_id, pr.parameter_id))
+            res_row = cur.fetchone()
+            if res_row:
+                cur.execute("""
+                    UPDATE test_results
+                    SET result_value = ?, is_positive = ?, entered_by_user_id = COALESCE(entered_by_user_id, ?), entered_at = COALESCE(entered_at, ?), verified_by_user_id = ?, verified_at = ?
+                    WHERE id = ?
+                """, (pr.result_value, pr_is_positive, current_user["id"], now_str, current_user["id"], now_str, res_row["id"]))
+            else:
+                cur.execute("""
+                    INSERT INTO test_results (order_id, parameter_id, result_value, is_positive, entered_by_user_id, entered_at, verified_by_user_id, verified_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """, (req.order_id, pr.parameter_id, pr.result_value, pr_is_positive, current_user["id"], now_str, current_user["id"], now_str))
     else:
+        eval_dict = evaluate_result(test_name, req.result_value, dob, sex, today)
+        is_positive = eval_dict.get("is_abnormal", False)
+
+        if req.result_value:
+            val_lower = req.result_value.strip().lower()
+            if val_lower in ["positive", "abnormal", "reactive"] or val_lower.startswith("positive") or val_lower.startswith("reactive"):
+                is_positive = True
+
+        overall_positive = is_positive
+
         cur.execute("SELECT id FROM test_results WHERE order_id = ? AND parameter_id IS NULL", (req.order_id,))
         res_row = cur.fetchone()
         if res_row:
@@ -221,12 +295,12 @@ def enter_result(req: TestResultCreate, conn: sqlite3.Connection = Depends(get_d
                 UPDATE test_results
                 SET result_value = ?, is_positive = ?, entered_by_user_id = COALESCE(entered_by_user_id, ?), entered_at = COALESCE(entered_at, ?), verified_by_user_id = ?, verified_at = ?
                 WHERE id = ?
-            """, (req.result_value, req.is_positive, current_user["id"], now_str, current_user["id"], now_str, res_row["id"]))
+            """, (req.result_value, is_positive, current_user["id"], now_str, current_user["id"], now_str, res_row["id"]))
         else:
             cur.execute("""
                 INSERT INTO test_results (order_id, parameter_id, result_value, is_positive, entered_by_user_id, entered_at, verified_by_user_id, verified_at)
                 VALUES (?, NULL, ?, ?, ?, ?, ?, ?)
-            """, (req.order_id, req.result_value, req.is_positive, current_user["id"], now_str, current_user["id"], now_str))
+            """, (req.order_id, req.result_value, is_positive, current_user["id"], now_str, current_user["id"], now_str))
 
     cur.execute("UPDATE test_orders SET status = 'completed' WHERE id = ?", (req.order_id,))
 
@@ -256,6 +330,7 @@ def enter_result(req: TestResultCreate, conn: sqlite3.Connection = Depends(get_d
     conn.commit()
     logger.info(f"Result saved successfully for order ID {req.order_id}, lab_number={assigned_lab_number}")
     return {"status": "result_saved", "order_id": req.order_id, "auto_incremented_daily_log": True, "lab_number": assigned_lab_number}
+
 
 @router.get("/api/clients/report/{order_id}")
 @router.get("/api/report/{order_id}")

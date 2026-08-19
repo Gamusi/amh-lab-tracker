@@ -152,4 +152,18 @@ class WardResponse(WardBase):
     class Config:
         from_attributes = True
 
+class ParameterResultItem(BaseModel):
+    parameter_id: int
+    result_value: str
+
+class TestResultCreate(BaseModel):
+    order_id: int
+    result_value: Optional[str] = None
+    parameter_results: Optional[List[ParameterResultItem]] = None
+
+class AddOrdersRequest(BaseModel):
+    test_ids: List[int]
+    sample_id: Optional[str] = None
+
+
 

@@ -343,3 +343,134 @@ def test_seed_database_wards(tmp_path, monkeypatch):
     for r in rows:
         assert r["is_active"] == 1
 
+def test_add_orders_to_visit(mock_db):
+    conn = mock_db["conn"]
+    cur = conn.cursor()
+    cur.execute("INSERT INTO clients (client_number, full_name, sex) VALUES ('AMH-301', 'Test Client', 'Male')")
+    client_id = cur.lastrowid
+    cur.execute("INSERT INTO visits (client_id, ward_of_origin) VALUES (?, 'OPD')", (client_id,))
+    visit_id = cur.lastrowid
+    conn.commit()
+
+    # Success: Add test orders to visit
+    res = client.post(f"/api/visits/{visit_id}/orders", json={"test_ids": [mock_db["cbc_id"], mock_db["mps_id"]]})
+    assert res.status_code == 200
+    data = res.json()
+    assert data["status"] == "orders_added"
+    assert data["visit_id"] == visit_id
+    assert len(data["order_ids"]) == 2
+
+    # Check orders in DB
+    cur.execute("SELECT * FROM test_orders WHERE visit_id = ?", (visit_id,))
+    orders = cur.fetchall()
+    assert len(orders) == 2
+
+    # Validation: Non-existent visit
+    res_404 = client.post("/api/visits/99999/orders", json={"test_ids": [mock_db["cbc_id"]]})
+    assert res_404.status_code == 404
+
+    # Validation: Empty test_ids
+    res_empty = client.post(f"/api/visits/{visit_id}/orders", json={"test_ids": []})
+    assert res_empty.status_code == 400
+
+    # Validation: Invalid test_id
+    res_invalid_test = client.post(f"/api/visits/{visit_id}/orders", json={"test_ids": [99999]})
+    assert res_invalid_test.status_code == 404
+
+def test_enter_result_auto_positive_evaluation_text(mock_db):
+    conn = mock_db["conn"]
+    cur = conn.cursor()
+    cur.execute("INSERT INTO clients (client_number, full_name, sex) VALUES ('AMH-302', 'Tracked Client', 'Female')")
+    client_id = cur.lastrowid
+    cur.execute("INSERT INTO visits (client_id, ward_of_origin) VALUES (?, 'OPD')", (client_id,))
+    visit_id = cur.lastrowid
+    cur.execute("INSERT INTO test_orders (visit_id, test_id, status) VALUES (?, ?, 'pending')", (visit_id, mock_db["mps_id"]))
+    order_pos_id = cur.lastrowid
+    cur.execute("INSERT INTO test_orders (visit_id, test_id, status) VALUES (?, ?, 'pending')", (visit_id, mock_db["mps_id"]))
+    order_neg_id = cur.lastrowid
+    conn.commit()
+
+    # Enter positive result (without passing is_positive in request)
+    res_pos = client.post("/api/results", json={
+        "order_id": order_pos_id,
+        "result_value": "Reactive"
+    })
+    assert res_pos.status_code == 200
+    cur.execute("SELECT is_positive FROM test_results WHERE order_id = ?", (order_pos_id,))
+    assert cur.fetchone()["is_positive"] == 1
+
+    # Enter negative result (without passing is_positive in request)
+    res_neg = client.post("/api/results", json={
+        "order_id": order_neg_id,
+        "result_value": "Negative"
+    })
+    assert res_neg.status_code == 200
+    cur.execute("SELECT is_positive FROM test_results WHERE order_id = ?", (order_neg_id,))
+    assert cur.fetchone()["is_positive"] == 0
+
+def test_enter_result_auto_positive_evaluation_numeric(mock_db):
+    conn = mock_db["conn"]
+    cur = conn.cursor()
+    # Pre-seed WBC test
+    cur.execute("INSERT INTO tests (name, section_id, is_active, is_tracked) VALUES ('WBC', ?, 1, 1)", (mock_db["section_id"],))
+    wbc_test_id = cur.lastrowid
+
+    # 35 year old Male
+    cur.execute("INSERT INTO clients (client_number, full_name, date_of_birth, sex) VALUES ('AMH-303', 'Adult Male', '1990-01-01', 'Male')")
+    client_id = cur.lastrowid
+    cur.execute("INSERT INTO visits (client_id, ward_of_origin) VALUES (?, 'OPD')", (client_id,))
+    visit_id = cur.lastrowid
+
+    cur.execute("INSERT INTO test_orders (visit_id, test_id, status) VALUES (?, ?, 'pending')", (visit_id, wbc_test_id))
+    order_high_id = cur.lastrowid
+    cur.execute("INSERT INTO test_orders (visit_id, test_id, status) VALUES (?, ?, 'pending')", (visit_id, wbc_test_id))
+    order_norm_id = cur.lastrowid
+    conn.commit()
+
+    # WBC 15.0 -> High (normal adult WBC 4.0 - 11.0)
+    res_high = client.post("/api/results", json={
+        "order_id": order_high_id,
+        "result_value": "15.0"
+    })
+    assert res_high.status_code == 200
+    cur.execute("SELECT is_positive FROM test_results WHERE order_id = ?", (order_high_id,))
+    assert cur.fetchone()["is_positive"] == 1
+
+    # WBC 6.5 -> Normal
+    res_norm = client.post("/api/results", json={
+        "order_id": order_norm_id,
+        "result_value": "6.5"
+    })
+    assert res_norm.status_code == 200
+    cur.execute("SELECT is_positive FROM test_results WHERE order_id = ?", (order_norm_id,))
+    assert cur.fetchone()["is_positive"] == 0
+
+def test_enter_result_parameter_results_auto_evaluation(mock_db):
+    conn = mock_db["conn"]
+    cur = conn.cursor()
+    # 35 year old Female -> normal Hb is 12.0 - 15.5
+    cur.execute("INSERT INTO clients (client_number, full_name, date_of_birth, sex) VALUES ('AMH-304', 'Adult Female', '1990-01-01', 'Female')")
+    client_id = cur.lastrowid
+    cur.execute("INSERT INTO visits (client_id, ward_of_origin) VALUES (?, 'OPD')", (client_id,))
+    visit_id = cur.lastrowid
+
+    cur.execute("INSERT INTO test_orders (visit_id, test_id, status) VALUES (?, ?, 'pending')", (visit_id, mock_db["cbc_id"]))
+    order_id = cur.lastrowid
+    conn.commit()
+
+    # Hb is 9.5 (Low for female -> abnormal), WBC is 7.0 (Normal)
+    res = client.post("/api/results", json={
+        "order_id": order_id,
+        "parameter_results": [
+            {"parameter_id": mock_db["wbc_param_id"], "result_value": "7.0"},
+            {"parameter_id": mock_db["hb_param_id"], "result_value": "9.5"}
+        ]
+    })
+    assert res.status_code == 200
+
+    cur.execute("SELECT parameter_id, is_positive FROM test_results WHERE order_id = ?", (order_id,))
+    rows = {r["parameter_id"]: r["is_positive"] for r in cur.fetchall()}
+    assert rows[mock_db["wbc_param_id"]] == 0
+    assert rows[mock_db["hb_param_id"]] == 1
+
+
