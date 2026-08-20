@@ -1304,6 +1304,7 @@ const app = {
                   <button class="btn btn-secondary btn-sm" onclick="app.viewReport(${v.visit_id})">Visit ${v.visit_id} ${labNumStr} - ${v.created_at.split(' ')[0]}</button>
                   <button class="btn btn-secondary btn-sm" onclick="app.openEditVisitModal(${v.visit_id})">Edit</button>
                   <button class="btn btn-primary btn-sm" onclick="app.showAddTestModal(${v.visit_id})">Add Tests</button>
+                  ${app.currentUser && app.currentUser.role === 'admin' ? `<button class="btn btn-danger btn-sm" onclick="app.deleteVisit(${v.visit_id})">Delete</button>` : ''}
                  </div>`;
       });
       container.innerHTML = html;
@@ -1313,7 +1314,32 @@ const app = {
     }
   },
 
-  viewReport(visitId) {
+  
+  deleteVisit(visitId) {
+    this.confirmAction(
+      "Delete Visit",
+      `Are you sure you want to delete visit ${visitId}? This will permanently remove all associated test orders and results. This action cannot be undone.`,
+      async () => {
+        try {
+          const res = await fetch(`/api/visits/${visitId}`, { method: 'DELETE' });
+          if (res.ok) {
+            this.showNotificationModal("Success", "Visit deleted successfully.", false);
+            // Refresh historical visits
+            if (this.currentClientId) {
+              this.loadHistoricalVisits(this.currentClientId);
+            }
+          } else {
+            const err = await res.json();
+            this.showNotificationModal("Error", err.detail || "Failed to delete visit.", true);
+          }
+        } catch(e) {
+          console.error(e);
+          this.showNotificationModal("Error", "Server error.", true);
+        }
+      }
+    );
+  },
+viewReport(visitId) {
     const frame = document.getElementById('report-frame');
     if (frame) {
       frame.style.display = 'block';

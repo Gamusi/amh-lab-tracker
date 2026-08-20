@@ -584,3 +584,32 @@ def get_visit_details(visit_id: int, conn: sqlite3.Connection = Depends(get_db),
     data = dict(visit_row)
     data["orders"] = orders
     return data
+
+@router.delete("/api/visits/{visit_id}")
+def delete_visit(visit_id: int, conn: sqlite3.Connection = Depends(get_db), current_user: dict = Depends(get_current_user)):
+    if current_user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="Only admins can delete visits")
+        
+    logger.info(f"Admin '{current_user['username']}' is deleting visit ID {visit_id}")
+    cur = conn.cursor()
+    
+    cur.execute("SELECT id FROM visits WHERE id = ?", (visit_id,))
+    if not cur.fetchone():
+        raise HTTPException(status_code=404, detail="Visit not found")
+        
+    # Find all test orders for this visit
+    cur.execute("SELECT id FROM test_orders WHERE visit_id = ?", (visit_id,))
+    orders = cur.fetchall()
+    
+    # Delete test results for these orders
+    for o in orders:
+        cur.execute("DELETE FROM test_results WHERE order_id = ?", (o["id"],))
+        
+    # Delete test orders
+    cur.execute("DELETE FROM test_orders WHERE visit_id = ?", (visit_id,))
+    
+    # Delete visit
+    cur.execute("DELETE FROM visits WHERE id = ?", (visit_id,))
+    
+    conn.commit()
+    return {"status": "deleted"}
