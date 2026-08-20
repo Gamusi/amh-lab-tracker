@@ -2217,39 +2217,117 @@ viewReport(visitId) {
       if (res.ok) {
         const tests = await res.json();
         this.testCatalog = tests;
-        let rows = '';
+
+        // Build section name lookup
+        const sectionMap = {};
+        (this.sections || []).forEach(s => { sectionMap[s.id] = s.name; });
+
+        // Identify panel parents: result_type === 'panel' and no parent_rollup_id
+        const parentIds = new Set(
+          tests.filter(t => t.result_type === 'panel' && !t.parent_rollup_id).map(t => t.id)
+        );
+
+        // Group all tests by section name, in section order
+        const bySection = {};
+        const sectionOrder = (this.sections || []).map(s => s.name);
         tests.forEach(t => {
           const secName = sectionMap[t.section_id] || `Section ${t.section_id}`;
-          rows += `
+          if (!bySection[secName]) bySection[secName] = [];
+          bySection[secName].push(t);
+        });
+
+        let tableHtml = `
+          <table class="data-table">
+            <thead>
               <tr>
-                <td><strong>${this.escape(t.name)}</strong></td>
-                <td>${this.escape(secName)}</td>
+                <th>Test Name</th>
+                <th style="width: 110px;">Type</th>
+                <th style="width: 210px;">Surveillance Tracking</th>
+                <th style="width: 160px;">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+        `;
+
+        // Render in section order, then any extra sections
+        const orderedSections = sectionOrder.filter(n => bySection[n]);
+        Object.keys(bySection).forEach(n => { if (!orderedSections.includes(n)) orderedSections.push(n); });
+
+        orderedSections.forEach(secName => {
+          const secTests = bySection[secName];
+
+          // Section header row
+          tableHtml += `
+            <tr style="background-color: var(--primary-color); color: white;">
+              <td colspan="4" style="font-weight: 700; padding: 6px 12px; font-size: 0.82rem; letter-spacing: 0.06em;">
+                ${this.escape(secName.toUpperCase())}
+              </td>
+            </tr>
+          `;
+
+          const panelsInSec = secTests.filter(t => parentIds.has(t.id));
+          const childrenMap = {};
+          secTests.filter(t => t.parent_rollup_id && parentIds.has(t.parent_rollup_id)).forEach(t => {
+            if (!childrenMap[t.parent_rollup_id]) childrenMap[t.parent_rollup_id] = [];
+            childrenMap[t.parent_rollup_id].push(t);
+          });
+          const standalones = secTests.filter(t => !parentIds.has(t.id) && !t.parent_rollup_id);
+
+          // Panel parent rows (collapsed by default)
+          panelsInSec.forEach(parent => {
+            const children = childrenMap[parent.id] || [];
+            const count = children.length;
+            tableHtml += `
+              <tr style="background-color: #EEF2FF; font-weight: 600;">
+                <td style="padding-left: 12px;">
+                  <button
+                    id="toggle-btn-${parent.id}"
+                    class="btn btn-secondary"
+                    style="padding: 1px 7px; font-size: 0.75rem; margin-right: 8px; min-width: 22px;"
+                    onclick="app.togglePanelGroup(${parent.id})"
+                  >+</button>${this.escape(parent.name)}<span style="font-size: 0.78rem; color: var(--text-muted); font-weight: 400; margin-left: 10px;">${count} parameter${count !== 1 ? 's' : ''}</span>
+                </td>
+                <td style="color: var(--text-muted); font-size: 0.8rem;">Panel</td>
+                <td>${parent.is_tracked ? 'Tracked (Positives / Findings)' : 'Standard (Done Only)'}</td>
+                <td style="color: var(--text-muted); font-size: 0.8rem;">System panel</td>
+              </tr>
+            `;
+            // Child rows hidden by default
+            children.forEach(child => {
+              tableHtml += `
+                <tr data-parent-id="${parent.id}" style="display: none; background-color: #FAFAFA;">
+                  <td style="padding-left: 40px; font-size: 0.9rem;">${this.escape(child.name)}</td>
+                  <td style="font-size: 0.8rem; color: var(--text-muted);">${this.escape(child.result_type || '')}</td>
+                  <td style="font-size: 0.85rem;">${child.is_tracked ? 'Tracked (Positives / Findings)' : 'Standard (Done Only)'}</td>
+                  <td>
+                    <button class="btn btn-secondary" style="padding: 2px 8px; font-size: 0.8rem;" onclick="app.openTestConfigModal(${child.id})">Edit</button>
+                    <button class="btn btn-secondary" style="padding: 2px 8px; font-size: 0.8rem; color: var(--danger-color);" onclick="app.deleteTest(${child.id})">Delete</button>
+                  </td>
+                </tr>
+              `;
+            });
+          });
+
+          // Standalone tests (flat rows with Edit + Delete)
+          standalones.forEach(t => {
+            tableHtml += `
+              <tr>
+                <td style="padding-left: 12px;"><strong>${this.escape(t.name)}</strong></td>
+                <td style="font-size: 0.8rem; color: var(--text-muted);">${this.escape(t.result_type || '')}</td>
                 <td>${t.is_tracked ? 'Tracked (Positives / Findings)' : 'Standard (Done Only)'}</td>
                 <td>
                   <button class="btn btn-secondary" style="padding: 2px 8px; font-size: 0.8rem;" onclick="app.openTestConfigModal(${t.id})">Edit</button>
                   <button class="btn btn-secondary" style="padding: 2px 8px; font-size: 0.8rem; color: var(--danger-color);" onclick="app.deleteTest(${t.id})">Delete</button>
                 </td>
               </tr>
-          `;
+            `;
+          });
         });
+
+        tableHtml += `</tbody></table>`;
+
         const catalogContainer = document.getElementById('config-table-container');
-        if (catalogContainer) {
-          catalogContainer.innerHTML = `
-            <table class="data-table">
-              <thead>
-                <tr>
-                  <th>Test Name</th>
-                  <th>Section</th>
-                  <th>Surveillance Tracking</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${rows}
-              </tbody>
-            </table>
-          `;
-        }
+        if (catalogContainer) catalogContainer.innerHTML = tableHtml;
       }
 
       // 3. Load clinicians config
@@ -2500,6 +2578,14 @@ viewReport(visitId) {
     }
   },
 
+  togglePanelGroup(panelId) {
+    const rows = document.querySelectorAll(`tr[data-parent-id="${panelId}"]`);
+    const btn = document.getElementById(`toggle-btn-${panelId}`);
+    const isHidden = rows.length > 0 && rows[0].style.display === 'none';
+    rows.forEach(row => { row.style.display = isHidden ? '' : 'none'; });
+    if (btn) btn.textContent = isHidden ? '-' : '+';
+  },
+
   async openTestConfigModal(testId = null) {
     // If editing, look up the test object from testCatalog (already loaded) or fetch it
     let test = null;
@@ -2650,11 +2736,21 @@ viewReport(visitId) {
   },
 
   async deleteTest(testId) {
-    app.confirmAction("Confirm Deletion", "Are you sure you want to deactivate/delete this test from the catalog?", async () => {
+    // Guard: block deletion of panel parent that still has children
+    const hasChildren = (this.testCatalog || []).some(t => t.parent_rollup_id === testId);
+    if (hasChildren) {
+      this.showNotificationModal(
+        "Cannot Delete Panel",
+        "This panel still has parameters configured under it. Remove or reassign all parameters before deleting the panel.",
+        true
+      );
+      return;
+    }
+
+    app.confirmAction("Confirm Deletion", "Are you sure you want to deactivate this test from the catalog?", async () => {
       try {
         const res = await fetch(`/api/config/tests/${testId}`, { method: 'DELETE' });
         if (res.ok) {
-          app.showNotificationModal("Success", 'Test removed from catalog.', false);
           app.loadConfigData();
         } else {
           app.showNotificationModal("Error", 'Failed to delete test.', true);
@@ -2664,6 +2760,7 @@ viewReport(visitId) {
       }
     });
    },
+
 
   async renderAuditLog(container) {
     container.innerHTML = `
