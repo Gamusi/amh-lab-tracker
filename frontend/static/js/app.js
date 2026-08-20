@@ -1326,17 +1326,36 @@ const app = {
     }
   },
 
+  updateEditAgePlaceholder() {
+    const cat = document.getElementById('edit-client-category').value;
+    const ageInput = document.getElementById('edit-client-age');
+    if (!ageInput) return;
+    if (cat === 'Neonate') ageInput.placeholder = "e.g. 14d or 14/365";
+    else if (cat === 'Infant') ageInput.placeholder = "e.g. 6m or 11/12";
+    else if (cat === 'Toddler') ageInput.placeholder = "e.g. 2y or 1 6/12";
+    else if (cat === 'Child') ageInput.placeholder = "e.g. 8, 8y";
+    else ageInput.placeholder = "e.g. 25, 25y";
+  },
+
   async openEditClientModal(clientId) {
     try {
+      // Fetch the specific client from the API to get current data
       const res = await fetch(`/api/clients?query=`);
-      // Use cached data from currentClientData if available, otherwise fetch
-      const data = this.currentClientData || {};
+      const clients = res.ok ? await res.json() : [];
+      const data = clients.find(c => c.id === parseInt(clientId, 10)) || this.currentClientData || {};
+
       document.getElementById('edit-client-id').value = clientId;
       document.getElementById('edit-client-name').value = data.full_name || '';
       document.getElementById('edit-client-sex').value = data.sex || 'Male';
       document.getElementById('edit-client-age').value = '';
       document.getElementById('edit-client-phone').value = data.phone || '';
-      document.getElementById('edit-client-category').value = data.age_category || 'Years';
+
+      // Set the correct demographic category — must match registration options
+      const cat = data.age_category || 'Adult';
+      const catSel = document.getElementById('edit-client-category');
+      catSel.value = cat;
+      this.updateEditAgePlaceholder();
+
       document.getElementById('edit-client-modal').style.display = 'flex';
     } catch(e) {
       this.showNotificationModal("Error", "Could not open edit form.", true);

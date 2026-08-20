@@ -441,32 +441,30 @@
           <label for="edit-client-name" style="font-weight: 600; display: block; margin-bottom: 4px;">Full Name:</label>
           <input type="text" id="edit-client-name" required style="width: 100%; padding: 8px; box-sizing: border-box;">
         </div>
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
-          <div class="form-group">
-            <label for="edit-client-age" style="font-weight: 600; display: block; margin-bottom: 4px;">Age:</label>
-            <input type="text" id="edit-client-age" placeholder="e.g. 25y or 6m" required style="width: 100%; padding: 8px; box-sizing: border-box;">
-          </div>
-          <div class="form-group">
-            <label for="edit-client-category" style="font-weight: 600; display: block; margin-bottom: 4px;">Age Category:</label>
-            <select id="edit-client-category" style="width: 100%; padding: 8px;">
-              <option value="Years">Years</option>
-              <option value="Months">Months</option>
-              <option value="Days">Days</option>
-            </select>
-          </div>
+        <div class="form-group" style="margin-bottom: 12px;">
+          <label for="edit-client-sex" style="font-weight: 600; display: block; margin-bottom: 4px;">Sex:</label>
+          <select id="edit-client-sex" required style="width: 100%; padding: 8px;">
+            <option value="Male">Male</option>
+            <option value="Female">Female</option>
+          </select>
         </div>
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px;">
-          <div class="form-group">
-            <label for="edit-client-sex" style="font-weight: 600; display: block; margin-bottom: 4px;">Sex:</label>
-            <select id="edit-client-sex" required style="width: 100%; padding: 8px;">
-              <option value="Male">Male</option>
-              <option value="Female">Female</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label for="edit-client-phone" style="font-weight: 600; display: block; margin-bottom: 4px;">Phone (Optional):</label>
-            <input type="text" id="edit-client-phone" style="width: 100%; padding: 8px; box-sizing: border-box;">
-          </div>
+        <div class="form-group" style="margin-bottom: 12px;">
+          <label for="edit-client-category" style="font-weight: 600; display: block; margin-bottom: 4px;">Age Category:</label>
+          <select id="edit-client-category" required onchange="app.updateEditAgePlaceholder()" style="width: 100%; padding: 8px;">
+            <option value="Adult">Adult (15+ years)</option>
+            <option value="Child">Child (4-14 years)</option>
+            <option value="Toddler">Toddler (1-3 years)</option>
+            <option value="Infant">Infant (1m - 1 year)</option>
+            <option value="Neonate">Neonate (0-28 days)</option>
+          </select>
+        </div>
+        <div class="form-group" style="margin-bottom: 12px;">
+          <label for="edit-client-age" style="font-weight: 600; display: block; margin-bottom: 4px;">Age (leave blank to keep existing):</label>
+          <input type="text" id="edit-client-age" placeholder="e.g. 25y, 6m, 14d" style="width: 100%; padding: 8px; box-sizing: border-box;">
+        </div>
+        <div class="form-group" style="margin-bottom: 16px;">
+          <label for="edit-client-phone" style="font-weight: 600; display: block; margin-bottom: 4px;">Phone (Optional):</label>
+          <input type="text" id="edit-client-phone" style="width: 100%; padding: 8px; box-sizing: border-box;">
         </div>
         <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 20px;">
           <button type="button" class="btn btn-secondary" onclick="document.getElementById('edit-client-modal').style.display='none'">Cancel</button>
