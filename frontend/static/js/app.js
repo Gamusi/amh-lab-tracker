@@ -1407,18 +1407,21 @@ viewReport(visitId) {
           ordersList.innerHTML = '<div style="color:var(--text-muted); font-size:0.85rem;">No tests attached to this visit.</div>';
         } else {
           const isAdmin = this.currentUser && (this.currentUser.role === 'admin' || this.currentUser.role === 'superadmin');
-          let oHtml = '<table style="width:100%; border-collapse:collapse; font-size:0.85rem;">';
-          oHtml += '<thead><tr style="border-bottom:1px solid #e2e8f0; color:var(--text-muted); text-align:left;"><th style="padding:4px 8px;">Test</th><th style="padding:4px 8px;">Result</th><th style="padding:4px 8px; text-align:right;">Action</th></tr></thead><tbody>';
+          let oHtml = '<table style="width:100%; border-collapse:collapse; font-size:0.875rem;">';
+          oHtml += '<thead><tr style="border-bottom:2px solid #e2e8f0; color:var(--text-muted); text-align:left; background:#f8fafc;"><th style="padding:8px 12px;">Test Name</th><th style="padding:8px 12px;">Section</th><th style="padding:8px 12px;">Category</th><th style="padding:8px 12px;">Current Result</th><th style="padding:8px 12px; text-align:right;">Action</th></tr></thead><tbody>';
           data.orders.forEach(o => {
             const hasResult = o.results && o.results.length > 0;
-            const resVal = hasResult ? (o.results[0].result_value || 'Completed') : '<span style="color:var(--text-muted);">Pending</span>';
-            const resUnit = hasResult && o.results[0].result_unit ? ` ${o.results[0].result_unit}` : '';
+            const resVal = hasResult ? (o.results[0].result_value || 'Completed') : '<span style="color:var(--text-muted); font-style:italic;">Pending Entry</span>';
+            const resUnit = hasResult && o.results[0].result_unit ? ` <span style="color:var(--text-muted); font-size:0.8rem;">${this.escape(o.results[0].result_unit)}</span>` : '';
+            const catBadge = `<span style="display:inline-block; padding:2px 8px; font-size:0.75rem; border-radius:12px; background:#eff6ff; color:#1d4ed8; border:1px solid #bfdbfe; text-transform:capitalize;">${this.escape(o.order_category || 'in-house')}</span>`;
             oHtml += `
               <tr style="border-bottom:1px solid #f1f5f9;">
-                <td style="padding:6px 8px;"><strong>${this.escape(o.test_name)}</strong> <small style="color:var(--text-muted);">(${this.escape(o.section_name || '')})</small></td>
-                <td style="padding:6px 8px;">${resVal}${resUnit}</td>
-                <td style="padding:6px 8px; text-align:right;">
-                  ${isAdmin ? `<button type="button" class="btn btn-secondary btn-sm" onclick="app.showEnterResultModal(${o.order_id}, ${o.test_id}, '${this.escape(o.test_name)}', '${hasResult ? this.escape(o.results[0].result_value || '') : ''}', '${hasResult && o.results[0].result_unit ? this.escape(o.results[0].result_unit) : ''}')">${hasResult ? 'Edit Result' : 'Enter Result'}</button>` : ''}
+                <td style="padding:10px 12px;"><strong>${this.escape(o.test_name)}</strong></td>
+                <td style="padding:10px 12px; color:var(--text-muted); font-size:0.8rem;">${this.escape(o.section_name || '—')}</td>
+                <td style="padding:10px 12px;">${catBadge}</td>
+                <td style="padding:10px 12px;"><strong>${resVal}</strong>${resUnit}</td>
+                <td style="padding:10px 12px; text-align:right;">
+                  ${isAdmin ? `<button type="button" class="btn btn-secondary btn-sm" style="padding:4px 12px;" onclick="app.showEnterResultModal(${o.order_id}, ${o.test_id}, '${this.escape(o.test_name)}', '${hasResult ? this.escape(o.results[0].result_value || '') : ''}', '${hasResult && o.results[0].result_unit ? this.escape(o.results[0].result_unit) : ''}')">${hasResult ? 'Edit Result' : 'Enter Result'}</button>` : ''}
                 </td>
               </tr>
             `;

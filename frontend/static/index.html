@@ -376,24 +376,24 @@
 
   <!-- Edit Visit Modal -->
   <div id="edit-visit-modal" class="modal-overlay" style="display: none;">
-    <div class="modal-content" style="max-width: 600px;">
-      <h3 style="margin-top: 0; color: var(--primary-color);">Edit Visit Details</h3>
-      <form onsubmit="app.submitEditVisit(event)">
+    <div class="modal-content" style="width: 820px; max-width: 92vw; max-height: 88vh; padding: 28px 32px; display: flex; flex-direction: column; overflow: hidden;">
+      <h3 style="margin-top: 0; margin-bottom: 20px; color: var(--primary-color); font-size: 1.25rem;">Edit Visit Details</h3>
+      <form onsubmit="app.submitEditVisit(event)" style="display: flex; flex-direction: column; flex: 1; overflow: hidden;">
         <input type="hidden" id="edit-visit-id">
-        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 16px;">
+        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-bottom: 20px;">
           <div class="form-group">
-            <label for="edit-visit-ward">Ward of Origin:</label>
-            <select id="edit-visit-ward" required style="width: 100%; padding: 8px;"></select>
+            <label for="edit-visit-ward" style="font-weight: 600; margin-bottom: 6px; display: block;">Ward of Origin:</label>
+            <select id="edit-visit-ward" required style="width: 100%; padding: 10px; border-radius: 4px; border: 1px solid var(--border-color);"></select>
           </div>
           <div class="form-group">
-            <label for="edit-visit-clinician">Requesting Clinician:</label>
-            <select id="edit-visit-clinician" style="width: 100%; padding: 8px;">
+            <label for="edit-visit-clinician" style="font-weight: 600; margin-bottom: 6px; display: block;">Requesting Clinician:</label>
+            <select id="edit-visit-clinician" style="width: 100%; padding: 10px; border-radius: 4px; border: 1px solid var(--border-color);">
               <option value="">-- None --</option>
             </select>
           </div>
           <div class="form-group">
-            <label for="edit-visit-order-category">Test Category:</label>
-            <select id="edit-visit-order-category" style="width: 100%; padding: 8px;">
+            <label for="edit-visit-order-category" style="font-weight: 600; margin-bottom: 6px; display: block;">Test Category:</label>
+            <select id="edit-visit-order-category" style="width: 100%; padding: 10px; border-radius: 4px; border: 1px solid var(--border-color);">
               <option value="in-house">In-house</option>
               <option value="referral">Referral</option>
               <option value="outreach">Outreach</option>
@@ -401,16 +401,19 @@
           </div>
         </div>
 
-        <div style="margin-top: 16px; border-top: 1px solid #e2e8f0; padding-top: 12px;">
-          <h4 style="font-size: 0.9rem; color: var(--primary-color); margin-bottom: 8px;">Tests in this Visit</h4>
-          <div id="edit-visit-orders-list" style="max-height: 180px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 4px; padding: 8px; background: #fff;">
+        <div style="margin-top: 8px; border-top: 1px solid #e2e8f0; padding-top: 16px; flex: 1; display: flex; flex-direction: column; overflow: hidden;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+            <h4 style="font-size: 1rem; color: var(--primary-color); margin: 0; font-weight: 600;">Ordered Tests & Results in this Visit</h4>
+            <span style="font-size: 0.8rem; color: var(--text-muted);">Results can be modified by administrators</span>
+          </div>
+          <div id="edit-visit-orders-list" style="flex: 1; max-height: 340px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 6px; padding: 12px; background: #fff;">
             Loading tests...
           </div>
         </div>
 
-        <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 20px;">
+        <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 24px; padding-top: 12px; border-top: 1px solid #f1f5f9;">
           <button type="button" class="btn btn-secondary" onclick="document.getElementById('edit-visit-modal').style.display='none'">Cancel</button>
-          <button type="submit" class="btn btn-primary">Save Changes</button>
+          <button type="submit" class="btn btn-primary" style="padding: 8px 24px;">Save Changes</button>
         </div>
       </form>
     </div>
