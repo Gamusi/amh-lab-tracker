@@ -45,6 +45,10 @@ SCHEMA_SQL = """
         sort_order INTEGER DEFAULT 0,
         result_type TEXT DEFAULT 'qualitative',
         default_unit TEXT,
+        secondary_unit TEXT,
+        ref_range TEXT,
+        panic_value_low FLOAT,
+        panic_value_high FLOAT,
         options TEXT,
         UNIQUE(name, section_id)
     );
@@ -84,6 +88,8 @@ SCHEMA_SQL = """
         client_number TEXT UNIQUE NOT NULL,
         full_name TEXT NOT NULL,
         date_of_birth DATE,
+        age_years FLOAT,
+        age_category TEXT,
         sex TEXT,
         phone TEXT,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
@@ -114,6 +120,7 @@ SCHEMA_SQL = """
         clinician_id INTEGER REFERENCES clinicians(id),
         ward_of_origin TEXT,
         lab_number TEXT UNIQUE,
+        order_category TEXT DEFAULT 'in-house',
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
 
@@ -133,11 +140,15 @@ SCHEMA_SQL = """
         order_id INTEGER NOT NULL REFERENCES test_orders(id),
         parameter_id INTEGER REFERENCES test_parameters(id),
         result_value TEXT,
+        result_unit TEXT,
         is_positive BOOLEAN,
         entered_by_user_id INTEGER REFERENCES users(id),
         entered_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         verified_by_user_id INTEGER REFERENCES users(id),
-        verified_at DATETIME
+        verified_at DATETIME,
+        edit_reason TEXT,
+        edited_by_user_id INTEGER REFERENCES users(id),
+        edited_at DATETIME
     );
 """
 
@@ -190,7 +201,11 @@ def init_db():
         ("tests", "panic_value_low", "FLOAT"),
         ("tests", "panic_value_high", "FLOAT"),
         ("tests", "secondary_unit", "TEXT"),
-        ("test_results", "result_unit", "TEXT")
+        ("test_results", "result_unit", "TEXT"),
+        ("test_results", "edit_reason", "TEXT"),
+        ("test_results", "edited_by_user_id", "INTEGER"),
+        ("test_results", "edited_at", "DATETIME"),
+        ("visits", "order_category", "TEXT DEFAULT 'in-house'")
     ]
     for table, col, col_def in migrations:
         try:

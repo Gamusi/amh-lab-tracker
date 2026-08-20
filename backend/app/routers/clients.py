@@ -12,9 +12,9 @@ logger = logging.getLogger("amh_clients")
 router = APIRouter(tags=["Clients, Visits & Clinicians"])
 
 class VisitEdit(BaseModel):
-    age_years: float
-    sex: str
     ward_of_origin: str
+    clinician_id: Optional[int] = None
+    order_category: Optional[str] = None
 
 class ClientCreate(BaseModel):
     client_number: Optional[str] = None
@@ -160,13 +160,14 @@ def update_visit(visit_id: int, req: VisitEdit, conn: sqlite3.Connection = Depen
     if not row:
         raise HTTPException(status_code=404, detail="Visit not found")
         
-    client_id = row["client_id"]
-    
     # Update visit
-    cur.execute("UPDATE visits SET ward_of_origin = ? WHERE id = ?", (req.ward_of_origin, visit_id))
+    cur.execute("UPDATE visits SET ward_of_origin = ?, clinician_id = ? WHERE id = ?",
+                (req.ward_of_origin, req.clinician_id, visit_id))
     
-    # Update client age and sex
-    cur.execute("UPDATE clients SET age_years = ?, sex = ? WHERE id = ?", (req.age_years, req.sex, client_id))
+    # Update order_category on all orders for this visit if provided
+    if req.order_category:
+        cur.execute("UPDATE test_orders SET order_category = ? WHERE visit_id = ?",
+                    (req.order_category, visit_id))
     
     conn.commit()
     return {"status": "updated", "visit_id": visit_id}
@@ -379,19 +380,29 @@ def enter_result(req: TestResultCreate, conn: sqlite3.Connection = Depends(get_d
             if pr_is_positive:
                 overall_positive = True
 
-            cur.execute("SELECT id FROM test_results WHERE order_id = ? AND parameter_id = ?", (req.order_id, pr.parameter_id))
+            cur.execute("SELECT id, result_value FROM test_results WHERE order_id = ? AND parameter_id = ?", (req.order_id, pr.parameter_id))
             res_row = cur.fetchone()
             if res_row:
+                if res_row["result_value"] is not None:
+                    if current_user["role"] not in ["admin", "superadmin"]:
+                        raise HTTPException(status_code=403, detail="Only admins can edit existing test results")
+                    if not req.edit_reason or not req.edit_reason.strip():
+                        raise HTTPException(status_code=400, detail="Reason for editing result is required")
+                    cur.execute("""
+                        INSERT INTO audit_log (user_id, action, detail, timestamp)
+                        VALUES (?, 'EDIT_RESULT', ?, ?)
+                    """, (current_user["id"], f"order_id={req.order_id} param_id={pr.parameter_id} old_value={res_row['result_value']!r} new_value={pr.result_value!r} reason={req.edit_reason!r}", now_str))
+
                 cur.execute("""
                     UPDATE test_results
-                    SET result_value = ?, is_positive = ?, entered_by_user_id = COALESCE(entered_by_user_id, ?), entered_at = COALESCE(entered_at, ?), verified_by_user_id = ?, verified_at = ?
+                    SET result_value = ?, is_positive = ?, result_unit = ?, edit_reason = ?, edited_by_user_id = ?, edited_at = ?, verified_by_user_id = ?, verified_at = ?
                     WHERE id = ?
-                """, (pr.result_value, pr_is_positive, current_user["id"], now_str, current_user["id"], now_str, res_row["id"]))
+                """, (pr.result_value, pr_is_positive, req.result_unit, req.edit_reason, current_user["id"], now_str, current_user["id"], now_str, res_row["id"]))
             else:
                 cur.execute("""
-                    INSERT INTO test_results (order_id, parameter_id, result_value, is_positive, entered_by_user_id, entered_at, verified_by_user_id, verified_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                """, (req.order_id, pr.parameter_id, pr.result_value, pr_is_positive, current_user["id"], now_str, current_user["id"], now_str))
+                    INSERT INTO test_results (order_id, parameter_id, result_value, result_unit, is_positive, entered_by_user_id, entered_at, verified_by_user_id, verified_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (req.order_id, pr.parameter_id, pr.result_value, req.result_unit, pr_is_positive, current_user["id"], now_str, current_user["id"], now_str))
     else:
         eval_dict = evaluate_result(test_name, req.result_value, dob, sex, today)
         is_positive = eval_dict.get("is_abnormal", False)
@@ -403,19 +414,29 @@ def enter_result(req: TestResultCreate, conn: sqlite3.Connection = Depends(get_d
 
         overall_positive = is_positive
 
-        cur.execute("SELECT id FROM test_results WHERE order_id = ? AND parameter_id IS NULL", (req.order_id,))
+        cur.execute("SELECT id, result_value, result_unit FROM test_results WHERE order_id = ? AND parameter_id IS NULL", (req.order_id,))
         res_row = cur.fetchone()
         if res_row:
+            if res_row["result_value"] is not None:
+                if current_user["role"] not in ["admin", "superadmin"]:
+                    raise HTTPException(status_code=403, detail="Only admins can edit existing test results")
+                if not req.edit_reason or not req.edit_reason.strip():
+                    raise HTTPException(status_code=400, detail="Reason for editing result is required")
+                cur.execute("""
+                    INSERT INTO audit_log (user_id, action, detail, timestamp)
+                    VALUES (?, 'EDIT_RESULT', ?, ?)
+                """, (current_user["id"], f"order_id={req.order_id} old_value={res_row['result_value']!r} new_value={req.result_value!r} old_unit={res_row['result_unit']!r} new_unit={req.result_unit!r} reason={req.edit_reason!r}", now_str))
+
             cur.execute("""
                 UPDATE test_results
-                SET result_value = ?, is_positive = ?, entered_by_user_id = COALESCE(entered_by_user_id, ?), entered_at = COALESCE(entered_at, ?), verified_by_user_id = ?, verified_at = ?
+                SET result_value = ?, is_positive = ?, result_unit = ?, edit_reason = ?, edited_by_user_id = ?, edited_at = ?, verified_by_user_id = ?, verified_at = ?
                 WHERE id = ?
-            """, (req.result_value, is_positive, current_user["id"], now_str, current_user["id"], now_str, res_row["id"]))
+            """, (req.result_value, is_positive, req.result_unit, req.edit_reason, current_user["id"], now_str, current_user["id"], now_str, res_row["id"]))
         else:
             cur.execute("""
-                INSERT INTO test_results (order_id, parameter_id, result_value, is_positive, entered_by_user_id, entered_at, verified_by_user_id, verified_at)
-                VALUES (?, NULL, ?, ?, ?, ?, ?, ?)
-            """, (req.order_id, req.result_value, is_positive, current_user["id"], now_str, current_user["id"], now_str))
+                INSERT INTO test_results (order_id, parameter_id, result_value, result_unit, is_positive, entered_by_user_id, entered_at, verified_by_user_id, verified_at)
+                VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?)
+            """, (req.order_id, req.result_value, req.result_unit, is_positive, current_user["id"], now_str, current_user["id"], now_str))
 
     cur.execute("UPDATE test_orders SET status = 'completed' WHERE id = ?", (req.order_id,))
 
@@ -449,6 +470,49 @@ def enter_result(req: TestResultCreate, conn: sqlite3.Connection = Depends(get_d
     logger.info(f"Result saved successfully for order ID {req.order_id}, lab_number={assigned_lab_number}")
     return {"status": "result_saved", "order_id": req.order_id, "auto_incremented_daily_log": True, "lab_number": assigned_lab_number}
 
+
+
+@router.put("/api/results/{result_id}")
+def edit_result(result_id: int, req: dict, conn: sqlite3.Connection = Depends(get_db), current_user: dict = Depends(get_current_user)):
+    """Edit an existing test result. Admin/superadmin only. Requires a reason."""
+    import json as _json
+    if current_user["role"] not in ["admin", "superadmin"]:
+        raise HTTPException(status_code=403, detail="Only admins can edit saved results")
+    
+    edit_reason = req.get("edit_reason", "").strip()
+    if not edit_reason:
+        raise HTTPException(status_code=400, detail="An edit reason is required")
+    
+    cur = conn.cursor()
+    cur.execute("SELECT id, result_value, order_id, parameter_id FROM test_results WHERE id = ?", (result_id,))
+    row = cur.fetchone()
+    if not row:
+        raise HTTPException(status_code=404, detail="Result not found")
+    
+    old_value = row["result_value"]
+    new_value = req.get("result_value", old_value)
+    new_unit = req.get("result_unit")
+    
+    now_str = __import__("datetime").datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+    
+    cur.execute("""
+        UPDATE test_results
+        SET result_value = ?, edit_reason = ?, edited_by_user_id = ?, edited_at = ?
+        """ + (", result_unit = ?" if new_unit else "") + """
+        WHERE id = ?
+    """, ([new_value, edit_reason, current_user["id"], now_str] + ([new_unit] if new_unit else []) + [result_id]))
+    
+    # Log to audit_log
+    cur.execute(
+        "INSERT INTO audit_log (user_id, action, detail, timestamp) VALUES (?, ?, ?, ?)",
+        (current_user["id"], "EDIT_RESULT",
+         f"result_id={result_id} order_id={row['order_id']} old_value={old_value!r} new_value={new_value!r} reason={edit_reason!r}",
+         now_str)
+    )
+    
+    conn.commit()
+    logger.info(f"Admin '{current_user['username']}' edited result ID {result_id}: {old_value!r} -> {new_value!r}")
+    return {"status": "updated", "result_id": result_id}
 
 @router.get("/api/clients/report/{order_id}")
 @router.get("/api/report/{order_id}")
@@ -556,7 +620,7 @@ def get_visit_details(visit_id: int, conn: sqlite3.Connection = Depends(get_db),
 
     cur.execute("""
         SELECT 
-            o.id as order_id, o.sample_id, o.ordered_at, o.status,
+            o.id as order_id, o.sample_id, o.ordered_at, o.status, o.order_category,
             t.id as test_id, t.name as test_name, t.is_tracked, s.name as section_name,
             u.full_name as ordered_by_name
         FROM test_orders o
@@ -570,8 +634,8 @@ def get_visit_details(visit_id: int, conn: sqlite3.Connection = Depends(get_db),
 
     for o in orders:
         cur.execute("""
-            SELECT r.id, r.parameter_id, tp.parameter_name, tp.unit, tp.ref_range, r.result_value, r.is_positive,
-                   r.entered_at, r.verified_at, u1.full_name as entered_by_name, u2.full_name as verified_by_name
+            SELECT r.id, r.parameter_id, tp.parameter_name, tp.unit, tp.ref_range, r.result_value, r.result_unit, r.is_positive,
+                   r.entered_at, r.verified_at, r.edit_reason, r.edited_at, u1.full_name as entered_by_name, u2.full_name as verified_by_name
             FROM test_results r
             LEFT JOIN test_parameters tp ON r.parameter_id = tp.id
             LEFT JOIN users u1 ON r.entered_by_user_id = u1.id

@@ -1271,7 +1271,9 @@ const app = {
             <td style="padding:8px; border-bottom:1px solid #ddd;"><strong>${this.escape(o.test_name)}</strong><br><small style="color:var(--text-muted);">Order ID: ${o.order_id}</small></td>
             <td style="padding:8px; border-bottom:1px solid #ddd;">${o.ordered_at}</td>
             <td style="padding:8px; border-bottom:1px solid #ddd; text-align:right;">
-              <button class="btn btn-primary btn-sm" onclick="app.showEnterResultModal(${o.order_id}, ${o.test_id}, '${this.escape(o.test_name)}')">Enter Result</button>
+              <button class="btn btn-primary btn-sm" onclick="app.showEnterResultModal(${o.order_id}, ${o.test_id}, '${this.escape(o.test_name)}', ${o.results && o.results.length > 0 ? `'${this.escape(o.results[0].result_value || '')}'` : 'null'}, ${o.results && o.results.length > 0 && o.results[0].result_unit ? `'${this.escape(o.results[0].result_unit)}'` : 'null'})">
+                ${o.results && o.results.length > 0 ? 'Edit Result' : 'Enter Result'}
+              </button>
               <button class="btn btn-danger btn-sm" onclick="app.removeOrder(${o.order_id})">Remove</button>
             </td>
           </tr>
@@ -1360,17 +1362,7 @@ viewReport(visitId) {
       
       document.getElementById('edit-visit-id').value = visitId;
       
-      const dobStr = data.date_of_birth;
-      let age = data.age_years || 0;
-      if (!age && dobStr) {
-        const dob = new Date(dobStr);
-        const diff = Date.now() - dob.getTime();
-        age = Math.floor(diff / (1000 * 60 * 60 * 24 * 365.25));
-      }
-      
-      document.getElementById('edit-visit-age').value = age;
-      document.getElementById('edit-visit-gender').value = data.sex || 'Male';
-      
+      // Populate ward dropdown
       const wardSelect = document.getElementById('edit-visit-ward');
       wardSelect.innerHTML = '';
       try {
@@ -1383,11 +1375,62 @@ viewReport(visitId) {
           wardSelect.appendChild(opt);
         });
       } catch(e) {}
-      
       wardSelect.value = data.ward_of_origin || '';
+      
+      // Populate clinician dropdown
+      const clinSelect = document.getElementById('edit-visit-clinician');
+      clinSelect.innerHTML = '<option value="">-- None --</option>';
+      try {
+        const cRes = await fetch('/api/config/clinicians');
+        const clins = await cRes.json();
+        clins.forEach(cl => {
+          const opt = document.createElement('option');
+          opt.value = cl.id;
+          opt.textContent = cl.name;
+          clinSelect.appendChild(opt);
+        });
+      } catch(e) {}
+      clinSelect.value = data.clinician_id || '';
+      
+      // Set order category — use first order's category as current value
+      const catSelect = document.getElementById('edit-visit-order-category');
+      if (data.orders && data.orders.length > 0 && data.orders[0].order_category) {
+        catSelect.value = data.orders[0].order_category;
+      } else {
+        catSelect.value = 'in-house';
+      }
+
+      // Render tests in this visit with current results and Edit Result action
+      const ordersList = document.getElementById('edit-visit-orders-list');
+      if (ordersList) {
+        if (!data.orders || data.orders.length === 0) {
+          ordersList.innerHTML = '<div style="color:var(--text-muted); font-size:0.85rem;">No tests attached to this visit.</div>';
+        } else {
+          const isAdmin = this.currentUser && (this.currentUser.role === 'admin' || this.currentUser.role === 'superadmin');
+          let oHtml = '<table style="width:100%; border-collapse:collapse; font-size:0.85rem;">';
+          oHtml += '<thead><tr style="border-bottom:1px solid #e2e8f0; color:var(--text-muted); text-align:left;"><th style="padding:4px 8px;">Test</th><th style="padding:4px 8px;">Result</th><th style="padding:4px 8px; text-align:right;">Action</th></tr></thead><tbody>';
+          data.orders.forEach(o => {
+            const hasResult = o.results && o.results.length > 0;
+            const resVal = hasResult ? (o.results[0].result_value || 'Completed') : '<span style="color:var(--text-muted);">Pending</span>';
+            const resUnit = hasResult && o.results[0].result_unit ? ` ${o.results[0].result_unit}` : '';
+            oHtml += `
+              <tr style="border-bottom:1px solid #f1f5f9;">
+                <td style="padding:6px 8px;"><strong>${this.escape(o.test_name)}</strong> <small style="color:var(--text-muted);">(${this.escape(o.section_name || '')})</small></td>
+                <td style="padding:6px 8px;">${resVal}${resUnit}</td>
+                <td style="padding:6px 8px; text-align:right;">
+                  ${isAdmin ? `<button type="button" class="btn btn-secondary btn-sm" onclick="app.showEnterResultModal(${o.order_id}, ${o.test_id}, '${this.escape(o.test_name)}', '${hasResult ? this.escape(o.results[0].result_value || '') : ''}', '${hasResult && o.results[0].result_unit ? this.escape(o.results[0].result_unit) : ''}')">${hasResult ? 'Edit Result' : 'Enter Result'}</button>` : ''}
+                </td>
+              </tr>
+            `;
+          });
+          oHtml += '</tbody></table>';
+          ordersList.innerHTML = oHtml;
+        }
+      }
       
       document.getElementById('edit-visit-modal').style.display = 'flex';
     } catch(e) {
+      console.error(e);
       this.showNotificationModal("Error", "Could not load visit details.", true);
     }
   },
@@ -1395,15 +1438,19 @@ viewReport(visitId) {
   async submitEditVisit(e) {
     e.preventDefault();
     const visitId = document.getElementById('edit-visit-id').value;
-    const age = parseFloat(document.getElementById('edit-visit-age').value);
-    const gender = document.getElementById('edit-visit-gender').value;
     const ward = document.getElementById('edit-visit-ward').value;
+    const clinicianId = document.getElementById('edit-visit-clinician').value;
+    const orderCat = document.getElementById('edit-visit-order-category').value;
 
     try {
       const res = await fetch(`/api/visits/${visitId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ age_years: age, sex: gender, ward_of_origin: ward })
+        body: JSON.stringify({
+          ward_of_origin: ward,
+          clinician_id: clinicianId ? parseInt(clinicianId, 10) : null,
+          order_category: orderCat
+        })
       });
       if (res.ok) {
         this.showNotificationModal("Success", "Visit details updated successfully.", false);
@@ -1515,10 +1562,23 @@ viewReport(visitId) {
   },
 
 
-  async showEnterResultModal(orderId, testId, testName) {
+  async showEnterResultModal(orderId, testId, testName, existingVal = null, existingUnit = null) {
     document.getElementById('result-entry-order-id').value = orderId;
     document.getElementById('result-entry-test-id').value = testId;
     document.getElementById('result-entry-test-name').textContent = testName;
+
+    const isEdit = existingVal !== null && existingVal !== undefined && existingVal !== '';
+    document.getElementById('result-entry-is-edit').value = isEdit ? '1' : '0';
+    
+    const titleElem = document.getElementById('result-entry-modal-title');
+    if (titleElem) titleElem.textContent = isEdit ? 'Edit Result' : 'Enter Result';
+
+    const reasonGroup = document.getElementById('result-entry-reason-group');
+    const reasonInput = document.getElementById('result-entry-reason');
+    if (reasonGroup) {
+      reasonGroup.style.display = isEdit ? 'block' : 'none';
+      if (reasonInput) reasonInput.value = '';
+    }
     
     // Ensure testCatalog is loaded
     if (!this.testCatalog || this.testCatalog.length === 0) {
@@ -1616,11 +1676,14 @@ viewReport(visitId) {
               <div class="form-group" style="margin-bottom: 16px;">
                 <label>Result Value:</label>
                 <div style="display: flex; gap: 8px;">
-                    <input type="number" step="any" id="result-entry-value" placeholder="Enter Value${test.ref_range ? '. Ref: ' + this.escape(test.ref_range) : ''}" style="flex: 1; padding: 8px;">
+                    <input type="number" step="any" id="result-entry-value" value="${isEdit ? this.escape(existingVal) : ''}" placeholder="Enter Value${test.ref_range ? '. Ref: ' + this.escape(test.ref_range) : ''}" style="flex: 1; padding: 8px;">
                     ${unitHtml}
                 </div>
               </div>
             `;
+            if (isEdit && existingUnit && document.getElementById('result-entry-unit')) {
+              document.getElementById('result-entry-unit').value = existingUnit;
+            }
         }
        
        // Check for child tests in testCatalog
@@ -1720,18 +1783,40 @@ viewReport(visitId) {
              body: JSON.stringify({ order_id: orderId, result_value: "Panel Completed" })
            });
          } else {
-           // Single order
-           const payload = { order_id: orderId, result_value: finalVal };
-           const res = await fetch('/api/clients/results', {
-             method: 'POST',
-             headers: { 'Content-Type': 'application/json' },
-             body: JSON.stringify(payload)
-           });
-           if (!res.ok) {
-             const err = await res.json();
-             this.showNotificationModal("Error", err.detail || "Failed to save result.", true);
-             return;
-           }
+            // Single order
+            const unitElem = document.getElementById('result-entry-unit');
+            const selectedUnit = unitElem ? (unitElem.tagName === 'SELECT' ? unitElem.value : unitElem.textContent.trim()) : null;
+            const isEditMode = document.getElementById('result-entry-is-edit') ? document.getElementById('result-entry-is-edit').value === '1' : false;
+            const editReason = document.getElementById('result-entry-reason') ? document.getElementById('result-entry-reason').value.trim() : '';
+
+            if (isEditMode) {
+              const isAdmin = this.currentUser && (this.currentUser.role === 'admin' || this.currentUser.role === 'superadmin');
+              if (!isAdmin) {
+                this.showNotificationModal("Error", "Only administrators can edit saved results.", true);
+                return;
+              }
+              if (!editReason) {
+                this.showNotificationModal("Error", "Reason for edit is required.", true);
+                return;
+              }
+            }
+
+            const payload = {
+              order_id: orderId,
+              result_value: finalVal,
+              result_unit: selectedUnit,
+              edit_reason: isEditMode ? editReason : null
+            };
+            const res = await fetch('/api/clients/results', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload)
+            });
+            if (!res.ok) {
+              const err = await res.json();
+              this.showNotificationModal("Error", err.detail || "Failed to save result.", true);
+              return;
+            }
          }
          
          this.showNotificationModal("Success", "Result saved successfully!", false);
@@ -1739,6 +1824,11 @@ viewReport(visitId) {
          if (this.currentClientId) {
             await this.loadPendingTests(this.currentClientId);
             await this.loadHistoricalVisits(this.currentClientId);
+         }
+         // Also refresh the edit visit modal tests list if it's currently open
+         const editVisitId = document.getElementById('edit-visit-id')?.value;
+         if (editVisitId && document.getElementById('edit-visit-modal')?.style.display !== 'none') {
+           await this.openEditVisitModal(parseInt(editVisitId, 10));
          }
        } catch(err) {
          this.showNotificationModal("Error", "Connection error saving result.", true);

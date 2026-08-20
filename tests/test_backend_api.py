@@ -157,8 +157,8 @@ def test_enter_result_sets_verification_and_sequential_lab_number(mock_db):
     res1_data = res1.json()
     assert res1_data["status"] == "result_saved"
     
-    ym_str = datetime.date.today().strftime("%y-%m")
-    expected_lab_no_1 = f"amh-{ym_str}-1"
+    today = datetime.date.today()
+    expected_lab_no_1 = f"AMH-{today.strftime('%y')}-{today.month}-001"
     assert res1_data["lab_number"] == expected_lab_no_1
     
     # Check visit 1 lab number is now assigned
@@ -193,7 +193,7 @@ def test_enter_result_sets_verification_and_sequential_lab_number(mock_db):
     assert cur.fetchone()["lab_number"] == expected_lab_no_1
     
     # Check sequence tracker value is still 1
-    seq_name = f"lab_number_{ym_str.replace('-', '_')}"
+    seq_name = f"lab_number_{today.strftime('%y')}_{today.month}"
     cur.execute("SELECT last_value FROM sequence_tracker WHERE seq_name = ?", (seq_name,))
     assert cur.fetchone()["last_value"] == 1
     
@@ -213,7 +213,7 @@ def test_enter_result_sets_verification_and_sequential_lab_number(mock_db):
         "is_positive": True
     })
     assert res3.status_code == 200
-    expected_lab_no_2 = f"amh-{ym_str}-2"
+    expected_lab_no_2 = f"AMH-{today.strftime('%y')}-{today.month}-002"
     assert res3.json()["lab_number"] == expected_lab_no_2
     
     cur.execute("SELECT lab_number FROM visits WHERE id = ?", (v2_id,))

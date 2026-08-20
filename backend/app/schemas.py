@@ -129,6 +129,14 @@ class ClinicianResponse(ClinicianBase):
     class Config:
         from_attributes = True
 
+
+class ResultEdit(BaseModel):
+    order_id: int
+    result_value: Optional[str] = None
+    parameter_results: Optional[list] = None
+    result_unit: Optional[str] = None
+    edit_reason: str
+
 class VisitCreate(BaseModel):
     client_id: int
     clinician_id: Optional[int] = None
@@ -172,7 +180,9 @@ class ParameterResultItem(BaseModel):
 class TestResultCreate(BaseModel):
     order_id: int
     result_value: Optional[str] = None
+    result_unit: Optional[str] = None
     parameter_results: Optional[List[ParameterResultItem]] = None
+    edit_reason: Optional[str] = None
 
 class AddOrdersRequest(BaseModel):
     test_ids: List[int]
