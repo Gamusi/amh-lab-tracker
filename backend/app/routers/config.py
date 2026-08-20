@@ -39,8 +39,8 @@ def create_test(req: TestCreate, admin_user: dict = Depends(require_admin), conn
         effective_tracked = 1 if req.is_tracked else 0
 
     cur.execute(
-        "INSERT INTO tests (name, section_id, is_tracked, sort_order, result_type, default_unit, options) VALUES (?, ?, ?, ?, ?, ?, ?)",
-        (req.name, req.section_id, effective_tracked, req.sort_order, req.result_type, req.default_unit, req.options)
+        "INSERT INTO tests (name, section_id, is_tracked, sort_order, result_type, default_unit, options, parent_rollup_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        (req.name, req.section_id, effective_tracked, req.sort_order, req.result_type, req.default_unit, req.options, req.parent_rollup_id)
     )
     tid = cur.lastrowid
     conn.commit()
@@ -48,7 +48,7 @@ def create_test(req: TestCreate, admin_user: dict = Depends(require_admin), conn
     conn.execute("INSERT INTO audit_log (user_id, action, detail) VALUES (?, ?, ?)", (admin_user["id"], "create_test", f"Created test '{req.name}'"))
     conn.commit()
     
-    return {"id": tid, "name": req.name, "section_id": req.section_id, "is_tracked": bool(effective_tracked), "result_type": req.result_type, "default_unit": req.default_unit, "options": req.options}
+    return {"id": tid, "name": req.name, "section_id": req.section_id, "is_tracked": bool(effective_tracked), "result_type": req.result_type, "default_unit": req.default_unit, "options": req.options, "parent_rollup_id": req.parent_rollup_id}
     
 
 @router.put("/tests/{test_id}", response_model=TestResponse)
@@ -65,15 +65,16 @@ def update_test(test_id: int, req: TestCreate, conn: sqlite3.Connection = Depend
 
     cur.execute("""
         UPDATE tests
-        SET name = ?, section_id = ?, is_tracked = ?, result_type = ?, default_unit = ?, options = ?
+        SET name = ?, section_id = ?, is_tracked = ?, result_type = ?, default_unit = ?, options = ?, parent_rollup_id = ?
         WHERE id = ?
-    """, (req.name, req.section_id, effective_tracked, req.result_type, req.default_unit, req.options, test_id))
+    """, (req.name, req.section_id, effective_tracked, req.result_type, req.default_unit, req.options, req.parent_rollup_id, test_id))
     
     conn.commit()
     return TestResponse(
         id=test_id, name=req.name, section_id=req.section_id, 
         is_tracked=bool(effective_tracked), sort_order=req.sort_order, is_active=True,
-        result_type=req.result_type, default_unit=req.default_unit, options=req.options
+        result_type=req.result_type, default_unit=req.default_unit, options=req.options,
+        parent_rollup_id=req.parent_rollup_id
     )
 
 @router.delete("/tests/{test_id}")

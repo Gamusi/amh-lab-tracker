@@ -44,6 +44,7 @@ class TestBase(BaseModel):
     result_type: str = "qualitative"
     default_unit: Optional[str] = None
     options: Optional[str] = None
+    parent_rollup_id: Optional[int] = None
 
 class TestCreate(TestBase):
     pass

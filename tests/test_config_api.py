@@ -76,3 +76,26 @@ def test_create_quantitative_test_defaults_untracked(config_db):
     assert res.status_code == 200
     data = res.json()
     assert data["is_tracked"] is False or data["is_tracked"] == 0
+
+def test_create_test_with_parent_sets_parent_rollup_id(config_db):
+    conn = config_db["conn"]
+    cur = conn.cursor()
+    cur.execute(
+        "INSERT INTO tests (name, section_id, is_active, is_tracked, result_type) VALUES ('CBC', ?, 1, 1, 'panel')",
+        (config_db["sec_id"],)
+    )
+    parent_id = cur.lastrowid
+    conn.commit()
+
+    payload = {
+        "name": "Hemoglobin (Hb)",
+        "section_id": config_db["sec_id"],
+        "result_type": "quantitative",
+        "default_unit": "g/dL",
+        "sort_order": 3,
+        "parent_rollup_id": parent_id
+    }
+    res = client.post("/api/config/tests", json=payload)
+    assert res.status_code == 200
+    data = res.json()
+    assert data["parent_rollup_id"] == parent_id
