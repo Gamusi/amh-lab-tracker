@@ -1301,8 +1301,8 @@ const app = {
       visits.forEach(v => {
         const labNumStr = v.lab_number ? `(${this.escape(v.lab_number)})` : '(Pending Lab No)';
         const isAdmin = this.currentUser && (this.currentUser.role === 'admin' || this.currentUser.role === 'superadmin');
-        const gridCols = isAdmin ? '2fr 1fr 1fr 1fr' : '2fr 1fr 1fr';
-        html += `<div style="display: grid; grid-template-columns: ${gridCols}; gap: 8px; margin-bottom: 8px; max-width: 600px;">
+        const gridCols = isAdmin ? '4fr 1fr 1fr 1fr' : '4fr 1fr 1fr';
+        html += `<div style="display: grid; grid-template-columns: ${gridCols}; gap: 8px; margin-bottom: 8px; max-width: 800px;">
                   <button class="btn btn-secondary btn-sm" style="text-align: left;" onclick="app.viewReport(${v.visit_id})">Visit ${v.visit_id} ${labNumStr} - ${v.created_at.split(' ')[0]}</button>
                   <button class="btn btn-secondary btn-sm" onclick="app.openEditVisitModal(${v.visit_id})">Edit</button>
                   <button class="btn btn-primary btn-sm" onclick="app.showAddTestModal(${v.visit_id})">Add Tests</button>
