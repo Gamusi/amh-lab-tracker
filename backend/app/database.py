@@ -121,6 +121,7 @@ SCHEMA_SQL = """
         ward_of_origin TEXT,
         lab_number TEXT UNIQUE,
         order_category TEXT DEFAULT 'in-house',
+        is_deleted BOOLEAN NOT NULL DEFAULT 0,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
 
@@ -205,7 +206,8 @@ def init_db():
         ("test_results", "edit_reason", "TEXT"),
         ("test_results", "edited_by_user_id", "INTEGER"),
         ("test_results", "edited_at", "DATETIME"),
-        ("visits", "order_category", "TEXT DEFAULT 'in-house'")
+        ("visits", "order_category", "TEXT DEFAULT 'in-house'"),
+        ("visits", "is_deleted", "BOOLEAN NOT NULL DEFAULT 0")
     ]
     for table, col, col_def in migrations:
         try:

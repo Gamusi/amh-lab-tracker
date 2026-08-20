@@ -127,8 +127,12 @@ class ClinicianResponse(ClinicianBase):
     is_active: bool = True
     created_at: Optional[datetime.datetime] = None
 
-    class Config:
-        from_attributes = True
+class ClientUpdate(BaseModel):
+    full_name: Optional[str] = None
+    age_string: Optional[str] = None
+    age_category: Optional[str] = None
+    sex: Optional[str] = None
+    phone: Optional[str] = None
 
 
 class ResultEdit(BaseModel):

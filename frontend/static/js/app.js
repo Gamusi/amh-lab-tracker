@@ -921,11 +921,13 @@ const app = {
 
   async selectClient(pid, pnum, pname, psex) {
     this.currentClientId = pid;
+    this.currentClientData = { id: pid, client_number: pnum, full_name: pname, sex: psex };
     const box = document.getElementById('client-detail-box');
     box.innerHTML = `
       <div>
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-          <h3 style="color: var(--primary-color);">Client: ${pname} (${pnum})</h3>
+          <h3 style="color: var(--primary-color);">Client: <span id="client-header-name">${pname}</span> (${pnum})</h3>
+          <button class="btn btn-secondary btn-sm" onclick="app.openEditClientModal(${pid})">Edit Client Details</button>
         </div>
 
         <!-- Section A: Create Visit -->
@@ -1295,15 +1297,15 @@ const app = {
   deleteVisit(visitId) {
     this.confirmAction(
       "Delete Visit",
-      `Are you sure you want to delete visit ${visitId}? This will permanently remove all associated test orders and results. This action cannot be undone.`,
+      `Are you sure you want to delete this visit? All associated test orders and results will be removed. This action cannot be undone.`,
       async () => {
         try {
           const res = await fetch(`/api/visits/${visitId}`, { method: 'DELETE' });
           if (res.ok) {
             this.showNotificationModal("Success", "Visit deleted successfully.", false);
-            // Refresh historical visits
             if (this.currentClientId) {
-              this.loadHistoricalVisits(this.currentClientId);
+              await this.loadHistoricalVisits(this.currentClientId);
+              await this.loadPendingTests(this.currentClientId);
             }
           } else {
             const err = await res.json();
@@ -1316,7 +1318,7 @@ const app = {
       }
     );
   },
-viewReport(visitId) {
+  viewReport(visitId) {
     const frame = document.getElementById('report-frame');
     if (frame) {
       frame.style.display = 'block';
@@ -1324,8 +1326,65 @@ viewReport(visitId) {
     }
   },
 
+  async openEditClientModal(clientId) {
+    try {
+      const res = await fetch(`/api/clients?query=`);
+      // Use cached data from currentClientData if available, otherwise fetch
+      const data = this.currentClientData || {};
+      document.getElementById('edit-client-id').value = clientId;
+      document.getElementById('edit-client-name').value = data.full_name || '';
+      document.getElementById('edit-client-sex').value = data.sex || 'Male';
+      document.getElementById('edit-client-age').value = '';
+      document.getElementById('edit-client-phone').value = data.phone || '';
+      document.getElementById('edit-client-category').value = data.age_category || 'Years';
+      document.getElementById('edit-client-modal').style.display = 'flex';
+    } catch(e) {
+      this.showNotificationModal("Error", "Could not open edit form.", true);
+    }
+  },
 
+  async submitEditClient(event) {
+    event.preventDefault();
+    const clientId = document.getElementById('edit-client-id').value;
+    const full_name = document.getElementById('edit-client-name').value.trim();
+    const age_string = document.getElementById('edit-client-age').value.trim();
+    const age_category = document.getElementById('edit-client-category').value;
+    const sex = document.getElementById('edit-client-sex').value;
+    const phone = document.getElementById('edit-client-phone').value.trim();
 
+    const payload = { full_name, sex, phone, age_category };
+    if (age_string) payload.age_string = age_string;
+
+    try {
+      const res = await fetch(`/api/clients/${clientId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        document.getElementById('edit-client-modal').style.display = 'none';
+        // Update header name live
+        const nameSpan = document.getElementById('client-header-name');
+        if (nameSpan) nameSpan.textContent = updated.full_name || full_name;
+        // Update cached data
+        if (this.currentClientData) {
+          this.currentClientData.full_name = updated.full_name || full_name;
+          this.currentClientData.sex = updated.sex || sex;
+          this.currentClientData.phone = updated.phone || phone;
+          this.currentClientData.age_category = updated.age_category || age_category;
+        }
+        // Refresh client list so search shows updated name
+        await this.searchClients('');
+        this.showNotificationModal("Success", "Client details updated successfully.", false);
+      } else {
+        const err = await res.json();
+        this.showNotificationModal("Error", err.detail || "Failed to update client.", true);
+      }
+    } catch(e) {
+      this.showNotificationModal("Error", "Connection error.", true);
+    }
+  },
 
   async openEditVisitModal(visitId) {
     try {

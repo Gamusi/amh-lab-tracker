@@ -520,3 +520,76 @@ def test_enter_result_parameter_results_auto_evaluation(mock_db):
     assert rows[mock_db["hb_param_id"]] == 1
 
 
+def test_soft_delete_visit_cleans_pending_orders_and_hides_from_history(mock_db):
+    conn = mock_db["conn"]
+    cur = conn.cursor()
+
+    # Override auth to admin role
+    app.dependency_overrides[get_current_user] = lambda: {"id": 1, "username": "admin1", "role": "admin", "full_name": "Admin User"}
+
+    cur.execute("INSERT INTO clients (client_number, full_name, sex) VALUES ('AMH-SD1', 'Soft Delete Test', 'Male')")
+    client_id = cur.lastrowid
+    cur.execute("INSERT INTO visits (client_id, ward_of_origin) VALUES (?, 'OPD')", (client_id,))
+    visit_id = cur.lastrowid
+    cur.execute("INSERT INTO test_orders (visit_id, test_id, status) VALUES (?, ?, 'pending')", (visit_id, mock_db["cbc_id"]))
+    order_id = cur.lastrowid
+    conn.commit()
+
+    # Confirm visit shows in history
+    res = client.get(f"/api/clients/{client_id}/visits")
+    assert res.status_code == 200
+    visits = res.json()
+    assert any(v["visit_id"] == visit_id for v in visits)
+
+    # Confirm pending order appears
+    res = client.get(f"/api/clients/{client_id}/orders")
+    assert res.status_code == 200
+    orders = res.json()
+    assert any(o["order_id"] == order_id for o in orders)
+
+    # Delete the visit
+    res = client.delete(f"/api/visits/{visit_id}")
+    assert res.status_code == 200
+    assert res.json()["status"] == "deleted"
+
+    # Visit should no longer appear in history
+    res = client.get(f"/api/clients/{client_id}/visits")
+    assert res.status_code == 200
+    visits_after = res.json()
+    assert not any(v["visit_id"] == visit_id for v in visits_after)
+
+    # Pending orders should be gone
+    res = client.get(f"/api/clients/{client_id}/orders")
+    assert res.status_code == 200
+    orders_after = res.json()
+    assert not any(o["order_id"] == order_id for o in orders_after)
+
+    # Visit row still exists in DB but is soft-deleted
+    cur.execute("SELECT is_deleted FROM visits WHERE id = ?", (visit_id,))
+    row = cur.fetchone()
+    assert row is not None
+    assert row["is_deleted"] == 1
+
+
+def test_update_client_details(mock_db):
+    conn = mock_db["conn"]
+    cur = conn.cursor()
+
+    cur.execute("INSERT INTO clients (client_number, full_name, sex, phone) VALUES ('AMH-UPD1', 'Original Name', 'Male', '0700000000')")
+    client_id = cur.lastrowid
+    conn.commit()
+
+    res = client.put(f"/api/clients/{client_id}", json={
+        "full_name": "Updated Name",
+        "sex": "Female",
+        "phone": "0711111111",
+        "age_string": "30y",
+        "age_category": "Years"
+    })
+    assert res.status_code == 200
+    updated = res.json()
+    assert updated["full_name"] == "Updated Name"
+    assert updated["sex"] == "Female"
+    assert updated["phone"] == "0711111111"
+    assert updated["age_category"] == "Years"
+    assert updated["age_years"] is not None and updated["age_years"] > 0

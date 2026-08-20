@@ -4,7 +4,7 @@ from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from ..database import get_db
 from ..auth import get_current_user
-from ..schemas import VisitCreate, TestResultCreate, ParameterResultItem, AddOrdersRequest
+from ..schemas import VisitCreate, TestResultCreate, ParameterResultItem, AddOrdersRequest, ClientUpdate
 from ..evaluator import evaluate_result
 
 logger = logging.getLogger("amh_clients")
@@ -110,6 +110,49 @@ def create_client(req: ClientCreate, conn: sqlite3.Connection = Depends(get_db),
     conn.commit()
     logger.info(f"Client created successfully: ID {pid}, Client Number {generated_client_number}")
     return {"status": "created", "client_id": pid, "client_number": generated_client_number}
+
+@router.put("/api/clients/{client_id}")
+def update_client(client_id: int, req: ClientUpdate, conn: sqlite3.Connection = Depends(get_db), current_user: dict = Depends(get_current_user)):
+    logger.info(f"User '{current_user['username']}' is updating client ID {client_id}")
+    cur = conn.cursor()
+    cur.execute("SELECT id, full_name FROM clients WHERE id = ?", (client_id,))
+    client_row = cur.fetchone()
+    if not client_row:
+        raise HTTPException(status_code=404, detail="Client not found")
+
+    updates = []
+    params = []
+
+    if req.full_name is not None:
+        updates.append("full_name = ?")
+        params.append(req.full_name.strip())
+    if req.age_string is not None:
+        parsed_age = parse_age_string(req.age_string)
+        updates.append("age_years = ?")
+        params.append(parsed_age)
+    if req.age_category is not None:
+        updates.append("age_category = ?")
+        params.append(req.age_category)
+    if req.sex is not None:
+        updates.append("sex = ?")
+        params.append(req.sex)
+    if req.phone is not None:
+        updates.append("phone = ?")
+        params.append(req.phone.strip())
+
+    if updates:
+        params.append(client_id)
+        cur.execute(f"UPDATE clients SET {', '.join(updates)} WHERE id = ?", tuple(params))
+        conn.commit()
+
+        now_str = datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%d %H:%M:%S")
+        cur.execute("INSERT INTO audit_log (user_id, action, detail, timestamp) VALUES (?, 'EDIT_CLIENT', ?, ?)",
+                    (current_user["id"], f"Updated client ID {client_id}: {req.model_dump(exclude_unset=True)}", now_str))
+        conn.commit()
+
+    cur.execute("SELECT * FROM clients WHERE id = ?", (client_id,))
+    updated_client = cur.fetchone()
+    return dict(updated_client)
 
 @router.post("/api/visits")
 def create_visit(req: VisitCreate, conn: sqlite3.Connection = Depends(get_db), current_user: dict = Depends(get_current_user)):
@@ -535,7 +578,7 @@ def get_printable_client_report(order_id: int, conn: sqlite3.Connection = Depend
         JOIN tests t ON o.test_id = t.id
         JOIN sections s ON t.section_id = s.id
         LEFT JOIN users u ON o.ordered_by_user_id = u.id
-        WHERE o.id = ?
+        WHERE o.id = ? AND v.is_deleted = 0
     """, (order_id,))
     
     order_info = cur.fetchone()
@@ -570,7 +613,7 @@ def get_client_orders(client_id: int, conn: sqlite3.Connection = Depends(get_db)
         JOIN tests t ON o.test_id = t.id
         JOIN sections s ON t.section_id = s.id
         LEFT JOIN users u ON o.ordered_by_user_id = u.id
-        WHERE v.client_id = ?
+        WHERE v.client_id = ? AND v.is_deleted = 0
         ORDER BY o.id DESC
     """, (client_id,))
     
@@ -597,7 +640,7 @@ def get_client_visits(client_id: int, conn: sqlite3.Connection = Depends(get_db)
             cl.name as clinician_name
         FROM visits v
         LEFT JOIN clinicians cl ON v.clinician_id = cl.id
-        WHERE v.client_id = ?
+        WHERE v.client_id = ? AND v.is_deleted = 0
         ORDER BY v.id DESC
     """, (client_id,))
     return [dict(r) for r in cur.fetchall()]
@@ -614,7 +657,7 @@ def get_visit_details(visit_id: int, conn: sqlite3.Connection = Depends(get_db),
         FROM visits v
         JOIN clients c ON v.client_id = c.id
         LEFT JOIN clinicians cl ON v.clinician_id = cl.id
-        WHERE v.id = ?
+        WHERE v.id = ? AND v.is_deleted = 0
     """, (visit_id,))
     visit_row = cur.fetchone()
     if not visit_row:
@@ -659,8 +702,9 @@ def delete_visit(visit_id: int, conn: sqlite3.Connection = Depends(get_db), curr
     logger.info(f"Admin '{current_user['username']}' is deleting visit ID {visit_id}")
     cur = conn.cursor()
     
-    cur.execute("SELECT id FROM visits WHERE id = ?", (visit_id,))
-    if not cur.fetchone():
+    cur.execute("SELECT id, is_deleted FROM visits WHERE id = ?", (visit_id,))
+    visit_row = cur.fetchone()
+    if not visit_row or visit_row["is_deleted"] == 1:
         raise HTTPException(status_code=404, detail="Visit not found")
         
     # Find all test orders for this visit
@@ -671,11 +715,15 @@ def delete_visit(visit_id: int, conn: sqlite3.Connection = Depends(get_db), curr
     for o in orders:
         cur.execute("DELETE FROM test_results WHERE order_id = ?", (o["id"],))
         
-    # Delete test orders
+    # Delete test orders to clean up pending orders completely
     cur.execute("DELETE FROM test_orders WHERE visit_id = ?", (visit_id,))
     
-    # Delete visit
-    cur.execute("DELETE FROM visits WHERE id = ?", (visit_id,))
+    # Soft delete visit
+    cur.execute("UPDATE visits SET is_deleted = 1 WHERE id = ?", (visit_id,))
+    
+    now_str = datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%d %H:%M:%S")
+    cur.execute("INSERT INTO audit_log (user_id, action, detail, timestamp) VALUES (?, 'DELETE_VISIT', ?, ?)",
+                (current_user["id"], f"Soft-deleted visit ID {visit_id} and removed associated test orders", now_str))
     
     conn.commit()
-    return {"status": "deleted"}
+    return {"status": "deleted", "visit_id": visit_id}
