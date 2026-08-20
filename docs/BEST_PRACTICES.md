@@ -28,7 +28,12 @@ This document outlines the coding standards and design principles that all devel
 ## D. Additional Core Rules
 
 1. No toast notifications for anything in the app. Only use clean, uncluttered modals for success/error states and prompts.
-2. The frontend is the interaction layer for users to interact with the backend; it must not contain any business logic.
+2. **Frontend is an interaction layer only. It must not contain any business logic.**
+   - All data validation, authorization checks, computation, and state mutation belong exclusively in backend API endpoints.
+   - The frontend sends requests and renders responses. It never decides what is valid, who is allowed, or what the outcome should be.
+   - If a frontend call returns an error, the error message originates from the backend. The frontend only presents it.
+   - Any validation duplicated in the frontend (e.g., field presence checks before submission) is acceptable only as UX convenience, never as the authoritative gate. The backend is always the authoritative gate.
+   - A 405 Method Not Allowed error means the server was not restarted after a new endpoint was added, or the route was not registered. Never work around this with client-side hacks. Restart the server and confirm the endpoint is registered.
 
 ## E. Surveillance & Incidence Tracking Standards
 
