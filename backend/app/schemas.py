@@ -135,6 +135,7 @@ class VisitCreate(BaseModel):
     ward_of_origin: Optional[str] = None
     test_ids: List[int]
     sample_id: Optional[str] = None
+    order_category: Optional[str] = 'in-house' 
 
 class VisitResponse(BaseModel):
     id: int

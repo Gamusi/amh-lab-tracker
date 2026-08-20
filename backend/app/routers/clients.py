@@ -143,8 +143,8 @@ def create_visit(req: VisitCreate, conn: sqlite3.Connection = Depends(get_db), c
     for tid in req.test_ids:
         cur.execute("""
             INSERT INTO test_orders (visit_id, test_id, sample_id, ordered_by_user_id, status, order_category)
-            VALUES (?, ?, ?, ?, 'pending', 'in-house')
-        """, (visit_id, tid, req.sample_id, current_user["id"]))
+            VALUES (?, ?, ?, ?, 'pending', ?)
+        """, (visit_id, tid, req.sample_id, current_user["id"], req.order_category))
         
     conn.commit()
     logger.info(f"Visit created successfully: visit_id={visit_id}")

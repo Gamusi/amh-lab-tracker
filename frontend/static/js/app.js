@@ -958,7 +958,7 @@ const app = {
         <!-- Section A: Create Visit -->
         <div class="no-print" style="margin-bottom: 20px; background: #EFF6FF; padding: 16px; border-radius: 6px; border: 1px solid #BFDBFE;">
           <h4 style="font-size: 0.95rem; color: var(--primary-color); margin-bottom: 12px;">Create Visit & Order Tests</h4>
-          <div style="display: grid; grid-template-columns: 1fr 1fr 2fr; gap: 12px; margin-bottom: 12px;">
+          <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 12px; margin-bottom: 12px;">
             <div class="form-group">
               <label>Ward of Origin:</label>
               <select id="visit-ward">
@@ -973,8 +973,16 @@ const app = {
             </div>
             <div class="form-group">
               <label>Test Category:</label>
-              <select id="visit-test-category" onchange="app.filterVisitTests()" style="width: 100%; padding: 8px;">
-                <option value="all">All Categories</option>
+              <select id="visit-order-category" style="width: 100%; padding: 8px;">
+                <option value="in-house" selected>In-house</option>
+                <option value="referral">Referral</option>
+                <option value="outreach">Outreach</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Lab Section:</label>
+              <select id="visit-test-section" onchange="app.filterVisitTests()" style="width: 100%; padding: 8px;">
+                <option value="all">All Sections</option>
               </select>
             </div>
           </div>
@@ -1161,9 +1169,9 @@ const app = {
       
       let html = '<div style="max-height: 150px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 4px; padding: 8px; background: #fff;">';
       
-      const catSelect = document.getElementById('visit-test-category');
+      const catSelect = document.getElementById('visit-test-section');
       if (catSelect && this.sections) {
-        let catHtml = '<option value="all">All Categories</option>';
+        let catHtml = '<option value="all">All Sections</option>';
         this.sections.forEach(s => {
           catHtml += `<option value="${s.id}">${this.escape(s.name)}</option>`;
         });
@@ -1190,7 +1198,7 @@ const app = {
 
   filterVisitTests() {
     const query = document.getElementById('visit-test-search').value.toLowerCase();
-    const cat = document.getElementById('visit-test-category') ? document.getElementById('visit-test-category').value : 'all';
+    const cat = document.getElementById('visit-test-section') ? document.getElementById('visit-test-section').value : 'all';
     const rows = document.querySelectorAll('.visit-test-row');
     rows.forEach(row => {
       const nameMatch = row.getAttribute('data-name').includes(query);
@@ -1205,6 +1213,7 @@ const app = {
   async createVisit(pid) {
     const ward = document.getElementById('visit-ward').value;
     const clinician = document.getElementById('visit-clinician').value;
+    const orderCat = document.getElementById('visit-order-category') ? document.getElementById('visit-order-category').value : 'in-house';
     const checkboxes = document.querySelectorAll('input[name="visit-test-cb"]:checked');
     const selectedTests = Array.from(checkboxes).map(cb => parseInt(cb.value, 10));
     
@@ -1217,7 +1226,8 @@ const app = {
       const payload = {
         client_id: pid,
         ward_of_origin: ward,
-        test_ids: selectedTests
+        test_ids: selectedTests,
+        order_category: orderCat
       };
       if (clinician) payload.clinician_id = parseInt(clinician, 10);
       
