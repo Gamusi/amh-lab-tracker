@@ -2237,12 +2237,12 @@ viewReport(visitId) {
         });
 
         let tableHtml = `
-          <table class="data-table">
+          <table class="data-table" style="table-layout: auto; width: 100%;">
             <thead>
               <tr>
                 <th>Test Name</th>
-                <th style="width: 210px;">Surveillance Tracking</th>
-                <th style="width: 160px;">Actions</th>
+                <th style="white-space: nowrap;">Surveillance Tracking</th>
+                <th style="white-space: nowrap;">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -2577,8 +2577,9 @@ viewReport(visitId) {
   togglePanelGroup(panelId) {
     const rows = document.querySelectorAll(`tr[data-parent-id="${panelId}"]`);
     const btn = document.getElementById(`toggle-btn-${panelId}`);
-    const isHidden = rows.length > 0 && rows[0].style.display === 'none';
-    rows.forEach(row => { row.style.display = isHidden ? '' : 'none'; });
+    if (!rows || rows.length === 0) return;
+    const isHidden = rows[0].style.display === 'none' || getComputedStyle(rows[0]).display === 'none';
+    rows.forEach(row => { row.style.display = isHidden ? 'table-row' : 'none'; });
     if (btn) btn.textContent = isHidden ? '-' : '+';
   },
 
