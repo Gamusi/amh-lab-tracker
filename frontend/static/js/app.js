@@ -1,4 +1,4 @@
-﻿const app = {
+const app = {
   currentUser: null,
   currentView: 'clients',
   theme: null,
@@ -1262,7 +1262,7 @@
             <td style="padding:8px; border-bottom:1px solid #ddd;">${o.ordered_at}</td>
             <td style="padding:8px; border-bottom:1px solid #ddd; text-align:right;">
               <button class="btn btn-primary btn-sm" onclick="app.showEnterResultModal(${o.order_id}, ${o.test_id}, '${this.escape(o.test_name)}')">Enter Result</button>
-              <button class="btn btn-secondary btn-sm" onclick="app.removeOrder(${o.order_id})" style="display: none;">Remove</button>
+              <button class="btn btn-danger btn-sm" onclick="app.removeOrder(${o.order_id})">Remove</button>
             </td>
           </tr>
         `;
