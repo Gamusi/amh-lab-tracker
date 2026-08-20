@@ -16,3 +16,5 @@ implemented/
 scratch/
 scratch_parser.py
 fix.py
+*.db-shm
+*.db-wal
