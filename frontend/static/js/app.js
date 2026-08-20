@@ -973,15 +973,16 @@
             </div>
             <div class="form-group">
               <label>Test Category:</label>
-              <select id="visit-test-category" onchange="app.filterVisitTests()" style="width: 100%; padding: 8px; margin-bottom: 6px;">
+              <select id="visit-test-category" onchange="app.filterVisitTests()" style="width: 100%; padding: 8px;">
                 <option value="all">All Categories</option>
               </select>
             </div>
-            <div class="form-group">
-              <label>Select Test(s):</label>
-              <input type="text" id="visit-test-search" placeholder="Search tests..." onkeyup="app.filterVisitTests()" style="width: 100%; padding: 8px; margin-bottom: 8px;">
-              <div id="visit-tests-container">Loading tests...</div>
-            </div>
+          </div>
+          <div class="form-group" style="margin-bottom: 12px;">
+            <label>Select Test(s):</label>
+            <input type="text" id="visit-test-search" placeholder="Search tests..." onkeyup="app.filterVisitTests()" style="width: 100%; padding: 8px; margin-bottom: 8px; box-sizing: border-box;">
+            <div id="visit-tests-container">Loading tests...</div>
+          </div>
           </div>
           <button class="btn btn-success" style="width: 100%; padding: 10px;" onclick="app.createVisit(${pid})">${this.icon('plus')} Create Visit & Orders</button>
         </div>
