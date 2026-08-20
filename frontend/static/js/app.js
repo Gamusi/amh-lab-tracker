@@ -2241,7 +2241,6 @@ viewReport(visitId) {
             <thead>
               <tr>
                 <th>Test Name</th>
-                <th style="width: 110px;">Type</th>
                 <th style="width: 210px;">Surveillance Tracking</th>
                 <th style="width: 160px;">Actions</th>
               </tr>
@@ -2259,7 +2258,7 @@ viewReport(visitId) {
           // Section header row
           tableHtml += `
             <tr style="background-color: var(--primary-color); color: white;">
-              <td colspan="4" style="font-weight: 700; padding: 6px 12px; font-size: 0.82rem; letter-spacing: 0.06em;">
+              <td colspan="3" style="font-weight: 700; padding: 6px 12px; font-size: 0.82rem; letter-spacing: 0.06em;">
                 ${this.escape(secName.toUpperCase())}
               </td>
             </tr>
@@ -2287,7 +2286,6 @@ viewReport(visitId) {
                     onclick="app.togglePanelGroup(${parent.id})"
                   >+</button>${this.escape(parent.name)}<span style="font-size: 0.78rem; color: var(--text-muted); font-weight: 400; margin-left: 10px;">${count} parameter${count !== 1 ? 's' : ''}</span>
                 </td>
-                <td style="color: var(--text-muted); font-size: 0.8rem;">Panel</td>
                 <td>${parent.is_tracked ? 'Tracked (Positives / Findings)' : 'Standard (Done Only)'}</td>
                 <td style="color: var(--text-muted); font-size: 0.8rem;">System panel</td>
               </tr>
@@ -2297,7 +2295,6 @@ viewReport(visitId) {
               tableHtml += `
                 <tr data-parent-id="${parent.id}" style="display: none; background-color: #FAFAFA;">
                   <td style="padding-left: 40px; font-size: 0.9rem;">${this.escape(child.name)}</td>
-                  <td style="font-size: 0.8rem; color: var(--text-muted);">${this.escape(child.result_type || '')}</td>
                   <td style="font-size: 0.85rem;">${child.is_tracked ? 'Tracked (Positives / Findings)' : 'Standard (Done Only)'}</td>
                   <td>
                     <button class="btn btn-secondary" style="padding: 2px 8px; font-size: 0.8rem;" onclick="app.openTestConfigModal(${child.id})">Edit</button>
@@ -2313,7 +2310,6 @@ viewReport(visitId) {
             tableHtml += `
               <tr>
                 <td style="padding-left: 12px;"><strong>${this.escape(t.name)}</strong></td>
-                <td style="font-size: 0.8rem; color: var(--text-muted);">${this.escape(t.result_type || '')}</td>
                 <td>${t.is_tracked ? 'Tracked (Positives / Findings)' : 'Standard (Done Only)'}</td>
                 <td>
                   <button class="btn btn-secondary" style="padding: 2px 8px; font-size: 0.8rem;" onclick="app.openTestConfigModal(${t.id})">Edit</button>
