@@ -147,6 +147,7 @@ def get_connection():
         os.makedirs(db_dir, exist_ok=True)
     conn = sqlite3.connect(DB_PATH, check_same_thread=False)
     conn.execute("PRAGMA foreign_keys = ON;")
+    conn.execute("PRAGMA journal_mode = WAL;")
     logger.debug(f"Connected to database at {DB_PATH}")
     return conn
 
@@ -182,7 +183,14 @@ def init_db():
         ("test_orders", "order_category", "TEXT DEFAULT 'in-house'"),
         ("tests", "result_type", "TEXT DEFAULT 'qualitative'"),
         ("tests", "default_unit", "TEXT"),
-        ("tests", "options", "TEXT")
+        ("tests", "options", "TEXT"),
+        ("clients", "age_years", "FLOAT"),
+        ("clients", "age_category", "TEXT"),
+        ("tests", "ref_range", "TEXT"),
+        ("tests", "panic_value_low", "FLOAT"),
+        ("tests", "panic_value_high", "FLOAT"),
+        ("tests", "secondary_unit", "TEXT"),
+        ("test_results", "result_unit", "TEXT")
     ]
     for table, col, col_def in migrations:
         try:

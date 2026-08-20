@@ -1,4 +1,4 @@
-const app = {
+﻿const app = {
   currentUser: null,
   currentView: 'clients',
   theme: null,
@@ -38,6 +38,16 @@ const app = {
     await this.loadTheme();
     await this.checkAuth();
     this.setupInactivityListeners();
+    
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        const el = document.activeElement;
+        if (el && el.type === 'checkbox') {
+          e.preventDefault();
+          el.click();
+        }
+      }
+    });
   },
 
   async loadTheme() {
@@ -402,6 +412,36 @@ const app = {
     modal.style.display = 'flex';
   },
 
+  confirmAction(title, message, callback) {
+    const modal = document.getElementById('confirm-modal');
+    if (!modal) {
+      if (confirm(message)) callback();
+      return;
+    }
+    document.getElementById('confirm-title').textContent = title;
+    document.getElementById('confirm-message').textContent = message;
+    
+    const cancelBtn = document.getElementById('confirm-cancel-btn');
+    const okBtn = document.getElementById('confirm-ok-btn');
+    
+    // Remove old listeners
+    const newCancel = cancelBtn.cloneNode(true);
+    const newOk = okBtn.cloneNode(true);
+    cancelBtn.parentNode.replaceChild(newCancel, cancelBtn);
+    okBtn.parentNode.replaceChild(newOk, okBtn);
+    
+    newCancel.addEventListener('click', () => {
+      modal.style.display = 'none';
+    });
+    
+    newOk.addEventListener('click', () => {
+      modal.style.display = 'none';
+      callback();
+    });
+    
+    modal.style.display = 'flex';
+  },
+
   shiftLogDate(offsetDays) {
     const dateInput = document.getElementById('log-date');
     if (!dateInput) return;
@@ -710,7 +750,7 @@ const app = {
               <td><strong>${this.escape(t.test_name)}</strong></td>
               <td style="text-align: right;">${t.done}</td>
               <td style="text-align: center;">${t.is_tracked ? (t.positive !== null ? t.positive : 0) : 'N/A'}</td>
-              <td style="text-align: right;">${t.positivity_rate !== null ? t.positivity_rate + '%' : '—'}</td>
+              <td style="text-align: right;">${t.positivity_rate !== null ? t.positivity_rate + '%' : 'â€”'}</td>
             </tr>
           `;
         });
@@ -932,6 +972,12 @@ const app = {
               </select>
             </div>
             <div class="form-group">
+              <label>Test Category:</label>
+              <select id="visit-test-category" onchange="app.filterVisitTests()" style="width: 100%; padding: 8px; margin-bottom: 6px;">
+                <option value="all">All Categories</option>
+              </select>
+            </div>
+            <div class="form-group">
               <label>Select Test(s):</label>
               <input type="text" id="visit-test-search" placeholder="Search tests..." onkeyup="app.filterVisitTests()" style="width: 100%; padding: 8px; margin-bottom: 8px;">
               <div id="visit-tests-container">Loading tests...</div>
@@ -1097,6 +1143,12 @@ const app = {
 
   async loadTestOptionsMulti() {
     try {
+      if (!this.sections) {
+         try {
+           const sres = await fetch('/api/config/sections');
+           if (sres.ok) this.sections = await sres.json();
+         } catch(e) { this.sections = []; }
+      }
       const res = await fetch('/api/config/tests');
       if (!res.ok) throw new Error('API returned ' + res.status);
       const tests = await res.json();
@@ -1107,15 +1159,28 @@ const app = {
       if (!container) return;
       
       let html = '<div style="max-height: 150px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 4px; padding: 8px; background: #fff;">';
+      
+      const catSelect = document.getElementById('visit-test-category');
+      if (catSelect && this.sections) {
+        let catHtml = '<option value="all">All Categories</option>';
+        this.sections.forEach(s => {
+          catHtml += `<option value="${s.id}">${this.escape(s.name)}</option>`;
+        });
+        catSelect.innerHTML = catHtml;
+      }
+      
       tests.forEach(t => {
-        html += `
-          <label class="visit-test-row" data-name="${this.escape(t.name).toLowerCase()}" style="display: block; margin-bottom: 4px; cursor: pointer;">
-            <input type="checkbox" name="visit-test-cb" value="${t.id}">
-            ${this.escape(t.name)}
-          </label>
-        `;
+        if (!t.parent_rollup_id) {
+          html += `
+            <label class="visit-test-row" data-name="${this.escape(t.name).toLowerCase()}" data-category="${t.section_id}" style="display: block; margin-bottom: 4px; cursor: pointer;">
+              <input type="checkbox" name="visit-test-cb" value="${t.id}">
+              ${this.escape(t.name)}
+            </label>
+          `;
+        }
       });
       html += '</div>';
+
       container.innerHTML = html;
     } catch (e) {
       console.error('Error loading tests', e);
@@ -1124,9 +1189,12 @@ const app = {
 
   filterVisitTests() {
     const query = document.getElementById('visit-test-search').value.toLowerCase();
+    const cat = document.getElementById('visit-test-category') ? document.getElementById('visit-test-category').value : 'all';
     const rows = document.querySelectorAll('.visit-test-row');
     rows.forEach(row => {
-      if (row.getAttribute('data-name').includes(query)) {
+      const nameMatch = row.getAttribute('data-name').includes(query);
+      const catMatch = (cat === 'all' || row.getAttribute('data-category') === cat);
+      if (nameMatch && catMatch) {
         row.style.display = 'block';
       } else {
         row.style.display = 'none';
@@ -1193,7 +1261,7 @@ const app = {
             <td style="padding:8px; border-bottom:1px solid #ddd;">${o.ordered_at}</td>
             <td style="padding:8px; border-bottom:1px solid #ddd; text-align:right;">
               <button class="btn btn-primary btn-sm" onclick="app.showEnterResultModal(${o.order_id}, ${o.test_id}, '${this.escape(o.test_name)}')">Enter Result</button>
-              <button class="btn btn-secondary btn-sm" onclick="app.removeOrder(${o.order_id})" style="color: var(--danger-color); border-color: var(--danger-color); margin-left: 4px;">Remove</button>
+              <button class="btn btn-secondary btn-sm" onclick="app.removeOrder(${o.order_id})" style="display: none;">Remove</button>
             </td>
           </tr>
         `;
@@ -1221,7 +1289,11 @@ const app = {
       let html = '';
       visits.forEach(v => {
         const labNumStr = v.lab_number ? `(${this.escape(v.lab_number)})` : '(Pending Lab No)';
-        html += `<button class="btn btn-secondary btn-sm" onclick="app.viewReport(${v.visit_id})">Visit ${v.visit_id} ${labNumStr} - ${v.created_at.split(' ')[0]}</button>`;
+        html += `<div style="display: flex; gap: 4px; margin-bottom: 4px;">
+                  <button class="btn btn-secondary btn-sm" onclick="app.viewReport(${v.visit_id})">Visit ${v.visit_id} ${labNumStr} - ${v.created_at.split(' ')[0]}</button>
+                  <button class="btn btn-secondary btn-sm" onclick="app.openEditVisitModal(${v.visit_id})">Edit</button>
+                  <button class="btn btn-primary btn-sm" onclick="app.showAddTestModal(${v.visit_id})">Add Tests</button>
+                 </div>`;
       });
       container.innerHTML = html;
     } catch(e) {
@@ -1241,6 +1313,74 @@ const app = {
 
 
 
+  async openEditVisitModal(visitId) {
+    try {
+      const res = await fetch(`/api/visits/${visitId}`);
+      if (!res.ok) throw new Error('Failed to load visit details');
+      const data = await res.json();
+      
+      document.getElementById('edit-visit-id').value = visitId;
+      
+      const dobStr = data.date_of_birth;
+      let age = data.age_years || 0;
+      if (!age && dobStr) {
+        const dob = new Date(dobStr);
+        const diff = Date.now() - dob.getTime();
+        age = Math.floor(diff / (1000 * 60 * 60 * 24 * 365.25));
+      }
+      
+      document.getElementById('edit-visit-age').value = age;
+      document.getElementById('edit-visit-gender').value = data.sex || 'Male';
+      
+      const wardSelect = document.getElementById('edit-visit-ward');
+      wardSelect.innerHTML = '';
+      try {
+        const wRes = await fetch('/api/config/wards?active_only=true');
+        const wards = await wRes.json();
+        wards.forEach(w => {
+          const opt = document.createElement('option');
+          opt.value = w.name;
+          opt.textContent = w.name;
+          wardSelect.appendChild(opt);
+        });
+      } catch(e) {}
+      
+      wardSelect.value = data.ward_of_origin || '';
+      
+      document.getElementById('edit-visit-modal').style.display = 'flex';
+    } catch(e) {
+      this.showNotificationModal("Error", "Could not load visit details.", true);
+    }
+  },
+
+  async submitEditVisit(e) {
+    e.preventDefault();
+    const visitId = document.getElementById('edit-visit-id').value;
+    const age = parseFloat(document.getElementById('edit-visit-age').value);
+    const gender = document.getElementById('edit-visit-gender').value;
+    const ward = document.getElementById('edit-visit-ward').value;
+
+    try {
+      const res = await fetch(`/api/visits/${visitId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ age_years: age, sex: gender, ward_of_origin: ward })
+      });
+      if (res.ok) {
+        this.showNotificationModal("Success", "Visit details updated successfully.", false);
+        document.getElementById('edit-visit-modal').style.display = 'none';
+        if (this.currentClientId) {
+          await this.loadHistoricalVisits(this.currentClientId);
+        }
+      } else {
+        const err = await res.json();
+        this.showNotificationModal("Error", err.detail || "Failed to update visit.", true);
+      }
+    } catch(err) {
+      this.showNotificationModal("Error", "Connection error.", true);
+    }
+  },
+
   async showAddTestModal(visitId) {
     document.getElementById('add-test-visit-id').value = visitId;
     document.getElementById('add-test-search').value = '';
@@ -1258,12 +1398,14 @@ const app = {
     if (this.testCatalog) {
       let html = '';
       this.testCatalog.forEach(t => {
-        html += `
-          <label class="add-test-row" data-name="${this.escape(t.name).toLowerCase()}" style="display: block; margin-bottom: 4px; cursor: pointer;">
-            <input type="checkbox" name="add-test-cb" value="${t.id}">
-            ${this.escape(t.name)}
-          </label>
-        `;
+        if (!t.parent_rollup_id) {
+          html += `
+            <label class="add-test-row" data-name="${this.escape(t.name).toLowerCase()}" style="display: block; margin-bottom: 4px; cursor: pointer;">
+              <input type="checkbox" name="add-test-cb" value="${t.id}">
+              ${this.escape(t.name)}
+            </label>
+          `;
+        }
       });
       container.innerHTML = html;
     }
@@ -1315,21 +1457,22 @@ const app = {
 
 
   async removeOrder(orderId) {
-    if (!confirm('Are you sure you want to remove this pending test?')) return;
-    try {
-      const res = await fetch(`/api/orders/${orderId}`, { method: 'DELETE' });
-      if (res.ok) {
-        this.showNotificationModal("Success", "Test order removed.", false);
-        if (this.currentClientId) {
-          await this.loadPendingTests(this.currentClientId);
+    app.confirmAction("Confirm Removal", "Are you sure you want to remove this pending test?", async () => {
+      try {
+        const res = await fetch(`/api/orders/${orderId}`, { method: 'DELETE' });
+        if (res.ok) {
+          app.showNotificationModal("Success", "Test order removed.", false);
+          if (app.currentClientId) {
+            await app.loadPendingTests(app.currentClientId);
+          }
+        } else {
+          const err = await res.json();
+          app.showNotificationModal("Error", err.detail || "Failed to remove test order.", true);
         }
-      } else {
-        const err = await res.json();
-        this.showNotificationModal("Error", err.detail || "Failed to remove test order.", true);
+      } catch(e) {
+        app.showNotificationModal("Error", "Connection error.", true);
       }
-    } catch(e) {
-      this.showNotificationModal("Error", "Connection error.", true);
-    }
+    });
   },
 
 
@@ -1421,31 +1564,39 @@ const app = {
             }
         } else {
             // quantitative
+            let unitHtml = '';
+            if (test.default_unit && test.secondary_unit) {
+                unitHtml = `<select id="result-entry-unit" style="padding: 8px; border: 1px solid var(--border-color); border-radius: 4px;">
+                    <option value="${this.escape(test.default_unit)}">${this.escape(test.default_unit)}</option>
+                    <option value="${this.escape(test.secondary_unit)}">${this.escape(test.secondary_unit)}</option>
+                </select>`;
+            } else if (test.default_unit) {
+                unitHtml = `<span style="padding: 8px; background: var(--bg-color); border: 1px solid var(--border-color); border-radius: 4px;">${this.escape(test.default_unit)}</span>`;
+            }
             singleContainer.innerHTML = `
               <div class="form-group" style="margin-bottom: 16px;">
-                <label>Result Value ${test.default_unit ? '(' + this.escape(test.default_unit) + ')' : ''}:</label>
+                <label>Result Value:</label>
                 <div style="display: flex; gap: 8px;">
-                    <input type="number" step="any" id="result-entry-value" placeholder="Enter Value" style="flex: 1; padding: 8px;">
-                    ${test.default_unit ? `<span style="padding: 8px; background: var(--bg-color); border: 1px solid var(--border-color); border-radius: 4px;">${this.escape(test.default_unit)}</span>` : ''}
+                    <input type="number" step="any" id="result-entry-value" placeholder="Enter Value${test.ref_range ? '. Ref: ' + this.escape(test.ref_range) : ''}" style="flex: 1; padding: 8px;">
+                    ${unitHtml}
                 </div>
               </div>
             `;
         }
        
-       // Load parameters if exist
+       // Check for child tests in testCatalog
        try {
-         const res = await fetch(`/api/config/tests/${testId}/parameters`);
-         const params = res.ok ? await res.json() : [];
-         if (params && params.length > 0) {
+         const childTests = this.testCatalog.filter(t => t.parent_rollup_id === testId);
+         if (childTests && childTests.length > 0) {
            singleContainer.style.display = 'none';
            paramsContainer.style.display = 'block';
            let html = '<h5 style="color: var(--primary-color); margin-bottom: 8px;">Panel Parameters:</h5>';
-           params.forEach(p => {
+           childTests.forEach(ct => {
              html += `
-               <div style="display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 8px; align-items: center; margin-bottom: 8px;" class="modal-param-row" data-param-id="${p.id}">
-                 <div><strong style="font-size: 0.85rem;">${this.escape(p.parameter_name)}</strong></div>
-                 <div><input type="text" class="modal-param-val" placeholder="Value" style="width: 100%; padding: 4px;"></div>
-                 <div style="font-size: 0.8rem; color: var(--text-muted);">${p.ref_range ? this.escape(p.ref_range) : ''} ${p.unit ? this.escape(p.unit) : ''}</div>
+               <div style="display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 8px; align-items: center; margin-bottom: 8px;" class="modal-param-row" data-param-id="${ct.id}">
+                 <div><strong style="font-size: 0.85rem;">${this.escape(ct.name)}</strong></div>
+                 <div><input type="text" class="modal-param-val" placeholder="Enter Value${ct.ref_range ? '. Ref: ' + this.escape(ct.ref_range) : ''}" style="width: 100%; padding: 4px;"></div>
+                 <div style="font-size: 0.8rem; color: var(--text-muted);">${ct.ref_range ? this.escape(ct.ref_range) : ''} ${ct.default_unit ? this.escape(ct.default_unit) : ''}</div>
                </div>
              `;
            });
@@ -1455,7 +1606,23 @@ const app = {
     }
     document.getElementById('result-entry-modal').style.display = 'flex';
     
+    // Add keyboard navigation
     const form = document.getElementById('result-entry-form');
+    const inputs = Array.from(form.querySelectorAll('input:not([type="hidden"]), select'));
+    inputs.forEach((input, index) => {
+        input.onkeydown = (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                const nextInput = inputs[index + 1];
+                if (nextInput) {
+                    nextInput.focus();
+                } else {
+                    form.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
+                }
+            }
+        };
+    });
+    
     form.onsubmit = async (e) => {
        e.preventDefault();
        
@@ -1467,9 +1634,9 @@ const app = {
          const rows = paramsContainer.querySelectorAll('.modal-param-row');
          rows.forEach(r => {
             const pid = parseInt(r.getAttribute('data-param-id'), 10);
-            const pval = r.querySelector('.modal-param-val').value;
+            const pval = r.querySelector('.modal-param-val').value.trim();
             if (pval) {
-              paramResults.push({ parameter_id: pid, result_value: pval });
+              paramResults.push({ test_id: pid, result_value: pval });
             }
          });
        } else if (nameLower.includes('urinalysis')) {
@@ -1484,30 +1651,55 @@ const app = {
          finalVal = document.getElementById('result-entry-value').value.trim();
        }
        
+       if ((!paramResults || paramResults.length === 0) && !finalVal) {
+           app.showNotificationModal("Error", "Result cannot be empty.", true);
+           return;
+       }
+       
        try {
-         const payload = { order_id: orderId };
-         if (paramResults) {
-           payload.parameter_results = paramResults;
+         if (paramResults && paramResults.length > 0) {
+           // Multiple orders for child tests
+           for (const child of paramResults) {
+             const ordRes = await fetch('/api/clients/orders', {
+               method: 'POST',
+               headers: { 'Content-Type': 'application/json' },
+               body: JSON.stringify({ client_id: app.currentClientId, test_id: child.test_id })
+             });
+             if (ordRes.ok) {
+               const ordData = await ordRes.json();
+               await fetch('/api/clients/results', {
+                 method: 'POST',
+                 headers: { 'Content-Type': 'application/json' },
+                 body: JSON.stringify({ order_id: ordData.order_id, result_value: child.result_value })
+               });
+             }
+           }
+           // Submit dummy result for parent order to close it
+           await fetch('/api/clients/results', {
+             method: 'POST',
+             headers: { 'Content-Type': 'application/json' },
+             body: JSON.stringify({ order_id: orderId, result_value: "Panel Completed" })
+           });
          } else {
-           payload.result_value = finalVal;
+           // Single order
+           const payload = { order_id: orderId, result_value: finalVal };
+           const res = await fetch('/api/clients/results', {
+             method: 'POST',
+             headers: { 'Content-Type': 'application/json' },
+             body: JSON.stringify(payload)
+           });
+           if (!res.ok) {
+             const err = await res.json();
+             this.showNotificationModal("Error", err.detail || "Failed to save result.", true);
+             return;
+           }
          }
          
-         const res = await fetch('/api/clients/results', {
-           method: 'POST',
-           headers: { 'Content-Type': 'application/json' },
-           body: JSON.stringify(payload)
-         });
-         
-         if (res.ok) {
-           this.showNotificationModal("Success", "Result saved successfully!", false);
-           document.getElementById('result-entry-modal').style.display = 'none';
-           if (this.currentClientId) {
-              await this.loadPendingTests(this.currentClientId);
-              await this.loadHistoricalVisits(this.currentClientId);
-           }
-         } else {
-           const err = await res.json();
-           this.showNotificationModal("Error", err.detail || "Failed to save result.", true);
+         this.showNotificationModal("Success", "Result saved successfully!", false);
+         document.getElementById('result-entry-modal').style.display = 'none';
+         if (this.currentClientId) {
+            await this.loadPendingTests(this.currentClientId);
+            await this.loadHistoricalVisits(this.currentClientId);
          }
        } catch(err) {
          this.showNotificationModal("Error", "Connection error saving result.", true);
@@ -1601,32 +1793,79 @@ const app = {
     document.getElementById('new-client-modal').style.display = 'none';
   },
 
+  updateAgePlaceholder() {
+    const cat = document.getElementById('client-category').value;
+    const ageInput = document.getElementById('client-age');
+    if (!ageInput) return;
+    if (cat === 'Neonate') ageInput.placeholder = "e.g. 14/365 or 14d";
+    else if (cat === 'Infant') ageInput.placeholder = "e.g. 11/12 or 11m";
+    else if (cat === 'Toddler') ageInput.placeholder = "e.g. 1 3/12 or 2y";
+    else ageInput.placeholder = "e.g. 25, 25y";
+  },
+
   async handleRegisterClientSubmit(e) {
     e.preventDefault();
     const pname = document.getElementById('client-name').value.trim();
     const psex = document.getElementById('client-sex').value;
+    const pcategory = document.getElementById('client-category').value;
+    const pageStr = document.getElementById('client-age').value.trim();
     const pphone = document.getElementById('client-phone').value.trim();
     
-    if (!pname) return;
+    if (!pname || !pageStr) return;
     
-    const pnum = 'AMH-C' + Math.floor(1000 + Math.random() * 9000);
+    // Strict Age Validation
+    let ageYrs = 0;
+    const lowerAge = pageStr.toLowerCase().replace(/ /g, '');
+    if (lowerAge.includes('d') || lowerAge.includes('/365')) {
+       ageYrs = parseInt(lowerAge) / 365.25;
+    } else if (lowerAge.includes('m') || lowerAge.includes('/12')) {
+       // Support '1 3/12' format by checking if there's a space? We stripped spaces.
+       // It's safer to just parse the first number if it's '11m'.
+       const parts = pageStr.split(' ');
+       if (parts.length > 1 && parts[1].includes('/12')) {
+          ageYrs = parseInt(parts[0]) + (parseInt(parts[1]) / 12);
+       } else {
+          ageYrs = parseInt(lowerAge) / 12;
+       }
+    } else {
+       ageYrs = parseFloat(lowerAge);
+    }
+    
+    if (isNaN(ageYrs)) {
+        app.showNotificationModal("Error", "Invalid age format.", true);
+        return;
+    }
+    
+    let isValid = true;
+    if (pcategory === 'Neonate' && ageYrs > 0.0768) isValid = false;
+    else if (pcategory === 'Infant' && (ageYrs <= 0.0768 || ageYrs > 1)) isValid = false;
+    else if (pcategory === 'Toddler' && (ageYrs <= 1 || ageYrs > 3)) isValid = false;
+    else if (pcategory === 'Child' && (ageYrs <= 3 || ageYrs > 14)) isValid = false;
+    else if (pcategory === 'Adult' && ageYrs < 15) isValid = false;
+
+    if (!isValid) {
+      app.showNotificationModal("Error", "Age does not match selected category.", true);
+      return;
+    }
     
     try {
       const res = await fetch('/api/clients', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          client_number: pnum,
           full_name: pname,
           sex: psex,
+          age_category: pcategory,
+          age_string: pageStr,
           phone: pphone
         })
       });
 
       if (res.ok) {
-        this.showNotificationModal("Success", `Client registered successfully! Assigned ID: ${pnum}`, false);
-        this.closeNewClientModal();
-        this.searchClients('');
+        const data = await res.json();
+        app.showNotificationModal("Success", `Client registered successfully! Assigned ID: ${data.client_number}`, false);
+        app.closeNewClientModal();
+        app.searchClients('');
       } else {
         this.showNotificationModal("Error", 'Error registering client.', true);
       }
@@ -1646,7 +1885,7 @@ const app = {
           <span class="card-title">${this.icon('settings')} Test Catalog & Section Configuration</span>
         </summary>
         <div style="padding: 16px;">
-          <button class="btn btn-primary" onclick="app.showAddTestModal()" style="margin-bottom: 12px;">${this.icon('plus')} Add New Test</button>
+          <button class="btn btn-primary" onclick="app.openTestConfigModal()" style="margin-bottom: 12px;">${this.icon('plus')} Add New Test</button>
           <div id="config-table-container">
             <p style="color: var(--text-muted);">Loading configuration...</p>
           </div>
@@ -1717,7 +1956,10 @@ const app = {
             <td>${w.is_active ? '<span style="color:green;">Active</span>' : '<span style="color:red;">Inactive</span>'}</td>
             <td>
               <button class="btn btn-secondary" style="padding: 2px 8px; font-size: 0.8rem;" onclick="app.editWard(${w.id}, '${this.escape(w.name)}', ${w.is_active})">Edit</button>
-              ${w.is_active ? `<button class="btn btn-secondary" style="padding: 2px 8px; font-size: 0.8rem; color: var(--danger-color);" onclick="app.deleteWard(${w.id})">Deactivate</button>` : ''}
+              ${w.is_active
+                ? `<button class="btn btn-secondary" style="padding: 2px 8px; font-size: 0.8rem; color: var(--danger-color);" onclick="app.deleteWard(${w.id})">Deactivate</button>`
+                : `<button class="btn btn-secondary" style="padding: 2px 8px; font-size: 0.8rem; color: green;" onclick="app.reactivateWard(${w.id})">Reactivate</button>`
+              }
             </td>
           </tr>
         `;
@@ -1732,36 +1974,76 @@ const app = {
   },
 
   async showAddWardModal() {
-    const name = prompt("Enter Ward Name:");
-    if (!name) return;
-    try {
-      await fetch('/api/config/wards', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: name.trim() })
-      });
-      this.loadWardsConfig();
-    } catch(e) { console.error(e); }
+    document.getElementById('ward-modal-title').textContent = 'Add Ward';
+    document.getElementById('ward-modal-id').value = '';
+    document.getElementById('ward-modal-active').value = '1';
+    document.getElementById('ward-modal-name').value = '';
+    document.getElementById('ward-modal').style.display = 'flex';
+    document.getElementById('ward-modal-name').focus();
   },
 
   async editWard(id, oldName, isActive) {
-    const name = prompt("Edit Ward Name:", oldName);
+    document.getElementById('ward-modal-title').textContent = 'Edit Ward';
+    document.getElementById('ward-modal-id').value = id;
+    document.getElementById('ward-modal-active').value = isActive ? '1' : '0';
+    document.getElementById('ward-modal-name').value = oldName;
+    document.getElementById('ward-modal').style.display = 'flex';
+    document.getElementById('ward-modal-name').focus();
+  },
+
+  async submitWardModal(e) {
+    e.preventDefault();
+    const id = document.getElementById('ward-modal-id').value;
+    const name = document.getElementById('ward-modal-name').value.trim();
+    const isActive = document.getElementById('ward-modal-active').value === '1';
     if (!name) return;
     try {
-      await fetch(`/api/config/wards/${id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: name.trim(), is_active: isActive })
-      });
-      this.loadWardsConfig();
+      let res;
+      if (id) {
+        res = await fetch(`/api/config/wards/${id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, is_active: isActive })
+        });
+      } else {
+        res = await fetch('/api/config/wards', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name })
+        });
+      }
+      if (res.ok) {
+        document.getElementById('ward-modal').style.display = 'none';
+        this.loadWardsConfig();
+      } else {
+        const err = await res.json();
+        this.showNotificationModal("Error", err.detail || "Failed to save ward.", true);
+      }
     } catch(e) { console.error(e); }
   },
 
   async deleteWard(id) {
-    if(!confirm("Are you sure you want to deactivate this ward?")) return;
+    app.confirmAction("Confirm Deactivation", "Are you sure you want to deactivate this ward?", async () => {
+      try {
+        await fetch(`/api/config/wards/${id}`, { method: 'DELETE' });
+        app.loadWardsConfig();
+      } catch(e) { console.error(e); }
+    });
+  },
+
+  async reactivateWard(id) {
     try {
-      await fetch(`/api/config/wards/${id}`, { method: 'DELETE' });
-      this.loadWardsConfig();
+      const res = await fetch(`/api/config/wards/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ is_active: true })
+      });
+      if (res.ok) {
+        this.loadWardsConfig();
+      } else {
+        const err = await res.json();
+        this.showNotificationModal("Error", err.detail || "Failed to reactivate ward.", true);
+      }
     } catch(e) { console.error(e); }
   },
 
@@ -1784,30 +2066,62 @@ const app = {
           <thead><tr><th>Clinician Name</th><th>Status</th></tr></thead>
           <tbody>${rows}</tbody>
         </table>
-        <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 8px;">(Note: Clinicians are currently automatically tracked via Orders, but can be viewed here).</p>
       `;
     } catch(e) { console.error(e); }
   },
   
-  async showAddClinicianModal() {
-     alert("Currently, new clinicians are added by simply typing their name in the Create Visit form. The backend will automatically track them.");
+  showAddClinicianModal() {
+    document.getElementById('clinician-modal-name').value = '';
+    document.getElementById('clinician-modal').style.display = 'flex';
+  },
+
+  async submitClinicianModal(event) {
+    event.preventDefault();
+    const name = document.getElementById('clinician-modal-name').value;
+    try {
+      const res = await fetch('/api/config/clinicians', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: name, is_active: true })
+      });
+      if (res.ok) {
+        document.getElementById('clinician-modal').style.display = 'none';
+        app.loadCliniciansConfig();
+      } else {
+        const err = await res.json();
+        app.showNotificationModal("Error", err.detail || "Failed to add clinician.", true);
+      }
+    } catch(e) { console.error(e); }
   },
 
   async loadConfigData() {
     try {
-      // 1. Load test catalog
+      // 1. Load sections first so we can display names
+      if (!this.sections) {
+        try {
+          const secRes = await fetch('/api/config/sections');
+          if (secRes.ok) this.sections = await secRes.json();
+          else this.sections = [];
+        } catch(e) { this.sections = []; }
+      }
+      const sectionMap = {};
+      (this.sections || []).forEach(s => { sectionMap[s.id] = s.name; });
+
+      // 2. Load test catalog
       const res = await fetch('/api/config/tests');
       if (res.ok) {
         const tests = await res.json();
+        this.testCatalog = tests;
         let rows = '';
         tests.forEach(t => {
+          const secName = sectionMap[t.section_id] || `Section ${t.section_id}`;
           rows += `
               <tr>
                 <td><strong>${this.escape(t.name)}</strong></td>
-                <td>Section ${t.section_id}</td>
+                <td>${this.escape(secName)}</td>
                 <td>${t.is_tracked ? 'Tracked (Positive Checked)' : 'Standard (Done Only)'}</td>
                 <td>
-                  <button class="btn btn-secondary" style="padding: 2px 8px; font-size: 0.8rem;" onclick="app.openTestConfigModal(${this.escape(JSON.stringify(t))})">Edit</button>
+                  <button class="btn btn-secondary" style="padding: 2px 8px; font-size: 0.8rem;" onclick="app.openTestConfigModal(${t.id})">Edit</button>
                   <button class="btn btn-secondary" style="padding: 2px 8px; font-size: 0.8rem; color: var(--danger-color);" onclick="app.deleteTest(${t.id})">Delete</button>
                 </td>
               </tr>
@@ -1820,7 +2134,7 @@ const app = {
               <thead>
                 <tr>
                   <th>Test Name</th>
-                  <th>Section ID</th>
+                  <th>Section</th>
                   <th>Surveillance Tracking</th>
                   <th>Actions</th>
                 </tr>
@@ -1833,13 +2147,13 @@ const app = {
         }
       }
 
-      // 2. Load clinicians config
+      // 3. Load clinicians config
       await this.loadCliniciansConfig();
 
-      // 3. Load wards config
+      // 4. Load wards config
       await this.loadWardsConfig();
 
-      // 4. Load user management for admin/superadmin
+      // 5. Load user management for admin/superadmin
       if (this.currentUser && (this.currentUser.role === 'admin' || this.currentUser.role === 'superadmin')) {
         const userRes = await fetch('/api/auth/users');
         if (userRes.ok) {
@@ -1857,7 +2171,7 @@ const app = {
             } else {
               let pendingRows = '';
               pendingUsers.forEach(u => {
-                const formattedDate = u.created_at ? u.created_at.replace('T', ' ').substring(0, 19) : '—';
+                const formattedDate = u.created_at ? u.created_at.replace('T', ' ').substring(0, 19) : 'â€”';
                 pendingRows += `
                   <tr>
                     <td><strong>${this.escape(u.full_name)}</strong></td>
@@ -1983,25 +2297,27 @@ const app = {
   },
 
   async rejectUser(userId, username) {
-    if (!confirm(`Are you sure you want to reject and delete the registration for '${username}'?`)) return;
-    try {
-      const res = await fetch(`/api/auth/users/${userId}`, { method: 'DELETE' });
-      if (res.ok) {
-        this.showNotificationModal("Success", `Registration for '${username}' rejected and removed.`, false);
-        await this.loadConfigData();
-      } else {
-        const err = await res.json();
-        this.showNotificationModal("Error", err.detail || 'Failed to reject registration.', true);
+    app.confirmAction("Reject User", `Are you sure you want to reject and delete the registration for '${username}'?`, async () => {
+      try {
+        const res = await fetch(`/api/auth/users/${userId}`, { method: 'DELETE' });
+        if (res.ok) {
+          app.showNotificationModal("Success", `Registration for '${username}' rejected and removed.`, false);
+          await app.loadConfigData();
+        } else {
+          const err = await res.json();
+          app.showNotificationModal("Error", err.detail || 'Failed to reject registration.', true);
+        }
+      } catch (e) {
+        app.showNotificationModal("Error", 'Connection error rejecting registration.', true);
       }
-    } catch (e) {
-      this.showNotificationModal("Error", 'Connection error rejecting registration.', true);
-    }
+    });
   },
 
   async deactivateUser(userId, role, cadre) {
-    if (!confirm('Are you sure you want to deactivate this account?')) return;
-    await this.saveUserUpdate(userId, { role: role, cadre: cadre || null, is_active: false });
-    this.showNotificationModal("Success", 'User account deactivated.', false);
+    app.confirmAction("Deactivate User", "Are you sure you want to deactivate this account?", async () => {
+      await app.saveUserUpdate(userId, { role: role, cadre: cadre || null, is_active: false });
+      app.showNotificationModal("Success", 'User account deactivated.', false);
+    });
   },
 
   async changeUserFields(userId, isActive) {
@@ -2013,15 +2329,48 @@ const app = {
     this.showNotificationModal("Success", 'User details updated successfully.', false);
   },
 
-  async promptResetPassword(userId, username, role, cadre) {
-    const tempPw = prompt(`Enter a new temporary password for user '${username}' (minimum 4 characters):`);
-    if (tempPw === null) return; // user clicked Cancel
-    if (tempPw.trim().length < 4) {
-      this.showNotificationModal("Error", 'Password must be at least 4 characters long.', true);
+  promptAction(title, message, callback) {
+    const modal = document.getElementById('prompt-modal');
+    if (!modal) {
+      const result = prompt(message);
+      if (result !== null) callback(result);
       return;
     }
-    await this.saveUserUpdate(userId, { role: role, cadre: cadre || null, is_active: true, password: tempPw.trim() });
-    this.showNotificationModal("Success", `Password reset for '${username}'. User will be required to change it on next login.`, false);
+    document.getElementById('prompt-title').textContent = title;
+    document.getElementById('prompt-message').textContent = message;
+    const input = document.getElementById('prompt-input');
+    input.value = '';
+    
+    const cancelBtn = document.getElementById('prompt-cancel-btn');
+    const okBtn = document.getElementById('prompt-ok-btn');
+    
+    const newCancel = cancelBtn.cloneNode(true);
+    const newOk = okBtn.cloneNode(true);
+    cancelBtn.parentNode.replaceChild(newCancel, cancelBtn);
+    okBtn.parentNode.replaceChild(newOk, okBtn);
+    
+    newCancel.addEventListener('click', () => {
+      modal.style.display = 'none';
+    });
+    
+    newOk.addEventListener('click', () => {
+      modal.style.display = 'none';
+      callback(input.value);
+    });
+    
+    modal.style.display = 'flex';
+    input.focus();
+  },
+
+  async promptResetPassword(userId, username, role, cadre) {
+    app.promptAction("Reset Password", `Enter a new temporary password for user '${username}' (minimum 4 characters):`, async (tempPw) => {
+      if (tempPw.trim().length < 4) {
+        app.showNotificationModal("Error", 'Password must be at least 4 characters long.', true);
+        return;
+      }
+      await app.saveUserUpdate(userId, { role: role, cadre: cadre || null, is_active: true, password: tempPw.trim() });
+      app.showNotificationModal("Success", `Password reset for '${username}'. User will be required to change it on next login.`, false);
+    });
   },
 
   async saveUserUpdate(userId, updateBody) {
@@ -2046,44 +2395,22 @@ const app = {
     }
   },
 
-  async showAddTestModal() {
-    const name = prompt('Enter Test Name:');
-    if (!name) return;
-    const secStr = prompt('Enter Section ID (1-8):', '1');
-    if (!secStr) return;
-    const isTracked = confirm('Enable Surveillance Tracking (Positives) for this test?');
-
-    try {
-      const res = await fetch('/api/config/tests', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: name.trim(),
-          section_id: parseInt(secStr, 10),
-          is_tracked: isTracked,
-          sort_order: 0
-        })
-      });
-      if (res.ok) {
-        this.showNotificationModal("Success", 'Test added successfully!', false);
-        this.loadConfigData();
-      } else {
-        const err = await res.json();
-        this.showNotificationModal("Error", err.detail || 'Failed to add test.', true);
-      }
-    } catch (e) {
-      this.showNotificationModal("Error", 'Connection error.', true);
-    }
-  },
-
-
-  
-  async openTestConfigModal(testRaw = null) {
+  async openTestConfigModal(testId = null) {
+    // If editing, look up the test object from testCatalog (already loaded) or fetch it
     let test = null;
-    if (typeof testRaw === 'string') {
-        try { test = JSON.parse(testRaw); } catch(e){}
-    } else if (testRaw) {
-        test = testRaw;
+    if (testId !== null) {
+      if (this.testCatalog && this.testCatalog.length > 0) {
+        test = this.testCatalog.find(t => t.id === testId) || null;
+      }
+      if (!test) {
+        try {
+          const res = await fetch('/api/config/tests');
+          if (res.ok) {
+            this.testCatalog = await res.json();
+            test = this.testCatalog.find(t => t.id === testId) || null;
+          }
+        } catch(e) {}
+      }
     }
     
     // Load sections if not loaded
@@ -2112,8 +2439,12 @@ const app = {
       document.getElementById('test-config-section').value = test.section_id;
       document.getElementById('test-config-result-type').value = test.result_type || 'qualitative';
       document.getElementById('test-config-unit').value = test.default_unit || '';
-      document.getElementById('test-config-options').value = test.options ? JSON.parse(test.options).join(', ') : '';
-      document.getElementById('test-config-tracked').checked = test.is_tracked;
+      try {
+        document.getElementById('test-config-options').value = test.options ? JSON.parse(test.options).join(', ') : '';
+      } catch(e) {
+        document.getElementById('test-config-options').value = '';
+      }
+      document.getElementById('test-config-tracked').checked = !!test.is_tracked;
     } else {
       document.getElementById('test-config-title').textContent = 'Add New Test';
       document.getElementById('test-config-id').value = '';
@@ -2191,49 +2522,21 @@ const app = {
       this.showNotificationModal("Error", 'Connection error.', true);
     }
   },
-async editTest(testId, oldName, oldSection, oldTracked) {
-    const name = prompt('Edit Test Name:', oldName);
-    if (!name) return;
-    const secStr = prompt('Edit Section ID (1-8):', oldSection);
-    if (!secStr) return;
-    const isTracked = confirm('Enable Surveillance Tracking (Positives) for this test? (OK for Yes, Cancel for No)');
-
-    try {
-      const res = await fetch(`/api/config/tests/${testId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: name.trim(),
-          section_id: parseInt(secStr, 10),
-          is_tracked: isTracked,
-          sort_order: 0
-        })
-      });
-      if (res.ok) {
-        this.showNotificationModal("Success", 'Test updated successfully!', false);
-        this.loadConfigData();
-      } else {
-        const err = await res.json();
-        this.showNotificationModal("Error", err.detail || 'Failed to update test.', true);
-      }
-    } catch (e) {
-      this.showNotificationModal("Error", 'Connection error.', true);
-    }
-  },
 
   async deleteTest(testId) {
-    if (!confirm('Are you sure you want to deactivate/delete this test from the catalog?')) return;
-    try {
-      const res = await fetch(`/api/config/tests/${testId}`, { method: 'DELETE' });
-      if (res.ok) {
-        this.showNotificationModal("Success", 'Test removed from catalog.', false);
-        this.loadConfigData();
-      } else {
-        this.showNotificationModal("Error", 'Failed to delete test.', true);
+    app.confirmAction("Confirm Deletion", "Are you sure you want to deactivate/delete this test from the catalog?", async () => {
+      try {
+        const res = await fetch(`/api/config/tests/${testId}`, { method: 'DELETE' });
+        if (res.ok) {
+          app.showNotificationModal("Success", 'Test removed from catalog.', false);
+          app.loadConfigData();
+        } else {
+          app.showNotificationModal("Error", 'Failed to delete test.', true);
+        }
+      } catch (e) {
+        app.showNotificationModal("Error", 'Connection error.', true);
       }
-    } catch (e) {
-      this.showNotificationModal("Error", 'Connection error.', true);
-	}	
+    });
    },
 
   async renderAuditLog(container) {

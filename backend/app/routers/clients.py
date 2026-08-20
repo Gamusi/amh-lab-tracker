@@ -11,11 +11,16 @@ logger = logging.getLogger("amh_clients")
 
 router = APIRouter(tags=["Clients, Visits & Clinicians"])
 
+class VisitEdit(BaseModel):
+    age_years: float
+    sex: str
+    ward_of_origin: str
+
 class ClientCreate(BaseModel):
-    client_number: str
+    client_number: Optional[str] = None
     full_name: str
-    age_years: Optional[int] = None
-    date_of_birth: Optional[str] = None
+    age_string: str
+    age_category: str
     sex: str # Male / Female
     phone: Optional[str] = None
 
@@ -49,24 +54,60 @@ def list_clients(query: Optional[str] = None, conn: sqlite3.Connection = Depends
     logger.info(f"Returned {len(results)} clients")
     return results
 
+import re
+
+def parse_age_string(s: str) -> float:
+    if not s: return 0.0
+    s = s.lower().strip()
+    if "/365" in s:
+        try: return float(s.replace("/365", "").strip()) / 365.0
+        except ValueError: pass
+    if "/12" in s:
+        parts = s.split()
+        if len(parts) == 2:
+            try: return float(parts[0]) + (float(parts[1].replace("/12", "")) / 12.0)
+            except ValueError: pass
+        else:
+            try: return float(s.replace("/12", "").strip()) / 12.0
+            except ValueError: pass
+    if s.endswith("d"):
+        try: return float(s.replace("d", "").strip()) / 365.0
+        except ValueError: pass
+    if s.endswith("m"):
+        try: return float(s.replace("m", "").strip()) / 12.0
+        except ValueError: pass
+    m = re.match(r"(\d+)y\s+(\d+)m", s)
+    if m:
+        return float(m.group(1)) + (float(m.group(2)) / 12.0)
+    try: return float(s.replace("y", "").strip())
+    except ValueError: return 0.0
+
 @router.post("/api/clients")
 def create_client(req: ClientCreate, conn: sqlite3.Connection = Depends(get_db), current_user: dict = Depends(get_current_user)):
-    logger.info(f"User '{current_user['username']}' is creating client: '{req.full_name}' ({req.client_number})")
+    logger.info(f"User '{current_user['username']}' is creating client: '{req.full_name}'")
     cur = conn.cursor()
-    cur.execute("SELECT id FROM clients WHERE client_number = ?", (req.client_number,))
-    if cur.fetchone():
-        logger.warning(f"Client creation failed: client number '{req.client_number}' already exists")
-        raise HTTPException(status_code=400, detail="Client number already exists")
+    
+    parsed_age = parse_age_string(req.age_string)
+
+    today = datetime.date.today()
+    yy_str = today.strftime("%y")
+    seq_name = f"client_number_{yy_str}"
+    cur.execute("INSERT OR IGNORE INTO sequence_tracker (seq_name, last_value) VALUES (?, 0)", (seq_name,))
+    cur.execute("UPDATE sequence_tracker SET last_value = last_value + 1 WHERE seq_name = ?", (seq_name,))
+    cur.execute("SELECT last_value FROM sequence_tracker WHERE seq_name = ?", (seq_name,))
+    seq_row = cur.fetchone()
+    seq_val = seq_row["last_value"] if seq_row else 1
+    generated_client_number = f"AMH-C{yy_str}-{seq_val:04d}"
     
     cur.execute("""
-        INSERT INTO clients (client_number, full_name, date_of_birth, sex, phone)
-        VALUES (?, ?, ?, ?, ?)
-    """, (req.client_number, req.full_name, req.date_of_birth, req.sex, req.phone))
+        INSERT INTO clients (client_number, full_name, age_years, age_category, sex, phone)
+        VALUES (?, ?, ?, ?, ?, ?)
+    """, (generated_client_number, req.full_name, parsed_age, req.age_category, req.sex, req.phone))
     
     pid = cur.lastrowid
     conn.commit()
-    logger.info(f"Client created successfully: ID {pid}")
-    return {"status": "created", "client_id": pid}
+    logger.info(f"Client created successfully: ID {pid}, Client Number {generated_client_number}")
+    return {"status": "created", "client_id": pid, "client_number": generated_client_number}
 
 @router.post("/api/visits")
 def create_visit(req: VisitCreate, conn: sqlite3.Connection = Depends(get_db), current_user: dict = Depends(get_current_user)):
@@ -108,6 +149,27 @@ def create_visit(req: VisitCreate, conn: sqlite3.Connection = Depends(get_db), c
     conn.commit()
     logger.info(f"Visit created successfully: visit_id={visit_id}")
     return {"status": "created", "visit_id": visit_id}
+
+@router.put("/api/visits/{visit_id}")
+def update_visit(visit_id: int, req: VisitEdit, conn: sqlite3.Connection = Depends(get_db), current_user: dict = Depends(get_current_user)):
+    logger.info(f"User '{current_user['username']}' is updating visit ID {visit_id}")
+    cur = conn.cursor()
+    
+    cur.execute("SELECT client_id FROM visits WHERE id = ?", (visit_id,))
+    row = cur.fetchone()
+    if not row:
+        raise HTTPException(status_code=404, detail="Visit not found")
+        
+    client_id = row["client_id"]
+    
+    # Update visit
+    cur.execute("UPDATE visits SET ward_of_origin = ? WHERE id = ?", (req.ward_of_origin, visit_id))
+    
+    # Update client age and sex
+    cur.execute("UPDATE clients SET age_years = ?, sex = ? WHERE id = ?", (req.age_years, req.sex, client_id))
+    
+    conn.commit()
+    return {"status": "updated", "visit_id": visit_id}
 
 @router.post("/api/visits/{visit_id}/orders")
 def add_orders_to_visit(visit_id: int, req: AddOrdersRequest, conn: sqlite3.Connection = Depends(get_db), current_user: dict = Depends(get_current_user)):
@@ -368,14 +430,17 @@ def enter_result(req: TestResultCreate, conn: sqlite3.Connection = Depends(get_d
         v_row = cur.fetchone()
         if v_row:
             if not v_row["lab_number"]:
-                ym_str = datetime.date.today().strftime("%y-%m")
-                seq_name = f"lab_number_{ym_str.replace('-', '_')}"
+                today = datetime.date.today()
+                yy_str = today.strftime("%y")
+                m_str = str(today.month)  # Non-zero-padded month (e.g. 8 not 08)
+                ym_key = f"{yy_str}_{m_str}"
+                seq_name = f"lab_number_{ym_key}"
                 cur.execute("INSERT OR IGNORE INTO sequence_tracker (seq_name, last_value) VALUES (?, 0)", (seq_name,))
                 cur.execute("UPDATE sequence_tracker SET last_value = last_value + 1 WHERE seq_name = ?", (seq_name,))
                 cur.execute("SELECT last_value FROM sequence_tracker WHERE seq_name = ?", (seq_name,))
                 seq_row = cur.fetchone()
                 seq_val = seq_row["last_value"] if seq_row else 1
-                assigned_lab_number = f"amh-{ym_str}-{seq_val}"
+                assigned_lab_number = f"AMH-{yy_str}-{m_str}-{seq_val:03d}"
                 cur.execute("UPDATE visits SET lab_number = ? WHERE id = ?", (assigned_lab_number, visit_id))
             else:
                 assigned_lab_number = v_row["lab_number"]
@@ -478,7 +543,7 @@ def get_visit_details(visit_id: int, conn: sqlite3.Connection = Depends(get_db),
     cur.execute("""
         SELECT 
             v.id as visit_id, v.ward_of_origin, v.lab_number, v.created_at,
-            c.id as client_id, c.client_number, c.full_name, c.date_of_birth, c.sex, c.phone,
+            c.id as client_id, c.client_number, c.full_name, c.date_of_birth, c.age_years, c.sex, c.phone,
             cl.id as clinician_id, cl.name as clinician_name
         FROM visits v
         JOIN clients c ON v.client_id = c.id

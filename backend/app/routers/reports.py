@@ -191,6 +191,29 @@ def create_pdf_report(
     pdf_bytes = generate_pdf(request.order_data, request.results_data)
     return Response(content=pdf_bytes, media_type="application/pdf")
 
+def _compute_flag(val_str, ref_str):
+    if not val_str or not ref_str: return ""
+    try:
+        val = float(val_str)
+        ref = ref_str.replace(" ", "")
+        if '-' in ref:
+            min_v, max_v = map(float, ref.split('-'))
+            if val < min_v: return 'Low'
+            if val > max_v: return 'High'
+        elif '>=' in ref:
+            if val < float(ref.replace('>=', '')): return 'Low'
+        elif '<=' in ref:
+            if val > float(ref.replace('<=', '')): return 'High'
+        elif '>' in ref:
+            if val <= float(ref.replace('>', '')): return 'Low'
+        elif '<' in ref:
+            if val >= float(ref.replace('<', '')): return 'High'
+    except Exception:
+        if isinstance(val_str, str) and isinstance(ref_str, str):
+            if val_str.strip().lower() != ref_str.strip().lower() and "negative" in ref_str.lower():
+                return "Abnormal"
+    return ""
+
 @router.get("/visit/{visit_id}/pdf")
 def get_visit_report_pdf(visit_id: int, db: sqlite3.Connection = Depends(get_db), current_user: dict = Depends(get_current_user)):
     cur = db.cursor()
@@ -224,6 +247,8 @@ def get_visit_report_pdf(visit_id: int, db: sqlite3.Connection = Depends(get_db)
         SELECT 
             t.name AS test_name, 
             tr.result_value, 
+            t.ref_range,
+            t.default_unit,
             s.name AS section_name, 
             to_ord.ordered_at, 
             tr.entered_at,
@@ -231,17 +256,20 @@ def get_visit_report_pdf(visit_id: int, db: sqlite3.Connection = Depends(get_db)
             u_ord.full_name AS ordered_by_name,
             u_ver.full_name AS verified_by_name
         FROM test_orders to_ord
-        JOIN test_results tr ON tr.order_id = to_ord.id
+        LEFT JOIN test_results tr ON tr.order_id = to_ord.id
         JOIN tests t ON to_ord.test_id = t.id
         JOIN sections s ON t.section_id = s.id
         LEFT JOIN users u_enter ON tr.entered_by_user_id = u_enter.id
         LEFT JOIN users u_ord ON to_ord.ordered_by_user_id = u_ord.id
         LEFT JOIN users u_ver ON tr.verified_by_user_id = u_ver.id
-        WHERE to_ord.visit_id = ? AND to_ord.status != 'cancelled'
+        WHERE to_ord.visit_id = ? AND to_ord.status = 'completed' AND tr.result_value IS NOT NULL
         ORDER BY s.sort_order, t.sort_order, tr.id
     """, (visit_id,))
     
     rows = cur.fetchall()
+    
+    if not rows:
+        raise HTTPException(status_code=400, detail="No completed test results found for this visit. Enter results before printing.")
     
     results_by_section = {}
     ordered_date = None
@@ -252,9 +280,7 @@ def get_visit_report_pdf(visit_id: int, db: sqlite3.Connection = Depends(get_db)
         test_name = row["test_name"]
         result_value = row["result_value"]
         section_name = row["section_name"]
-        entry_at_str = row["entered_at"] or row["ordered_at"]
-        entry_date = datetime.datetime.strptime(entry_at_str[:10], "%Y-%m-%d").date() if entry_at_str else datetime.date.today()
-        
+            
         if not ordered_date and row["ordered_at"]:
             ordered_date = row["ordered_at"][:10]
         if not technician_name:
@@ -262,17 +288,12 @@ def get_visit_report_pdf(visit_id: int, db: sqlite3.Connection = Depends(get_db)
         if not verified_by and row["verified_by_name"]:
             verified_by = row["verified_by_name"]
             
-        if dob:
-            eval_dict = evaluator.evaluate_result(test_name, result_value, dob, sex, entry_date)
-        else:
-            eval_dict = {"unit": None, "reference": None, "flag": None, "is_abnormal": False}
-            
         test_data = {
             "test_name": test_name,
             "result": result_value,
-            "unit": eval_dict["unit"] or "",
-            "reference": eval_dict["reference"] or "",
-            "flag": eval_dict["flag"] or ""
+            "unit": row["default_unit"] or "",
+            "reference": row["ref_range"] or "",
+            "flag": _compute_flag(result_value, row["ref_range"])
         }
         
         if section_name not in results_by_section:
