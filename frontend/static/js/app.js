@@ -1300,11 +1300,13 @@ const app = {
       let html = '';
       visits.forEach(v => {
         const labNumStr = v.lab_number ? `(${this.escape(v.lab_number)})` : '(Pending Lab No)';
-        html += `<div style="display: flex; gap: 4px; margin-bottom: 4px;">
-                  <button class="btn btn-secondary btn-sm" onclick="app.viewReport(${v.visit_id})">Visit ${v.visit_id} ${labNumStr} - ${v.created_at.split(' ')[0]}</button>
+        const isAdmin = this.currentUser && (this.currentUser.role === 'admin' || this.currentUser.role === 'superadmin');
+        const gridCols = isAdmin ? '2fr 1fr 1fr 1fr' : '2fr 1fr 1fr';
+        html += `<div style="display: grid; grid-template-columns: ${gridCols}; gap: 8px; margin-bottom: 8px; max-width: 600px;">
+                  <button class="btn btn-secondary btn-sm" style="text-align: left;" onclick="app.viewReport(${v.visit_id})">Visit ${v.visit_id} ${labNumStr} - ${v.created_at.split(' ')[0]}</button>
                   <button class="btn btn-secondary btn-sm" onclick="app.openEditVisitModal(${v.visit_id})">Edit</button>
                   <button class="btn btn-primary btn-sm" onclick="app.showAddTestModal(${v.visit_id})">Add Tests</button>
-                  ${app.currentUser && app.currentUser.role === 'admin' ? `<button class="btn btn-danger btn-sm" onclick="app.deleteVisit(${v.visit_id})">Delete</button>` : ''}
+                  ${isAdmin ? `<button class="btn btn-danger btn-sm" onclick="app.deleteVisit(${v.visit_id})">Delete</button>` : ''}
                  </div>`;
       });
       container.innerHTML = html;

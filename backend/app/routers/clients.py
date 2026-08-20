@@ -587,7 +587,7 @@ def get_visit_details(visit_id: int, conn: sqlite3.Connection = Depends(get_db),
 
 @router.delete("/api/visits/{visit_id}")
 def delete_visit(visit_id: int, conn: sqlite3.Connection = Depends(get_db), current_user: dict = Depends(get_current_user)):
-    if current_user["role"] != "admin":
+    if current_user["role"] not in ["admin", "superadmin"]:
         raise HTTPException(status_code=403, detail="Only admins can delete visits")
         
     logger.info(f"Admin '{current_user['username']}' is deleting visit ID {visit_id}")
