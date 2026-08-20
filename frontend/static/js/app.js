@@ -482,9 +482,10 @@ const app = {
         </div>
 
         <div id="daily-summary-container" style="background: var(--bg-color); padding: 12px; margin-bottom: 20px; border-radius: 6px; display: flex; gap: 32px; border: 1px solid var(--border-color);">
-          <div><strong>Total Tests:</strong> <span id="summary-total">0</span></div>
-          <div><strong>Pending:</strong> <span id="summary-pending">0</span></div>
-          <div><strong>Completed:</strong> <span id="summary-completed">0</span></div>
+          <div><strong>Tests Done:</strong> <span id="summary-done">0</span></div>
+          <div><strong>Tracked Findings:</strong> <span id="summary-pos">0</span></div>
+          <div><strong>Pending Orders:</strong> <span id="summary-pending">0</span></div>
+          <div><strong>Completed Orders:</strong> <span id="summary-completed">0</span></div>
         </div>
 
         <div id="daily-sections-container">
@@ -501,10 +502,18 @@ const app = {
       if (!res.ok) throw new Error('API returned ' + res.status);
       const data = await res.json();
       
+      if (data.today_check) {
+        const doneEl = document.getElementById('summary-done');
+        const posEl = document.getElementById('summary-pos');
+        if (doneEl) doneEl.textContent = data.today_check.total_done;
+        if (posEl) posEl.textContent = data.today_check.total_positive;
+      }
+
       if (data.order_summary) {
-        document.getElementById('summary-total').textContent = data.order_summary.total;
-        document.getElementById('summary-pending').textContent = data.order_summary.pending;
-        document.getElementById('summary-completed').textContent = data.order_summary.completed;
+        const pendEl = document.getElementById('summary-pending');
+        const compEl = document.getElementById('summary-completed');
+        if (pendEl) pendEl.textContent = data.order_summary.pending;
+        if (compEl) compEl.textContent = data.order_summary.completed;
       }
 
       const secContainer = document.getElementById('daily-sections-container');
@@ -512,22 +521,42 @@ const app = {
 
       data.sections.forEach(sec => {
         let rowsHtml = '';
+        let secDone = 0;
+        let secPos = 0;
+
         sec.tests.forEach(t => {
-          const posCell = t.is_tracked 
-            ? `<input type="number" class="test-pos-input" data-test-id="${t.test_id}" min="0" value="${t.positive !== null ? t.positive : ''}" oninput="app.updateSectionSubtotals()">`
-            : `N/A`;
+          const done = t.done || 0;
+          const pos = (t.positive !== null && t.positive !== undefined) ? t.positive : null;
+          
+          secDone += done;
+          if (pos !== null) {
+            secPos += pos;
+          }
+
+          let rateStr = '-';
+          if (t.is_tracked && done > 0 && pos !== null) {
+            rateStr = ((pos / done) * 100).toFixed(1) + '%';
+          }
+
+          const posDisplay = t.is_tracked 
+            ? (pos !== null ? pos : 0)
+            : 'N/A';
 
           rowsHtml += `
             <tr>
               <td><strong>${this.escape(t.test_name)}</strong></td>
               <td>${t.is_tracked ? 'Tracked' : 'Standard'}</td>
-              <td style="text-align: right;">
-                <input type="number" class="test-done-input" data-test-id="${t.test_id}" min="0" value="${t.done || ''}" oninput="app.updateSectionSubtotals()">
-              </td>
-              <td style="text-align: center;">${posCell}</td>
+              <td style="text-align: right; font-weight: 500;">${done}</td>
+              <td style="text-align: center; font-weight: 500;">${posDisplay}</td>
+              <td style="text-align: right; color: var(--text-muted);">${rateStr}</td>
             </tr>
           `;
         });
+
+        let secRateStr = '-';
+        if (secDone > 0 && secPos > 0) {
+          secRateStr = ((secPos / secDone) * 100).toFixed(1) + '%';
+        }
 
         secContainer.innerHTML += `
           <div style="margin-bottom: 24px;">
@@ -538,9 +567,10 @@ const app = {
               <thead>
                 <tr>
                   <th>Test Name</th>
-                  <th style="width: 120px;">Surveillance</th>
-                  <th style="width: 140px; text-align: right;">Done Count</th>
-                  <th style="width: 140px; text-align: center;">Positive Count</th>
+                  <th style="width: 110px;">Surveillance</th>
+                  <th style="width: 120px; text-align: right;">Done Count</th>
+                  <th style="width: 160px; text-align: center;">Tracked Findings</th>
+                  <th style="width: 130px; text-align: right;">Incidence Rate</th>
                 </tr>
               </thead>
               <tbody>
@@ -549,75 +579,18 @@ const app = {
               <tfoot>
                 <tr style="background-color: #F8FAFC; font-weight: 700;">
                   <td colspan="2">Subtotal &mdash; ${this.escape(sec.section_name)}</td>
-                  <td style="text-align: right;" id="sec-subtotal-done-${sec.section_id}">0</td>
-                  <td style="text-align: center;" id="sec-subtotal-pos-${sec.section_id}">0</td>
+                  <td style="text-align: right;">${secDone}</td>
+                  <td style="text-align: center;">${secPos}</td>
+                  <td style="text-align: right;">${secRateStr}</td>
                 </tr>
               </tfoot>
             </table>
           </div>
         `;
       });
-
-      this.updateSectionSubtotals();
-      this.setupKeyboardNavigation();
     } catch (e) {
       console.error('Error loading daily log:', e);
     }
-  },
-
-  setupKeyboardNavigation() {
-    const inputs = Array.from(document.querySelectorAll('.test-done-input, .test-pos-input'));
-    inputs.forEach(input => {
-      input.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' || e.key === 'ArrowDown') {
-          e.preventDefault();
-          const isPos = input.classList.contains('test-pos-input');
-          const selector = isPos ? '.test-pos-input' : '.test-done-input';
-          const colInputs = Array.from(document.querySelectorAll(selector));
-          const idx = colInputs.indexOf(input);
-          if (idx >= 0 && idx < colInputs.length - 1) {
-            colInputs[idx + 1].focus();
-            colInputs[idx + 1].select();
-          }
-        } else if (e.key === 'ArrowUp') {
-          e.preventDefault();
-          const isPos = input.classList.contains('test-pos-input');
-          const selector = isPos ? '.test-pos-input' : '.test-done-input';
-          const colInputs = Array.from(document.querySelectorAll(selector));
-          const idx = colInputs.indexOf(input);
-          if (idx > 0) {
-            colInputs[idx - 1].focus();
-            colInputs[idx - 1].select();
-          }
-        }
-      });
-    });
-  },
-
-  updateSectionSubtotals() {
-    // Calculate per-section subtotals
-    document.querySelectorAll('table.data-table[data-section-id]').forEach(table => {
-      const secId = table.getAttribute('data-section-id');
-      let secDone = 0;
-      let secPos = 0;
-
-      table.querySelectorAll('.test-done-input').forEach(inp => {
-        const v = parseInt(inp.value, 10);
-        if (!isNaN(v) && v > 0) {
-          secDone += v;
-        }
-      });
-
-      table.querySelectorAll('.test-pos-input').forEach(inp => {
-        const v = parseInt(inp.value, 10);
-        if (!isNaN(v) && v > 0) secPos += v;
-      });
-
-      const secDoneEl = document.getElementById(`sec-subtotal-done-${secId}`);
-      const secPosEl = document.getElementById(`sec-subtotal-pos-${secId}`);
-      if (secDoneEl) secDoneEl.textContent = secDone;
-      if (secPosEl) secPosEl.textContent = secPos;
-    });
   },
 
   async saveDailyLogData() {
@@ -2251,7 +2224,7 @@ viewReport(visitId) {
               <tr>
                 <td><strong>${this.escape(t.name)}</strong></td>
                 <td>${this.escape(secName)}</td>
-                <td>${t.is_tracked ? 'Tracked (Positive Checked)' : 'Standard (Done Only)'}</td>
+                <td>${t.is_tracked ? 'Tracked (Positives / Findings)' : 'Standard (Done Only)'}</td>
                 <td>
                   <button class="btn btn-secondary" style="padding: 2px 8px; font-size: 0.8rem;" onclick="app.openTestConfigModal(${t.id})">Edit</button>
                   <button class="btn btn-secondary" style="padding: 2px 8px; font-size: 0.8rem; color: var(--danger-color);" onclick="app.deleteTest(${t.id})">Delete</button>
@@ -2583,7 +2556,7 @@ viewReport(visitId) {
       document.getElementById('test-config-result-type').value = 'qualitative';
       document.getElementById('test-config-unit').value = '';
       document.getElementById('test-config-options').value = '';
-      document.getElementById('test-config-tracked').checked = false;
+      document.getElementById('test-config-tracked').checked = true;
     }
     this.handleTestResultTypeChange();
     modal.style.display = 'flex';
@@ -2598,15 +2571,23 @@ viewReport(visitId) {
     const rType = document.getElementById('test-config-result-type').value;
     const unitGroup = document.getElementById('test-config-unit-group');
     const optionsGroup = document.getElementById('test-config-options-group');
+    const trackedCheckbox = document.getElementById('test-config-tracked');
+    const isNew = !document.getElementById('test-config-id').value;
     
     if (rType === 'quantitative') {
       unitGroup.style.display = 'block';
       optionsGroup.style.display = 'none';
       document.getElementById('test-config-options').value = '';
+      if (isNew) {
+        trackedCheckbox.checked = false;
+      }
     } else if (rType === 'qualitative' || rType === 'semi_quantitative') {
       unitGroup.style.display = 'none';
       optionsGroup.style.display = 'block';
       document.getElementById('test-config-unit').value = '';
+      if (isNew) {
+        trackedCheckbox.checked = true;
+      }
     }
   },
 

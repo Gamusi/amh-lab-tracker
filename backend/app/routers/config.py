@@ -33,9 +33,14 @@ def create_test(req: TestCreate, admin_user: dict = Depends(require_admin), conn
     if not cur.fetchone():
         raise HTTPException(status_code=400, detail="Invalid section ID")
     
+    if req.is_tracked is None:
+        effective_tracked = 1 if req.result_type in ("qualitative", "semi_quantitative", "options", "panel") else 0
+    else:
+        effective_tracked = 1 if req.is_tracked else 0
+
     cur.execute(
         "INSERT INTO tests (name, section_id, is_tracked, sort_order, result_type, default_unit, options) VALUES (?, ?, ?, ?, ?, ?, ?)",
-        (req.name, req.section_id, 1 if req.is_tracked else 0, req.sort_order, req.result_type, req.default_unit, req.options)
+        (req.name, req.section_id, effective_tracked, req.sort_order, req.result_type, req.default_unit, req.options)
     )
     tid = cur.lastrowid
     conn.commit()
@@ -43,7 +48,7 @@ def create_test(req: TestCreate, admin_user: dict = Depends(require_admin), conn
     conn.execute("INSERT INTO audit_log (user_id, action, detail) VALUES (?, ?, ?)", (admin_user["id"], "create_test", f"Created test '{req.name}'"))
     conn.commit()
     
-    return {"id": tid, "name": req.name, "section_id": req.section_id, "is_tracked": req.is_tracked, "result_type": req.result_type, "default_unit": req.default_unit, "options": req.options}
+    return {"id": tid, "name": req.name, "section_id": req.section_id, "is_tracked": bool(effective_tracked), "result_type": req.result_type, "default_unit": req.default_unit, "options": req.options}
     
 
 @router.put("/tests/{test_id}", response_model=TestResponse)
@@ -53,16 +58,21 @@ def update_test(test_id: int, req: TestCreate, conn: sqlite3.Connection = Depend
     if not cur.fetchone():
         raise HTTPException(status_code=404, detail="Test not found")
         
+    if req.is_tracked is None:
+        effective_tracked = 1 if req.result_type in ("qualitative", "semi_quantitative", "options", "panel") else 0
+    else:
+        effective_tracked = 1 if req.is_tracked else 0
+
     cur.execute("""
         UPDATE tests
         SET name = ?, section_id = ?, is_tracked = ?, result_type = ?, default_unit = ?, options = ?
         WHERE id = ?
-    """, (req.name, req.section_id, 1 if req.is_tracked else 0, req.result_type, req.default_unit, req.options, test_id))
+    """, (req.name, req.section_id, effective_tracked, req.result_type, req.default_unit, req.options, test_id))
     
     conn.commit()
     return TestResponse(
         id=test_id, name=req.name, section_id=req.section_id, 
-        is_tracked=req.is_tracked, sort_order=req.sort_order, is_active=True,
+        is_tracked=bool(effective_tracked), sort_order=req.sort_order, is_active=True,
         result_type=req.result_type, default_unit=req.default_unit, options=req.options
     )
 

@@ -39,7 +39,7 @@ class SectionResponse(BaseModel):
 class TestBase(BaseModel):
     name: str
     section_id: int
-    is_tracked: bool = False
+    is_tracked: Optional[bool] = None
     sort_order: int = 0
     result_type: str = "qualitative"
     default_unit: Optional[str] = None
