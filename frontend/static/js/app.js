@@ -1670,11 +1670,23 @@ viewReport(visitId) {
            paramsContainer.style.display = 'block';
            let html = '<h5 style="color: var(--primary-color); margin-bottom: 8px;">Panel Parameters:</h5>';
            childTests.forEach(ct => {
+             let unitDisplay = '';
+             if (ct.default_unit && ct.secondary_unit) {
+               unitDisplay = `<select class="modal-param-unit" style="padding: 2px 4px; font-size: 0.8rem; border: 1px solid var(--border-color); border-radius: 4px;">
+                 <option value="${this.escape(ct.default_unit)}">${this.escape(ct.default_unit)}</option>
+                 <option value="${this.escape(ct.secondary_unit)}">${this.escape(ct.secondary_unit)}</option>
+               </select>`;
+             } else if (ct.default_unit) {
+               unitDisplay = `<span class="modal-param-unit" data-unit="${this.escape(ct.default_unit)}" style="font-size: 0.8rem; color: var(--text-muted);">${this.escape(ct.default_unit)}</span>`;
+             }
              html += `
-               <div style="display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 8px; align-items: center; margin-bottom: 8px;" class="modal-param-row" data-param-id="${ct.id}">
+               <div style="display: grid; grid-template-columns: 2fr 1.2fr 1fr; gap: 8px; align-items: center; margin-bottom: 8px;" class="modal-param-row" data-param-id="${ct.id}">
                  <div><strong style="font-size: 0.85rem;">${this.escape(ct.name)}</strong></div>
                  <div><input type="text" class="modal-param-val" placeholder="Enter Value${ct.ref_range ? '. Ref: ' + this.escape(ct.ref_range) : ''}" style="width: 100%; padding: 4px;"></div>
-                 <div style="font-size: 0.8rem; color: var(--text-muted);">${ct.ref_range ? this.escape(ct.ref_range) : ''} ${ct.default_unit ? this.escape(ct.default_unit) : ''}</div>
+                 <div style="display: flex; gap: 4px; align-items: center;">
+                   ${unitDisplay}
+                   ${ct.ref_range ? `<span style="font-size: 0.75rem; color: var(--text-muted);">(${this.escape(ct.ref_range)})</span>` : ''}
+                 </div>
                </div>
              `;
            });
@@ -1713,8 +1725,13 @@ viewReport(visitId) {
          rows.forEach(r => {
             const pid = parseInt(r.getAttribute('data-param-id'), 10);
             const pval = r.querySelector('.modal-param-val').value.trim();
+            const uElem = r.querySelector('.modal-param-unit');
+            let punit = null;
+            if (uElem) {
+              punit = uElem.tagName === 'SELECT' ? uElem.value : (uElem.getAttribute('data-unit') || uElem.textContent.trim());
+            }
             if (pval) {
-              paramResults.push({ test_id: pid, result_value: pval });
+              paramResults.push({ test_id: pid, result_value: pval, result_unit: punit });
             }
          });
        } else if (nameLower.includes('urinalysis')) {
@@ -1748,7 +1765,7 @@ viewReport(visitId) {
                await fetch('/api/clients/results', {
                  method: 'POST',
                  headers: { 'Content-Type': 'application/json' },
-                 body: JSON.stringify({ order_id: ordData.order_id, result_value: child.result_value })
+                 body: JSON.stringify({ order_id: ordData.order_id, result_value: child.result_value, result_unit: child.result_unit })
                });
              }
            }
@@ -2664,21 +2681,37 @@ viewReport(visitId) {
   handleTestResultTypeChange() {
     const rType = document.getElementById('test-config-result-type').value;
     const unitGroup = document.getElementById('test-config-unit-group');
+    const unitInput = document.getElementById('test-config-unit');
+    const unitLabel = document.getElementById('test-config-unit-label');
     const optionsGroup = document.getElementById('test-config-options-group');
     const trackedCheckbox = document.getElementById('test-config-tracked');
     const isNew = !document.getElementById('test-config-id').value;
     
     if (rType === 'quantitative') {
       unitGroup.style.display = 'block';
+      if (unitLabel) unitLabel.textContent = 'Reporting Unit (Required):';
+      if (unitInput) unitInput.required = true;
       optionsGroup.style.display = 'none';
       document.getElementById('test-config-options').value = '';
       if (isNew) {
         trackedCheckbox.checked = false;
       }
-    } else if (rType === 'qualitative' || rType === 'semi_quantitative') {
-      unitGroup.style.display = 'none';
+    } else if (rType === 'semi_quantitative') {
+      unitGroup.style.display = 'block';
+      if (unitLabel) unitLabel.textContent = 'Reporting Unit (Optional):';
+      if (unitInput) unitInput.required = false;
       optionsGroup.style.display = 'block';
-      document.getElementById('test-config-unit').value = '';
+      if (isNew) {
+        trackedCheckbox.checked = true;
+      }
+    } else {
+      // qualitative / options
+      unitGroup.style.display = 'none';
+      if (unitInput) {
+        unitInput.required = false;
+        unitInput.value = '';
+      }
+      optionsGroup.style.display = 'block';
       if (isNew) {
         trackedCheckbox.checked = true;
       }
@@ -2687,7 +2720,7 @@ viewReport(visitId) {
 
   async saveTestConfig() {
     const id = document.getElementById('test-config-id').value;
-    const name = document.getElementById('test-config-name').value;
+    const name = document.getElementById('test-config-name').value.trim();
     const section_id = parseInt(document.getElementById('test-config-section').value, 10);
     const result_type = document.getElementById('test-config-result-type').value;
     const default_unit = document.getElementById('test-config-unit').value.trim() || null;
@@ -2695,6 +2728,11 @@ viewReport(visitId) {
     const is_tracked = document.getElementById('test-config-tracked').checked;
     const parentRaw = document.getElementById('test-config-parent') ? document.getElementById('test-config-parent').value : '';
     const parent_rollup_id = parentRaw ? parseInt(parentRaw, 10) : null;
+
+    if (result_type === 'quantitative' && !default_unit) {
+      this.showNotificationModal("Validation Error", "Reporting unit is required for quantitative tests.", true);
+      return;
+    }
     
     let options = null;
     if (optionsRaw.trim() && (result_type === 'qualitative' || result_type === 'semi_quantitative')) {

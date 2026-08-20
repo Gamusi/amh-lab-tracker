@@ -5,7 +5,7 @@ from .database import get_connection, init_db
 # Auto-generated from amh-comprehensive-test-reporting-specifications.md
 SECTIONS = ['Hematology', 'Serology & Clinical Immunology', 'Clinical Biochemistry', 'Urinalysis Profile', 'Parasitology & Stool Diagnostics', 'Microbiology & Tuberculosis', 'Blood Transfusion & Immunohematology']
 
-PANELS = {'Complete Blood Count (CBC)': ['Total WBC Count (White Blood Cells)', 'Red Blood Cells (RBC)', 'Hemoglobin (Hb)', 'Hematocrit (HCT)', 'Mean Cell Volume (MCV)', 'Mean Cell Hb (MCH)', 'Mean Cell Hb Conc (MCHC)', 'Platelets Count (PLT)', 'Neutrophils (%) \\[Relative Count\\]', 'Lymphocytes (%) \\[Relative Count\\]', 'Monocytes (%) \\[Relative Count\\]', 'Eosinophils (%) \\[Relative Count\\]', 'Basophils (%) \\[Relative Count\\]', 'Neutrophils (Absolute Count)', 'Lymphocytes (Absolute Count)', 'Monocytes (Absolute Count)', 'Eosinophils (Absolute Count)', 'Basophils (Absolute Count)', 'RBC Distribution Width (RDW)', 'Thrombocrit (PCT)', 'Mean Platelet Volume (MPV)', 'PLT Distribution Width (PDW)'], 'LFTS': ['ALT / SGPT (Alanine Aminotransferase)', 'AST / SGOT (Aspartate Aminotransferase)', 'Alkaline Phosphatase (ALP)', 'Total Bilirubin', 'Direct Bilirubin', 'Total Protein', 'Serum Albumin', 'Gamma-Glutamyl Transferase (GGT)', 'Total Cholesterol'], 'RFTS': ['Serum Urea', 'Serum Creatinine', 'Serum Uric Acid'], 'CARDIAC': ['Troponin I (cTnI)', 'Troponin T (cTnT)', 'CK-MB (Creatine Kinase-MB)', 'BNP / NT-proBNP', 'D-Dimer', 'LDH (Lactate Dehydrogenase)'], 'ELECTROLYTES': ['Serum Potassium (K+)', 'Serum Sodium (Na+)', 'Serum Chloride (Cl-)', 'Bicarbonate (HCO3-)'], 'URINALYSIS': ['Macroscopy (Physical Profile)', 'Specific Gravity (S.G)', 'PH', 'Proteins (Albuminuria Screening)', 'Glucose (Glucosuria Screening)', 'Bilirubin (Bilirubinuria)', 'Urobilinogen', 'Ketones (Ketonuria)', 'Blood (Hematuria/Hemoglobinuria)', 'Nitrates (Nitrite Screening)', 'Leukocytes (Leukocyte Esterase)', 'Microscopy (Sediment Cytology)'], 'STOOL ANALYSIS': ['Stool Analysis (Macroscopy)', 'Stool Analysis (Microscopy)', 'Stool Occult Blood'], 'HIV (MoH Three-Test Algorithm)': ['Determine', 'Stat-Pak', 'SD Bioline']}
+PANELS = {'Complete Blood Count (CBC)': ['Total WBC Count (White Blood Cells)', 'Red Blood Cells (RBC)', 'Hemoglobin (Hb)', 'Hematocrit (HCT)', 'Mean Cell Volume (MCV)', 'Mean Cell Hb (MCH)', 'Mean Cell Hb Conc (MCHC)', 'Platelets Count (PLT)', 'Neutrophils (%) [Relative Count]', 'Lymphocytes (%) [Relative Count]', 'Monocytes (%) [Relative Count]', 'Eosinophils (%) [Relative Count]', 'Basophils (%) [Relative Count]', 'Neutrophils (Absolute Count)', 'Lymphocytes (Absolute Count)', 'Monocytes (Absolute Count)', 'Eosinophils (Absolute Count)', 'Basophils (Absolute Count)', 'RBC Distribution Width (RDW)', 'Thrombocrit (PCT)', 'Mean Platelet Volume (MPV)', 'PLT Distribution Width (PDW)'], 'LFTS': ['ALT / SGPT (Alanine Aminotransferase)', 'AST / SGOT (Aspartate Aminotransferase)', 'Alkaline Phosphatase (ALP)', 'Total Bilirubin', 'Direct Bilirubin', 'Total Protein', 'Serum Albumin', 'Gamma-Glutamyl Transferase (GGT)', 'Total Cholesterol'], 'RFTS': ['Serum Urea', 'Serum Creatinine', 'Serum Uric Acid'], 'CARDIAC': ['Troponin I (cTnI)', 'Troponin T (cTnT)', 'CK-MB (Creatine Kinase-MB)', 'BNP / NT-proBNP', 'D-Dimer', 'LDH (Lactate Dehydrogenase)'], 'ELECTROLYTES': ['Serum Potassium (K+)', 'Serum Sodium (Na+)', 'Serum Chloride (Cl-)', 'Bicarbonate (HCO3-)'], 'URINALYSIS': ['Macroscopy (Physical Profile)', 'Specific Gravity (S.G)', 'PH', 'Proteins (Albuminuria Screening)', 'Glucose (Glucosuria Screening)', 'Bilirubin (Bilirubinuria)', 'Urobilinogen', 'Ketones (Ketonuria)', 'Blood (Hematuria/Hemoglobinuria)', 'Nitrates (Nitrite Screening)', 'Leukocytes (Leukocyte Esterase)', 'Microscopy (Sediment Cytology)'], 'STOOL ANALYSIS': ['Stool Analysis (Macroscopy)', 'Stool Analysis (Microscopy)', 'Stool Occult Blood'], 'HIV Testing Service': ['Determine', 'Stat-Pak', 'SD Bioline']}
 
 TESTS = [
     {'name': 'Complete Blood Count (CBC)', 'section': 'Hematology', 'is_tracked': 1, 'result_type': 'panel', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': None, 'parent_name': None, 'sort_order': 0},
@@ -15,7 +15,7 @@ TESTS = [
     {'name': 'ELECTROLYTES', 'section': 'Clinical Biochemistry', 'is_tracked': 0, 'result_type': 'panel', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': None, 'parent_name': None, 'sort_order': 0},
     {'name': 'URINALYSIS', 'section': 'Urinalysis Profile', 'is_tracked': 1, 'result_type': 'panel', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': None, 'parent_name': None, 'sort_order': 0},
     {'name': 'STOOL ANALYSIS', 'section': 'Parasitology & Stool Diagnostics', 'is_tracked': 1, 'result_type': 'panel', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': None, 'parent_name': None, 'sort_order': 0},
-    {'name': 'HIV (MoH Three-Test Algorithm)', 'section': 'Serology & Clinical Immunology', 'is_tracked': 1, 'result_type': 'panel', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': None, 'parent_name': None, 'sort_order': 0},
+    {'name': 'HIV Testing Service', 'section': 'Serology & Clinical Immunology', 'is_tracked': 1, 'result_type': 'panel', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': None, 'parent_name': None, 'sort_order': 0},
     {'name': 'E.S.R (Erythrocyte Sedimentation Rate)', 'section': 'Hematology', 'is_tracked': 0, 'result_type': 'quantitative', 'default_unit': 'mm/hour', 'secondary_unit': None, 'ref_range': None, 'options': None, 'parent_name': None, 'sort_order': 0},
     {'name': 'Aptt (Activated Partial Thromboplastin Time)', 'section': 'Hematology', 'is_tracked': 0, 'result_type': 'quantitative', 'default_unit': 'Seconds', 'secondary_unit': None, 'ref_range': None, 'options': None, 'parent_name': None, 'sort_order': 0},
     {'name': 'Prothrombin Time (PT)', 'section': 'Hematology', 'is_tracked': 0, 'result_type': 'quantitative', 'default_unit': 'Seconds', 'secondary_unit': None, 'ref_range': None, 'options': None, 'parent_name': None, 'sort_order': 0},
@@ -55,15 +55,15 @@ TESTS = [
     {'name': 'Red Blood Cells (RBC)', 'section': 'Hematology', 'is_tracked': 0, 'result_type': 'quantitative', 'default_unit': '10⁶/µL', 'secondary_unit': '10¹²/L', 'ref_range': None, 'options': None, 'parent_name': 'Complete Blood Count (CBC)', 'sort_order': 2},
     {'name': 'Hemoglobin (Hb)', 'section': 'Hematology', 'is_tracked': 0, 'result_type': 'quantitative', 'default_unit': 'g/dL', 'secondary_unit': None, 'ref_range': None, 'options': None, 'parent_name': 'Complete Blood Count (CBC)', 'sort_order': 3},
     {'name': 'Hematocrit (HCT)', 'section': 'Hematology', 'is_tracked': 0, 'result_type': 'quantitative', 'default_unit': '%', 'secondary_unit': None, 'ref_range': None, 'options': None, 'parent_name': 'Complete Blood Count (CBC)', 'sort_order': 4},
-    {'name': 'Mean Cell Volume (MCV)', 'section': 'Hematology', 'is_tracked': 0, 'result_type': 'quantitative', 'default_unit': 'fL (Femtoliters)', 'secondary_unit': None, 'ref_range': None, 'options': None, 'parent_name': 'Complete Blood Count (CBC)', 'sort_order': 5},
-    {'name': 'Mean Cell Hb (MCH)', 'section': 'Hematology', 'is_tracked': 0, 'result_type': 'quantitative', 'default_unit': 'pg (Picograms)', 'secondary_unit': None, 'ref_range': None, 'options': None, 'parent_name': 'Complete Blood Count (CBC)', 'sort_order': 6},
+    {'name': 'Mean Cell Volume (MCV)', 'section': 'Hematology', 'is_tracked': 0, 'result_type': 'quantitative', 'default_unit': 'fL', 'secondary_unit': None, 'ref_range': None, 'options': None, 'parent_name': 'Complete Blood Count (CBC)', 'sort_order': 5},
+    {'name': 'Mean Cell Hb (MCH)', 'section': 'Hematology', 'is_tracked': 0, 'result_type': 'quantitative', 'default_unit': 'pg', 'secondary_unit': None, 'ref_range': None, 'options': None, 'parent_name': 'Complete Blood Count (CBC)', 'sort_order': 6},
     {'name': 'Mean Cell Hb Conc (MCHC)', 'section': 'Hematology', 'is_tracked': 0, 'result_type': 'quantitative', 'default_unit': 'g/dL', 'secondary_unit': None, 'ref_range': None, 'options': None, 'parent_name': 'Complete Blood Count (CBC)', 'sort_order': 7},
     {'name': 'Platelets Count (PLT)', 'section': 'Hematology', 'is_tracked': 0, 'result_type': 'quantitative', 'default_unit': '10³/µL', 'secondary_unit': '10⁹/L', 'ref_range': None, 'options': None, 'parent_name': 'Complete Blood Count (CBC)', 'sort_order': 8},
-    {'name': 'Neutrophils (%) \\[Relative Count\\]', 'section': 'Hematology', 'is_tracked': 0, 'result_type': 'quantitative', 'default_unit': '%', 'secondary_unit': None, 'ref_range': None, 'options': None, 'parent_name': 'Complete Blood Count (CBC)', 'sort_order': 9},
-    {'name': 'Lymphocytes (%) \\[Relative Count\\]', 'section': 'Hematology', 'is_tracked': 0, 'result_type': 'quantitative', 'default_unit': '%', 'secondary_unit': None, 'ref_range': None, 'options': None, 'parent_name': 'Complete Blood Count (CBC)', 'sort_order': 10},
-    {'name': 'Monocytes (%) \\[Relative Count\\]', 'section': 'Hematology', 'is_tracked': 0, 'result_type': 'quantitative', 'default_unit': '%', 'secondary_unit': None, 'ref_range': None, 'options': None, 'parent_name': 'Complete Blood Count (CBC)', 'sort_order': 11},
-    {'name': 'Eosinophils (%) \\[Relative Count\\]', 'section': 'Hematology', 'is_tracked': 0, 'result_type': 'quantitative', 'default_unit': '%', 'secondary_unit': None, 'ref_range': None, 'options': None, 'parent_name': 'Complete Blood Count (CBC)', 'sort_order': 12},
-    {'name': 'Basophils (%) \\[Relative Count\\]', 'section': 'Hematology', 'is_tracked': 0, 'result_type': 'quantitative', 'default_unit': '%', 'secondary_unit': None, 'ref_range': None, 'options': None, 'parent_name': 'Complete Blood Count (CBC)', 'sort_order': 13},
+    {'name': 'Neutrophils (%) [Relative Count]', 'section': 'Hematology', 'is_tracked': 0, 'result_type': 'quantitative', 'default_unit': '%', 'secondary_unit': None, 'ref_range': None, 'options': None, 'parent_name': 'Complete Blood Count (CBC)', 'sort_order': 9},
+    {'name': 'Lymphocytes (%) [Relative Count]', 'section': 'Hematology', 'is_tracked': 0, 'result_type': 'quantitative', 'default_unit': '%', 'secondary_unit': None, 'ref_range': None, 'options': None, 'parent_name': 'Complete Blood Count (CBC)', 'sort_order': 10},
+    {'name': 'Monocytes (%) [Relative Count]', 'section': 'Hematology', 'is_tracked': 0, 'result_type': 'quantitative', 'default_unit': '%', 'secondary_unit': None, 'ref_range': None, 'options': None, 'parent_name': 'Complete Blood Count (CBC)', 'sort_order': 11},
+    {'name': 'Eosinophils (%) [Relative Count]', 'section': 'Hematology', 'is_tracked': 0, 'result_type': 'quantitative', 'default_unit': '%', 'secondary_unit': None, 'ref_range': None, 'options': None, 'parent_name': 'Complete Blood Count (CBC)', 'sort_order': 12},
+    {'name': 'Basophils (%) [Relative Count]', 'section': 'Hematology', 'is_tracked': 0, 'result_type': 'quantitative', 'default_unit': '%', 'secondary_unit': None, 'ref_range': None, 'options': None, 'parent_name': 'Complete Blood Count (CBC)', 'sort_order': 13},
     {'name': 'Neutrophils (Absolute Count)', 'section': 'Hematology', 'is_tracked': 0, 'result_type': 'quantitative', 'default_unit': '10⁹/µL', 'secondary_unit': '10⁹/L', 'ref_range': None, 'options': None, 'parent_name': 'Complete Blood Count (CBC)', 'sort_order': 14},
     {'name': 'Lymphocytes (Absolute Count)', 'section': 'Hematology', 'is_tracked': 0, 'result_type': 'quantitative', 'default_unit': '10⁹/µL', 'secondary_unit': None, 'ref_range': None, 'options': None, 'parent_name': 'Complete Blood Count (CBC)', 'sort_order': 15},
     {'name': 'Monocytes (Absolute Count)', 'section': 'Hematology', 'is_tracked': 0, 'result_type': 'quantitative', 'default_unit': '10⁹/µL', 'secondary_unit': None, 'ref_range': None, 'options': None, 'parent_name': 'Complete Blood Count (CBC)', 'sort_order': 16},
@@ -71,9 +71,9 @@ TESTS = [
     {'name': 'Basophils (Absolute Count)', 'section': 'Hematology', 'is_tracked': 0, 'result_type': 'quantitative', 'default_unit': '10⁹/µL', 'secondary_unit': None, 'ref_range': None, 'options': None, 'parent_name': 'Complete Blood Count (CBC)', 'sort_order': 18},
     {'name': 'RBC Distribution Width (RDW)', 'section': 'Hematology', 'is_tracked': 0, 'result_type': 'quantitative', 'default_unit': '%', 'secondary_unit': None, 'ref_range': None, 'options': None, 'parent_name': 'Complete Blood Count (CBC)', 'sort_order': 19},
     {'name': 'Thrombocrit (PCT)', 'section': 'Hematology', 'is_tracked': 0, 'result_type': 'quantitative', 'default_unit': '%', 'secondary_unit': None, 'ref_range': None, 'options': None, 'parent_name': 'Complete Blood Count (CBC)', 'sort_order': 20},
-    {'name': 'Mean Platelet Volume (MPV)', 'section': 'Hematology', 'is_tracked': 0, 'result_type': 'quantitative', 'default_unit': 'fL (Femtoliters)', 'secondary_unit': None, 'ref_range': None, 'options': None, 'parent_name': 'Complete Blood Count (CBC)', 'sort_order': 21},
+    {'name': 'Mean Platelet Volume (MPV)', 'section': 'Hematology', 'is_tracked': 0, 'result_type': 'quantitative', 'default_unit': 'fL', 'secondary_unit': None, 'ref_range': None, 'options': None, 'parent_name': 'Complete Blood Count (CBC)', 'sort_order': 21},
     {'name': 'PLT Distribution Width (PDW)', 'section': 'Hematology', 'is_tracked': 0, 'result_type': 'quantitative', 'default_unit': '%', 'secondary_unit': None, 'ref_range': None, 'options': None, 'parent_name': 'Complete Blood Count (CBC)', 'sort_order': 22},
-    {'name': 'ALT / SGPT (Alanine Aminotransferase)', 'section': 'Clinical Biochemistry', 'is_tracked': 0, 'result_type': 'quantitative', 'default_unit': 'U/L (Units per Liter)', 'secondary_unit': None, 'ref_range': None, 'options': None, 'parent_name': 'LFTS', 'sort_order': 1},
+    {'name': 'ALT / SGPT (Alanine Aminotransferase)', 'section': 'Clinical Biochemistry', 'is_tracked': 0, 'result_type': 'quantitative', 'default_unit': 'U/L', 'secondary_unit': None, 'ref_range': None, 'options': None, 'parent_name': 'LFTS', 'sort_order': 1},
     {'name': 'AST / SGOT (Aspartate Aminotransferase)', 'section': 'Clinical Biochemistry', 'is_tracked': 0, 'result_type': 'quantitative', 'default_unit': 'U/L', 'secondary_unit': None, 'ref_range': None, 'options': None, 'parent_name': 'LFTS', 'sort_order': 2},
     {'name': 'Alkaline Phosphatase (ALP)', 'section': 'Clinical Biochemistry', 'is_tracked': 0, 'result_type': 'quantitative', 'default_unit': 'U/L', 'secondary_unit': None, 'ref_range': None, 'options': None, 'parent_name': 'LFTS', 'sort_order': 3},
     {'name': 'Total Bilirubin', 'section': 'Clinical Biochemistry', 'is_tracked': 0, 'result_type': 'quantitative', 'default_unit': 'µmol/L', 'secondary_unit': None, 'ref_range': None, 'options': None, 'parent_name': 'LFTS', 'sort_order': 4},
@@ -110,9 +110,9 @@ TESTS = [
     {'name': 'Stool Analysis (Macroscopy)', 'section': 'Parasitology & Stool Diagnostics', 'is_tracked': 0, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['Formed, No blood/mucus', 'Semi-formed, No blood/mucus', 'Loose', 'Watery', 'Blood present', 'Mucus present', 'Blood and mucus present'], 'parent_name': 'STOOL ANALYSIS', 'sort_order': 1},
     {'name': 'Stool Analysis (Microscopy)', 'section': 'Parasitology & Stool Diagnostics', 'is_tracked': 0, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['No ova, cysts, or trophozoites seen', 'E. histolytica cysts seen', 'E. histolytica trophozoites seen', 'G. lamblia cysts seen', 'G. lamblia trophozoites seen', 'Hookworm ova seen', 'Ascaris lumbricoides ova seen', 'Schistosoma mansoni ova seen', 'Trichuris trichiura ova seen'], 'parent_name': 'STOOL ANALYSIS', 'sort_order': 2},
     {'name': 'Stool Occult Blood', 'section': 'Parasitology & Stool Diagnostics', 'is_tracked': 0, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['Negative', 'Positive'], 'parent_name': 'STOOL ANALYSIS', 'sort_order': 3},
-    {'name': 'Determine', 'section': 'Serology & Clinical Immunology', 'is_tracked': 0, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['Non-Reactive', 'Reactive'], 'parent_name': 'HIV (MoH Three-Test Algorithm)', 'sort_order': 1},
-    {'name': 'Stat-Pak', 'section': 'Serology & Clinical Immunology', 'is_tracked': 0, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['Non-Reactive', 'Reactive'], 'parent_name': 'HIV (MoH Three-Test Algorithm)', 'sort_order': 2},
-    {'name': 'SD Bioline', 'section': 'Serology & Clinical Immunology', 'is_tracked': 0, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['Non-Reactive', 'Reactive'], 'parent_name': 'HIV (MoH Three-Test Algorithm)', 'sort_order': 3}
+    {'name': 'Determine', 'section': 'Serology & Clinical Immunology', 'is_tracked': 0, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['Non-Reactive', 'Reactive'], 'parent_name': 'HIV Testing Service', 'sort_order': 1},
+    {'name': 'Stat-Pak', 'section': 'Serology & Clinical Immunology', 'is_tracked': 0, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['Non-Reactive', 'Reactive'], 'parent_name': 'HIV Testing Service', 'sort_order': 2},
+    {'name': 'SD Bioline', 'section': 'Serology & Clinical Immunology', 'is_tracked': 0, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['Non-Reactive', 'Reactive'], 'parent_name': 'HIV Testing Service', 'sort_order': 3}
 ]
 
 
@@ -142,8 +142,21 @@ def seed_database():
 
     conn.commit()
 
-    # Rename migration
+    # Rename migrations
     cur.execute("UPDATE tests SET name = 'Complete Blood Count (CBC)' WHERE name = 'CBC'")
+    cur.execute("UPDATE tests SET name = 'HIV Testing Service' WHERE name = 'HIV (MoH Three-Test Algorithm)'")
+    
+    # Clean relative count test names
+    rel_names = [
+        ('Neutrophils (%) \\[Relative Count\\]', 'Neutrophils (%) [Relative Count]'),
+        ('Lymphocytes (%) \\[Relative Count\\]', 'Lymphocytes (%) [Relative Count]'),
+        ('Monocytes (%) \\[Relative Count\\]', 'Monocytes (%) [Relative Count]'),
+        ('Eosinophils (%) \\[Relative Count\\]', 'Eosinophils (%) [Relative Count]'),
+        ('Basophils (%) \\[Relative Count\\]', 'Basophils (%) [Relative Count]')
+    ]
+    for old_n, new_n in rel_names:
+        cur.execute("UPDATE tests SET name = ? WHERE name = ?", (new_n, old_n))
+
     conn.commit()
 
     test_id_map = {}
@@ -184,7 +197,7 @@ def seed_database():
         if not sec_id:
             sec_id = list(sec_map.values())[0]
         opts = json.dumps(t["options"]) if t["options"] else None
-        cur.execute("SELECT id FROM tests WHERE name = ? AND parent_rollup_id = ?", (t["name"], parent_id))
+        cur.execute("SELECT id FROM tests WHERE name = ? AND section_id = ?", (t["name"], sec_id))
         r = cur.fetchone()
         if not r:
             cur.execute("""INSERT OR IGNORE INTO tests (name, section_id, is_tracked, sort_order, result_type,
@@ -194,9 +207,9 @@ def seed_database():
                   t["default_unit"], t["secondary_unit"], t["ref_range"], opts, parent_id))
         else:
             cur.execute("""
-                UPDATE tests SET result_type=?, default_unit=?, secondary_unit=?, ref_range=?, options=?, sort_order=?
+                UPDATE tests SET result_type=?, default_unit=?, secondary_unit=?, ref_range=?, options=?, sort_order=?, parent_rollup_id=?
                 WHERE id=?
-            """, (t["result_type"], t["default_unit"], t["secondary_unit"], t["ref_range"], opts, t["sort_order"], r["id"]))
+            """, (t["result_type"], t["default_unit"], t["secondary_unit"], t["ref_range"], opts, t["sort_order"], parent_id, r["id"]))
 
     conn.commit()
     conn.close()
