@@ -2537,6 +2537,17 @@ viewReport(visitId) {
       secSelect.innerHTML += `<option value="${s.id}">${this.escape(s.name)}</option>`;
     });
 
+    // Populate parent panel selector
+    const parentSelect = document.getElementById('test-config-parent');
+    if (parentSelect) {
+      parentSelect.innerHTML = '<option value="">None (standalone test)</option>';
+      const panels = (this.testCatalog || []).filter(t => t.result_type === 'panel' && t.is_active !== 0);
+      panels.forEach(p => {
+        parentSelect.innerHTML += `<option value="${p.id}">${this.escape(p.name)}</option>`;
+      });
+      parentSelect.value = (test && test.parent_rollup_id) ? test.parent_rollup_id : '';
+    }
+
     if (test) {
       document.getElementById('test-config-title').textContent = 'Edit Test';
       document.getElementById('test-config-id').value = test.id;
@@ -2599,13 +2610,15 @@ viewReport(visitId) {
     const default_unit = document.getElementById('test-config-unit').value.trim() || null;
     const optionsRaw = document.getElementById('test-config-options').value;
     const is_tracked = document.getElementById('test-config-tracked').checked;
+    const parentRaw = document.getElementById('test-config-parent') ? document.getElementById('test-config-parent').value : '';
+    const parent_rollup_id = parentRaw ? parseInt(parentRaw, 10) : null;
     
     let options = null;
     if (optionsRaw.trim() && (result_type === 'qualitative' || result_type === 'semi_quantitative')) {
       options = JSON.stringify(optionsRaw.split(',').map(s => s.trim()).filter(s => s));
     }
 
-    const payload = { name, section_id, is_tracked, result_type, default_unit, options, sort_order: 0 };
+    const payload = { name, section_id, is_tracked, result_type, default_unit, options, sort_order: 0, parent_rollup_id };
     
     try {
       let res;
