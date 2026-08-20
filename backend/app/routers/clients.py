@@ -12,9 +12,11 @@ logger = logging.getLogger("amh_clients")
 router = APIRouter(tags=["Clients, Visits & Clinicians"])
 
 class VisitEdit(BaseModel):
-    ward_of_origin: str
+    ward_of_origin: Optional[str] = None
     clinician_id: Optional[int] = None
     order_category: Optional[str] = None
+    age_years: Optional[float] = None
+    sex: Optional[str] = None
 
 class ClientCreate(BaseModel):
     client_number: Optional[str] = None
