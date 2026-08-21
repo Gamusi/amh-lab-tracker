@@ -56,6 +56,33 @@ def list_clients(query: Optional[str] = None, conn: sqlite3.Connection = Depends
     logger.info(f"Returned {len(results)} clients")
     return results
 
+@router.get("/api/clients/{client_id}")
+def get_client(client_id: int, conn: sqlite3.Connection = Depends(get_db), current_user: dict = Depends(get_current_user)):
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM clients WHERE id = ?", (client_id,))
+    row = cur.fetchone()
+    if not row:
+        raise HTTPException(status_code=404, detail="Client not found")
+    client_dict = dict(row)
+    # Format age_string for convenience if not explicitly stored
+    age_years = client_dict.get("age_years")
+    if age_years is not None:
+        if age_years < 0.08: # ~29 days
+            days = round(age_years * 365.25)
+            client_dict["age_display"] = f"{days}d"
+        elif age_years < 1.0:
+            months = round(age_years * 12)
+            client_dict["age_display"] = f"{months}m"
+        elif age_years < 3.0:
+            yrs = int(age_years)
+            rem_m = round((age_years - yrs) * 12)
+            client_dict["age_display"] = f"{yrs}y {rem_m}m" if rem_m > 0 else f"{yrs}y"
+        else:
+            client_dict["age_display"] = f"{int(age_years)}y" if age_years.is_integer() else f"{age_years:g}y"
+    else:
+        client_dict["age_display"] = ""
+    return client_dict
+
 import re
 
 def parse_age_string(s: str) -> float:

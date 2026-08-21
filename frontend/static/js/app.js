@@ -1339,18 +1339,16 @@ const app = {
 
   async openEditClientModal(clientId) {
     try {
-      // Fetch the specific client from the API to get current data
-      const res = await fetch(`/api/clients?query=`);
-      const clients = res.ok ? await res.json() : [];
-      const data = clients.find(c => c.id === parseInt(clientId, 10)) || this.currentClientData || {};
+      const res = await fetch(`/api/clients/${clientId}`);
+      if (!res.ok) throw new Error("Failed to fetch client");
+      const data = await res.json();
 
       document.getElementById('edit-client-id').value = clientId;
       document.getElementById('edit-client-name').value = data.full_name || '';
       document.getElementById('edit-client-sex').value = data.sex || 'Male';
-      document.getElementById('edit-client-age').value = '';
+      document.getElementById('edit-client-age').value = data.age_display || '';
       document.getElementById('edit-client-phone').value = data.phone || '';
 
-      // Set the correct demographic category — must match registration options
       const cat = data.age_category || 'Adult';
       const catSel = document.getElementById('edit-client-category');
       catSel.value = cat;
@@ -1358,6 +1356,7 @@ const app = {
 
       document.getElementById('edit-client-modal').style.display = 'flex';
     } catch(e) {
+      console.error(e);
       this.showNotificationModal("Error", "Could not open edit form.", true);
     }
   },

@@ -584,12 +584,30 @@ def test_update_client_details(mock_db):
         "sex": "Female",
         "phone": "0711111111",
         "age_string": "30y",
-        "age_category": "Years"
+        "age_category": "Adult"
     })
     assert res.status_code == 200
     updated = res.json()
     assert updated["full_name"] == "Updated Name"
     assert updated["sex"] == "Female"
     assert updated["phone"] == "0711111111"
-    assert updated["age_category"] == "Years"
+    assert updated["age_category"] == "Adult"
     assert updated["age_years"] is not None and updated["age_years"] > 0
+
+
+def test_get_client_endpoint(mock_db):
+    conn = mock_db["conn"]
+    cur = conn.cursor()
+    cur.execute("INSERT INTO clients (client_number, full_name, sex, age_years, age_category, phone) VALUES ('AMH-GET1', 'John Doe', 'Male', 25.0, 'Adult', '0722000000')")
+    client_id = cur.lastrowid
+    conn.commit()
+
+    res = client.get(f"/api/clients/{client_id}")
+    assert res.status_code == 200
+    data = res.json()
+    assert data["full_name"] == "John Doe"
+    assert data["sex"] == "Male"
+    assert data["age_category"] == "Adult"
+    assert data["age_display"] == "25y"
+    assert data["phone"] == "0722000000"
+
