@@ -163,6 +163,132 @@ def _build_urinalysis_table(urinalysis_test: dict) -> KeepTogether:
     ]))
     return KeepTogether([t, Spacer(1, 15)])
 
+def _build_cbc_table(order_data: dict, cbc_test: dict) -> list:
+    # Build distinct sections exactly matching the clinical reporting standard:
+    # 1. Main Indices (WBC, RBC, Hb, HCT, MCV, MCH, MCHC, PLT)
+    # 2. Differential Relative (%)
+    # 3. Differential Absolute (10^9 / uL)
+    # 4. RBC / Platelet Indices (RDW, PCT, MPV, PDW)
+    flowables = []
+    
+    title_style = ParagraphStyle(
+        name='CBCTitle',
+        fontName='Helvetica-Bold',
+        fontSize=12,
+        leading=14,
+        alignment=TA_CENTER,
+        textColor=colors.black
+    )
+    
+    # Title box with border
+    header_table = Table([[Paragraph("HAEMATOLOGY CBC REPORT", title_style)]], colWidths=[480])
+    header_table.setStyle(TableStyle([
+        ('BOX', (0,0), (-1,-1), 1, colors.black),
+        ('TOPPADDING', (0,0), (-1,-1), 5),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 5),
+        ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+    ]))
+    flowables.append(header_table)
+    flowables.append(Spacer(1, 8))
+    
+    params = cbc_test.get("parameters", [])
+    params_map = {p.get("name", "").strip().lower(): p for p in params}
+
+    def get_row(name, display_name, def_unit, def_ref):
+        match = None
+        for k, v in params_map.items():
+            if name.lower() in k:
+                match = v
+                break
+        res_val = match.get("result", "") if match else ""
+        unit_val = match.get("unit", def_unit) if match else def_unit
+        flag_val = match.get("flag", "") if match else ""
+        ref_val = match.get("reference", def_ref) if match else def_ref
+        
+        # Format flag: Low, High, *, etc.
+        flag_display = ""
+        if flag_val:
+            if flag_val == "L": flag_display = "Low"
+            elif flag_val == "H": flag_display = "High"
+            elif flag_val == "*": flag_display = "Panic *"
+            else: flag_display = str(flag_val)
+
+        return [display_name, str(res_val), str(unit_val or ""), flag_display, f"[ {ref_val} ]" if ref_val else ""]
+
+    # Section 1: Main Indices
+    sec1 = [
+        get_row("Total WBC Count", "Total WBC Count", "(10^3 / uL)", "6.0-14.0"),
+        get_row("Red Blood Cells", "Red Blood Cells (RBC)", "(10^6 / uL)", "4.00 -5.20"),
+        get_row("Hemoglobin", "Hemoglobin (Hb)", "g/dL", "11.5-15.5"),
+        get_row("Hematocrit", "Hematocrit (HCT)", "%", "35.0-45.0"),
+        get_row("Mean Cell Volume", "Mean Cell Volume (MCV)", "fL", "77.0-95.0"),
+        get_row("Mean Cell Hb (MCH)", "Mean Cell Hb (MCH)", "pg", "23.0-31.0"),
+        get_row("Mean Cell Hb Conc", "Mean Cell Hb Conc.(MCHC)", "g/dL", "28.0-33.0"),
+        get_row("Platelets Count", "Platelets Count", "(10^3 / uL)", "150-400"),
+    ]
+
+    # Section 2: Differential Relative (%)
+    sec2 = [
+        get_row("Neutrophils (%)", "Neutrophils", "%", "40.0-65.0"),
+        get_row("Lymphocytes (%)", "Lymphocytes", "%", "19.2-49.5"),
+        get_row("Monocytes (%)", "Monocytes", "%", "4.5-12.1"),
+        get_row("Eosinophils (%)", "Eosinophils", "%", "1.0-12.0"),
+        get_row("Basophils (%)", "Basophils", "%", "0.0-1.0"),
+    ]
+
+    # Section 3: Differential Absolute
+    sec3 = [
+        get_row("Neutrophils (Absolute", "Neutrophils Count", "(10^9 / uL)", "2.00-6.00"),
+        get_row("Lymphocytes (Absolute", "Lymphocytes Count", "(10^9 / uL)", "5.00-8.50"),
+        get_row("Monocytes (Absolute", "Monocytes Count", "(10^9 / uL)", "0.70-1.50"),
+        get_row("Eosinophils (Absolute", "Eosinophils Count", "(10^9 / uL)", "0.30-0.80"),
+        get_row("Basophils (Absolute", "Basophils Count", "(10^9 / uL)", "0.0-0.5"),
+    ]
+
+    # Section 4: RBC / Platelet Indices
+    sec4 = [
+        get_row("RBC Distribution Width", "RBC Distribution Width", "%", "11.0-16.0"),
+        get_row("Thrombocrit", "Thrombocrit (PCT)", "%", "0.16-0.33"),
+        get_row("Mean Platelet Volume", "Mean Platelet Volume (MPV)", "fL", "6.0 - 10.0"),
+        get_row("PLT Distribution Width", "Plt Distribution Width", "%", "12.0 - 18.0"),
+    ]
+
+    table_data = [
+        ["Test", "Result", "Units", "Flag", "Ref. Ranges"]
+    ]
+    
+    divider = ["-", "", "", "", ""]
+
+    table_data.extend(sec1)
+    table_data.append(divider)
+    table_data.extend(sec2)
+    table_data.append(divider)
+    table_data.extend(sec3)
+    table_data.append(divider)
+    table_data.extend(sec4)
+
+    t = Table(table_data, colWidths=[150, 65, 85, 60, 120])
+    t.setStyle(TableStyle([
+        ('FONTNAME', (0,0), (-1,-1), 'Helvetica'),
+        ('FONTSIZE', (0,0), (-1,-1), 8.5),
+        ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0,0), (-1,0), 9),
+        ('LINEBELOW', (0,0), (-1,0), 1, colors.black),
+        ('ALIGN', (0,0), (-1,-1), 'LEFT'),
+        ('ALIGN', (1,1), (1,-1), 'RIGHT'),
+        ('ALIGN', (3,1), (3,-1), 'CENTER'),
+        ('ALIGN', (4,1), (4,-1), 'CENTER'),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 2.5),
+        ('TOPPADDING', (0,0), (-1,-1), 2.5),
+        ('FONTNAME', (1,1), (1,-1), 'Helvetica-Bold'),
+    ]))
+    
+    flowables.append(t)
+    flowables.append(Spacer(1, 10))
+    return flowables
+
+from reportlab.platypus import PageBreak
+
 def generate_pdf(order_data: dict, results_data: list) -> bytes:
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(
@@ -184,55 +310,85 @@ def generate_pdf(order_data: dict, results_data: list) -> bytes:
     )
     
     flowables = []
-    flowables.append(Paragraph("Laboratory Report", title_style))
-    flowables.append(Spacer(1, 12))
     
-    flowables.append(_build_metadata_table(order_data))
-    flowables.append(Spacer(1, 15))
-    
-    urinalysis_test = None
+    # Check for CBC
+    cbc_test = None
+    other_departments = []
     
     for dept_data in results_data:
         dept_name = dept_data.get("department", "UNKNOWN")
         tests = dept_data.get("tests", [])
         
-        # Group orders by test_name (proxy for test_id)
-        grouped_tests = {}
+        filtered_tests = []
         for t in tests:
-            t_name = t.get("test_name", "")
-            if t_name not in grouped_tests:
-                grouped_tests[t_name] = []
-            grouped_tests[t_name].append(t)
-            
-        final_tests = []
-        for t_name, orders in grouped_tests.items():
-            valid_orders = [o for o in orders if str(o.get("result") or "").lower() != "invalid"]
-            if valid_orders:
-                final_tests.extend(valid_orders)
+            t_name = str(t.get("test_name") or "").lower()
+            if "cbc" in t_name or "complete blood count" in t_name:
+                cbc_test = t
             else:
-                first_order = orders[0].copy()
-                first_order["result"] = "Not done"
-                final_tests.append(first_order)
+                filtered_tests.append(t)
                 
-        # Intercept Urinalysis
-        tests_to_render = []
-        for t in final_tests:
-            if str(t.get("test_name") or "").lower() == "urinalysis":
-                urinalysis_test = t
-            else:
-                tests_to_render.append(t)
-                
-        if tests_to_render:
-            flowables.append(_build_department_table(dept_name, tests_to_render))
+        if filtered_tests:
+            other_departments.append({"department": dept_name, "tests": filtered_tests})
+
+    # If we have other tests, render main report page first
+    if other_departments or not cbc_test:
+        flowables.append(Paragraph("Laboratory Report", title_style))
+        flowables.append(Spacer(1, 12))
+        flowables.append(_build_metadata_table(order_data))
+        flowables.append(Spacer(1, 15))
+        
+        urinalysis_test = None
+        for dept_data in other_departments:
+            dept_name = dept_data.get("department", "UNKNOWN")
+            tests = dept_data.get("tests", [])
             
-    if urinalysis_test:
-        flowables.append(_build_urinalysis_table(urinalysis_test))
-    
-    flowables.append(_build_signatures_table(order_data))
+            # Group orders by test_name (proxy for test_id)
+            grouped_tests = {}
+            for t in tests:
+                t_name = t.get("test_name", "")
+                if t_name not in grouped_tests:
+                    grouped_tests[t_name] = []
+                grouped_tests[t_name].append(t)
+                
+            final_tests = []
+            for t_name, orders in grouped_tests.items():
+                valid_orders = [o for o in orders if str(o.get("result") or "").lower() != "invalid"]
+                if valid_orders:
+                    final_tests.extend(valid_orders)
+                else:
+                    first_order = orders[0].copy()
+                    first_order["result"] = "Not done"
+                    final_tests.append(first_order)
+                    
+            tests_to_render = []
+            for t in final_tests:
+                if str(t.get("test_name") or "").lower() == "urinalysis":
+                    urinalysis_test = t
+                else:
+                    tests_to_render.append(t)
+                    
+            if tests_to_render:
+                flowables.append(_build_department_table(dept_name, tests_to_render))
+                
+        if urinalysis_test:
+            flowables.append(_build_urinalysis_table(urinalysis_test))
+            
+        flowables.append(_build_signatures_table(order_data))
+        
+        if cbc_test:
+            flowables.append(PageBreak())
+
+    # Render dedicated CBC page if present
+    if cbc_test:
+        flowables.append(_build_metadata_table(order_data))
+        flowables.append(Spacer(1, 10))
+        flowables.extend(_build_cbc_table(order_data, cbc_test))
+        flowables.append(_build_signatures_table(order_data))
     
     doc.build(flowables, onFirstPage=_draw_background_hook, onLaterPages=_draw_background_hook)
     
     return buffer.getvalue()
 
 generate_report_pdf = generate_pdf
+
 
