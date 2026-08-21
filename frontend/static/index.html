@@ -232,6 +232,25 @@
             </div>
         </div>
 
+        <!-- Analyzer Paste Section (for CBC) -->
+        <div id="result-entry-analyzer-section" style="display: none; margin-bottom: 12px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <span style="font-weight: 600; font-size: 0.9rem; color: var(--primary-color);">Capture from Analyzer:</span>
+            <button type="button" class="btn btn-secondary btn-sm" id="btn-toggle-analyzer-paste" onclick="app.toggleAnalyzerPaste()">Paste from Analyzer</button>
+          </div>
+          <div id="analyzer-paste-container" style="display: none; background: #F0FDF4; border: 1px solid #BBF7D0; border-radius: 6px; padding: 10px; margin-bottom: 10px;">
+            <label for="analyzer-raw-input" style="font-size: 0.8rem; font-weight: 600; color: #166534; display: block; margin-bottom: 4px;">Paste raw Nihon Kohden output text:</label>
+            <textarea id="analyzer-raw-input" rows="3" placeholder="Paste instrument text here e.g. [host] [Send] MEK-7222..." style="width: 100%; padding: 6px; font-family: monospace; font-size: 0.75rem; border: 1px solid #86EFAC; border-radius: 4px; box-sizing: border-box;"></textarea>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 8px;">
+              <span id="analyzer-parse-status" style="font-size: 0.8rem; color: #15803D;"></span>
+              <div style="display: flex; gap: 8px;">
+                <button type="button" class="btn btn-secondary btn-sm" onclick="app.toggleAnalyzerPaste(false)">Close</button>
+                <button type="button" class="btn btn-primary btn-sm" onclick="app.parseAndPopulateAnalyzerData()">Parse & Populate</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <div id="result-entry-params-container" style="display: none; margin-bottom: 16px; max-height: 52vh; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 6px; padding: 12px; background: #FAFAFA;">
             <!-- Parameters will be injected here -->
         </div>

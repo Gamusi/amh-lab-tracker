@@ -1635,6 +1635,78 @@ const app = {
   },
 
 
+  toggleAnalyzerPaste(show = null) {
+    const container = document.getElementById('analyzer-paste-container');
+    if (!container) return;
+    if (show === null) {
+      container.style.display = container.style.display === 'none' ? 'block' : 'none';
+    } else {
+      container.style.display = show ? 'block' : 'none';
+    }
+    if (container.style.display === 'block') {
+      const input = document.getElementById('analyzer-raw-input');
+      if (input) input.focus();
+    }
+  },
+
+  async parseAndPopulateAnalyzerData() {
+    const rawText = document.getElementById('analyzer-raw-input').value.trim();
+    const statusSpan = document.getElementById('analyzer-parse-status');
+    if (!rawText) {
+      this.showNotificationModal("Error", "Please paste raw output from the analyzer first.", true);
+      return;
+    }
+
+    try {
+      const res = await fetch('/api/integrations/parse-analyzer-output', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ analyzer_type: 'nihon_kohden', raw_text: rawText })
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        this.showNotificationModal("Parsing Failed", err.detail || "Failed to parse analyzer output.", true);
+        return;
+      }
+
+      const data = await res.json();
+      if (data.status !== 'success' || !data.parameters) {
+        this.showNotificationModal("Error", "No parameters extracted from output.", true);
+        return;
+      }
+
+      // Populate each parameter input row by matching name
+      let populatedCount = 0;
+      const paramRows = document.querySelectorAll('.modal-param-row');
+      data.parameters.forEach(p => {
+        paramRows.forEach(row => {
+          const nameEl = row.querySelector('strong');
+          if (nameEl && nameEl.textContent.trim().toLowerCase() === p.name.trim().toLowerCase()) {
+            const input = row.querySelector('.modal-param-val');
+            if (input) {
+              input.value = p.value;
+              // store device flag if present
+              if (p.flag) {
+                row.setAttribute('data-device-flag', p.flag);
+              }
+              populatedCount++;
+            }
+          }
+        });
+      });
+
+      if (statusSpan) {
+        statusSpan.textContent = `Captured: ${populatedCount} parameters (Sample: ${data.sample_id || 'N/A'})`;
+      }
+      this.showNotificationModal("Success", `Captured ${populatedCount} CBC parameters from ${data.device_model || 'Analyzer'}. Review values and save.`, false);
+      this.toggleAnalyzerPaste(false);
+    } catch(err) {
+      console.error(err);
+      this.showNotificationModal("Error", "Failed to connect to parser service.", true);
+    }
+  },
+
   async showEnterResultModal(orderId, testId, testName, existingVal = null, existingUnit = null) {
     document.getElementById('result-entry-order-id').value = orderId;
     document.getElementById('result-entry-test-id').value = testId;
@@ -1651,6 +1723,17 @@ const app = {
     if (reasonGroup) {
       reasonGroup.style.display = isEdit ? 'block' : 'none';
       if (reasonInput) reasonInput.value = '';
+    }
+
+    const analyzerSection = document.getElementById('result-entry-analyzer-section');
+    const isCBC = testName.toLowerCase().includes('cbc') || testName.toLowerCase().includes('complete blood count');
+    if (analyzerSection) {
+      analyzerSection.style.display = isCBC ? 'block' : 'none';
+      this.toggleAnalyzerPaste(false);
+      const rawInput = document.getElementById('analyzer-raw-input');
+      if (rawInput) rawInput.value = '';
+      const statusSpan = document.getElementById('analyzer-parse-status');
+      if (statusSpan) statusSpan.textContent = '';
     }
     
     // Ensure testCatalog is loaded
