@@ -1777,15 +1777,15 @@ const app = {
                unitDisplay = `<span class="modal-param-unit" data-unit="${this.escape(ct.default_unit)}" style="font-size: 0.8rem; color: var(--text-muted);">${this.escape(ct.default_unit)}</span>`;
              }
              html += `
-               <div style="display: grid; grid-template-columns: 2fr 1.2fr 1fr; gap: 8px; align-items: center; margin-bottom: 8px;" class="modal-param-row" data-param-id="${ct.id}">
-                 <div><strong style="font-size: 0.85rem;">${this.escape(ct.name)}</strong></div>
-                 <div><input type="text" class="modal-param-val" placeholder="Enter Value${ct.ref_range ? '. Ref: ' + this.escape(ct.ref_range) : ''}" style="width: 100%; padding: 4px;"></div>
-                 <div style="display: flex; gap: 4px; align-items: center;">
-                   ${unitDisplay}
-                   ${ct.ref_range ? `<span style="font-size: 0.75rem; color: var(--text-muted);">(${this.escape(ct.ref_range)})</span>` : ''}
-                 </div>
-               </div>
-             `;
+                <div style="display: grid; grid-template-columns: 1.8fr 1.1fr 1.1fr; gap: 8px; align-items: center; padding: 6px 0; border-bottom: 1px solid #edf2f7;" class="modal-param-row" data-param-id="${ct.id}">
+                  <div><strong style="font-size: 0.85rem; color: var(--text-dark);">${this.escape(ct.name)}</strong></div>
+                  <div><input type="text" class="modal-param-val" placeholder="Value" style="width: 100%; padding: 6px 8px; border: 1px solid var(--border-color); border-radius: 4px; box-sizing: border-box; font-size: 0.85rem;"></div>
+                  <div style="display: flex; gap: 4px; align-items: center;">
+                    ${unitDisplay}
+                    ${ct.ref_range ? `<span style="font-size: 0.75rem; color: var(--text-muted); white-space: nowrap;">(${this.escape(ct.ref_range)})</span>` : ''}
+                  </div>
+                </div>
+              `;
            });
            paramsContainer.innerHTML = html;
          }
