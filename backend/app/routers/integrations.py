@@ -18,6 +18,8 @@ def parse_analyzer_output(
     current_user: dict = Depends(get_current_user)
 ):
     logger.info(f"User '{current_user['username']}' requested parse for analyzer '{req.analyzer_type}'")
+    logger.debug(f"raw_text length={len(req.raw_text)}, preview={req.raw_text[:200]!r}")
+
     
     if req.analyzer_type == "nihon_kohden":
         result = parse_nihon_kohden_output(req.raw_text)
