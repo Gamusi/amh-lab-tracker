@@ -3,9 +3,8 @@ import time
 import logging
 from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, JSONResponse
 from .database import init_db
-from .routers import auth, daily_log, config, reports, trends, audit, clients
+from .routers import auth, daily_log, config, reports, trends, audit, clients, integrations
 
 # Configure Logging
 logging.basicConfig(
@@ -28,6 +27,8 @@ async def log_requests(request: Request, call_next):
     logger.info(f"Method={request.method} Path={request.url.path} Status={response.status_code} Time={process_time:.2f}ms")
     return response
 
+from .routers import auth, daily_log, config, reports, trends, audit, clients, integrations
+
 # Register API Routers
 app.include_router(auth.router)
 app.include_router(daily_log.router)
@@ -36,6 +37,7 @@ app.include_router(reports.router)
 app.include_router(trends.router)
 app.include_router(audit.router)
 app.include_router(clients.router)
+app.include_router(integrations.router)
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 FRONTEND_DIR = os.path.join(BASE_DIR, "frontend", "static")
