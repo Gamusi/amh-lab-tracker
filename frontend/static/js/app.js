@@ -1527,6 +1527,23 @@ const app = {
     container.innerHTML = 'Loading...';
     document.getElementById('add-test-modal').style.display = 'flex';
 
+    if (!this.sections || this.sections.length === 0) {
+      try {
+        const sres = await fetch('/api/config/sections');
+        if (sres.ok) this.sections = await sres.json();
+      } catch(e) { this.sections = []; }
+    }
+
+    const secSelect = document.getElementById('add-test-section');
+    if (secSelect && this.sections) {
+      let secHtml = '<option value="all">All Sections</option>';
+      this.sections.forEach(s => {
+        secHtml += `<option value="${s.id}">${this.escape(s.name)}</option>`;
+      });
+      secSelect.innerHTML = secHtml;
+      secSelect.value = 'all';
+    }
+
     if (!this.testCatalog || this.testCatalog.length === 0) {
       try {
         const res = await fetch('/api/config/tests');
@@ -1539,7 +1556,7 @@ const app = {
       this.testCatalog.forEach(t => {
         if (!t.parent_rollup_id) {
           html += `
-            <label class="add-test-row" data-name="${this.escape(t.name).toLowerCase()}" style="display: block; margin-bottom: 4px; cursor: pointer;">
+            <label class="add-test-row" data-name="${this.escape(t.name).toLowerCase()}" data-category="${t.section_id}" style="display: block; margin-bottom: 4px; cursor: pointer;">
               <input type="checkbox" name="add-test-cb" value="${t.id}">
               ${this.escape(t.name)}
             </label>
@@ -1552,9 +1569,12 @@ const app = {
 
   filterAddTests() {
     const query = document.getElementById('add-test-search').value.toLowerCase();
+    const cat = document.getElementById('add-test-section') ? document.getElementById('add-test-section').value : 'all';
     const rows = document.querySelectorAll('.add-test-row');
     rows.forEach(row => {
-      if (row.getAttribute('data-name').includes(query)) {
+      const nameMatch = row.getAttribute('data-name').includes(query);
+      const catMatch = (cat === 'all' || row.getAttribute('data-category') === cat);
+      if (nameMatch && catMatch) {
         row.style.display = 'block';
       } else {
         row.style.display = 'none';
