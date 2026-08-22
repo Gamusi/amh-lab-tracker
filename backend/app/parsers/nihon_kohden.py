@@ -34,37 +34,66 @@ _YEAR_RE = re.compile(r'^20\d{2}$')
 _TWO_DIGIT_RE = re.compile(r'^\d{1,2}$')
 
 
-def _isolate_results_record(raw_text: str) -> Optional[str]:
+def _extract_fields(raw_text: str) -> List[str]:
     """
-    The MEK-7222 outputs two records per sample, separated by \\n:
-      Record 1 (patient results):  starts with [host] [Send]<STX>MEK-7222
-      Record 2 (reference ranges): starts with [host] [Send]<STX>EXP
-    Returns the patient-results record as a raw string (CR-delimited fields intact).
-    Returns None if only an EXP record is present (no patient data to parse).
-    """
-    lines = raw_text.split('\n')
-    for line in lines:
-        # Must contain MEK-7222 and must NOT be the EXP reference-ranges record
-        if 'MEK-7222' in line and 'EXP' not in line and line.strip():
-            return line
-    # No suitable line found — do NOT fall back to an EXP line
-    return None
+    Extracts the ordered field list from the patient-results record.
 
+    Handles two input formats produced by the MEK-7222:
+
+    1. Raw serial/protocol format: the entire record is one line with fields
+       separated by bare CR (\\r). STX (\\x02) and ETX (\\x03) frame the record.
+       Two records appear on separate \\n-terminated lines:
+         Line 1 (patient data):  [host] [Send]<STX>MEK-7222\\r<fields...><ETX>
+         Line 2 (ref ranges):    [host] [Send]<STX>EXP\\r<fields...><ETX>
+
+    2. Clipboard-paste format: when the user copies from the Nihon Kohden host
+       software and pastes into a textarea, each \\r field becomes its own \\n-
+       separated line. STX/ETX are stripped as invisible characters. The EXP
+       record boundary becomes the line "[host] [Send]EXP".
+
+    Returns the flat, stripped field list for the patient record only.
+    Returns an empty list if no patient record is found.
+    """
+    # Normalise \\r\\n → \\n so we don't get empty fields from CRLF line endings
+    text = raw_text.replace('\r\n', '\n')
+    lines = text.split('\n')
+
+    # --- Mode 1: raw protocol (embedded \\r within a line) ---
+    for line in lines:
+        if 'MEK-7222' in line and 'EXP' not in line and '\r' in line and line.strip():
+            return [f.strip() for f in line.split('\r')]
+
+    # --- Mode 2: clipboard-paste (one field per \\n line) ---
+    # Collect all lines that belong to the patient record, stopping at the
+    # EXP reference-ranges record or end of input.
+    fields: List[str] = []
+    in_record = False
+    for line in lines:
+        stripped = line.strip()
+
+        if not in_record:
+            # The patient-record header line contains "MEK-7222" but not "EXP"
+            if 'MEK-7222' in line and 'EXP' not in line:
+                in_record = True
+                fields.append(stripped)
+            continue
+
+        # Stop at the EXP record: a line with both "[host]" and "EXP",
+        # or a bare "EXP" line immediately after the patient block.
+        if 'EXP' in line and ('[host]' in line or stripped == 'EXP'):
+            break
+
+        fields.append(stripped)
+
+    return fields
 
 
 def parse_nihon_kohden_output(raw_text: str) -> Dict[str, Any]:
     """
     Parses raw serial/clipboard output from Nihon Kohden MEK-7222 hematology analyzer.
 
-    Real protocol format (discovered from reference files):
-    - STX (0x02) at record start, ETX (0x03) at record end.
-    - Fields are delimited by bare CR (\\r, 0x0D).
-    - Date is split across three consecutive CR-fields: YYYY \\r MM \\r DD
-    - Time is split across three consecutive CR-fields: HH \\r MM \\r SS
-      with a possible empty/whitespace field between date and time.
-    - Result values are individual CR-fields, e.g. " 4.1  \\r30.4* \\r..."
-    - A 3-digit status/run code (e.g. "102") immediately precedes the values.
-    - Record 2 (reference ranges) starts with EXP and is discarded.
+    Supports both raw serial protocol (CR-delimited) and clipboard-paste format
+    (LF-per-field, as rendered by the Nihon Kohden host software).
     """
     if not raw_text or not isinstance(raw_text, str):
         return {"status": "error", "detail": "Empty or invalid raw text input"}
@@ -73,16 +102,12 @@ def parse_nihon_kohden_output(raw_text: str) -> Dict[str, Any]:
         return {"status": "error", "detail": "No content to parse"}
 
     # Strip STX (0x02), ETX (0x03), and other non-printable control chars
-    # but preserve CR (\r = 0x0D) and LF (\n = 0x0A) which are structural.
+    # Preserve CR (\\r = 0x0D) and LF (\\n = 0x0A) — both are structural.
     clean_text = re.sub(r'[\x00-\x09\x0b\x0c\x0e-\x1f\x7f]', '', raw_text)
 
-    # Isolate the patient-results record (line 1, not the EXP reference-ranges line)
-    record = _isolate_results_record(clean_text)
-    if not record:
-        return {"status": "error", "detail": "No content to parse"}
-
-    # Split into fields on CR
-    fields = [f.strip() for f in record.split('\r')]
+    fields = _extract_fields(clean_text)
+    if not fields:
+        return {"status": "error", "detail": "No patient results record found. Ensure you paste the full analyzer output."}
 
     # --- Sample ID ---
     # The sample ID is a 6-8 digit field (distinct from 5-digit machine codes like 01024, 01536).

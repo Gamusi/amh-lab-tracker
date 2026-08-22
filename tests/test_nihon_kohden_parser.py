@@ -195,3 +195,64 @@ def test_reference_ranges_not_parsed_as_results():
     res = parse_nihon_kohden_output(exp_only)
     # Should error since reference-range line has no patient results record
     assert res["status"] == "error"
+
+
+# ---------------------------------------------------------------------------
+# Clipboard-paste mode — \r rendered as \n by textarea (real user scenario)
+# ---------------------------------------------------------------------------
+
+# This is exactly what arrives in the textarea when the user pastes from the
+# Nihon Kohden host software: each CR-field becomes its own newline.
+RAW_CLIPBOARD_PASTE = (
+    "[host] [Send]MEK-7222  \n"
+    "   22\n01024\nMANUAL      \nCBC + Diff  \n01\n"
+    "BLOOD           \nMMM \n0002437   \nV03-02  \nV04-02  \nV03-01  \n"
+    "01536\n1    \n   \n"
+    "2026\n08\n21\n     \n17\n41\n52\n"
+    "134            \n"
+    " 4.2* \n26.5L \n45.6* \n20.1* \n 5.2  \n 2.6H \n"
+    " 1.1  \n 1.9* \n 0.8* \n 0.2  \n 0.1  \n"
+    "5.39* \n11.8L \n36.9  \n68.5L \n21.9L \n32.0  \n16.3H \n 233* \n0.17  \n 7.5  \n18.7H \n"
+    "                                                                                     \n"
+    " \n \n \n \n \n \n \n \n \n \n \n \n+\n \n+\n \n \n             \n \n \n \n+\n \n \n \n"
+    "         \n \n \n \n+\n       \n"
+    "\n"
+    "[host] [Send]EXP\n"
+    "00512\nMEK-7222  \n01\n"
+    " 4.0\n 9.0\n28.0\n78.0\n17.0\n57.0\n 0.0\n10.0\n 0.0\n10.0\n 0.0\n 2.0\n 1.1\n 7.0\n"
+    " 0.7\n 5.1\n 0.0\n 0.9\n 0.0\n 0.9\n 0.0\n 0.2\n3.76\n5.70\n12.0\n18.0\n33.5\n52.0\n80.0\n"
+    " 100\n28.0\n32.0\n31.0\n35.0\n11.6\n14.0\n 150\n 350\n0.16\n0.33\n 7.0\n11.0\n15.0\n17.0\n"
+)
+
+
+def test_clipboard_paste_mode_success():
+    """Clipboard paste: \r rendered as \n — should parse identically to raw protocol."""
+    res = parse_nihon_kohden_output(RAW_CLIPBOARD_PASTE)
+    assert res["status"] == "success"
+    assert res["sample_id"] == "0002437"
+    assert res["timestamp"] == "2026-08-21 17:41:52"
+    assert len(res["parameters"]) == 22
+
+
+def test_clipboard_paste_mode_values():
+    res = parse_nihon_kohden_output(RAW_CLIPBOARD_PASTE)
+    p = {r["name"]: r for r in res["parameters"]}
+
+    assert p["Total WBC Count (White Blood Cells)"]["value"] == "4.2"
+    assert p["Total WBC Count (White Blood Cells)"]["flag"] == "*"
+
+    assert p["Neutrophils (%) [Relative Count]"]["value"] == "26.5"
+    assert p["Neutrophils (%) [Relative Count]"]["flag"] == "L"
+
+    assert p["Red Blood Cells (RBC)"]["value"] == "5.39"
+    assert p["Red Blood Cells (RBC)"]["flag"] == "*"
+
+    assert p["Hemoglobin (Hb)"]["value"] == "11.8"
+    assert p["Hemoglobin (Hb)"]["flag"] == "L"
+
+    assert p["Platelets Count (PLT)"]["value"] == "233"
+    assert p["Platelets Count (PLT)"]["flag"] == "*"
+
+    assert p["PLT Distribution Width (PDW)"]["value"] == "18.7"
+    assert p["PLT Distribution Width (PDW)"]["flag"] == "H"
+
