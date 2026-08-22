@@ -194,5 +194,12 @@ class AddOrdersRequest(BaseModel):
     sample_id: Optional[str] = None
     order_category: Optional[str] = "in-house"
 
+class BulkOrderDeleteRequest(BaseModel):
+    order_ids: List[int]
+
+class BulkVisitDeleteRequest(BaseModel):
+    visit_ids: List[int]
+
+
 
 

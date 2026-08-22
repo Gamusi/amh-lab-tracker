@@ -1238,11 +1238,32 @@ const app = {
         return;
       }
       
-      let html = '<table style="width:100%; border-collapse:collapse; font-size:0.9rem;">';
-      html += '<tr><th style="text-align:left; padding:8px; border-bottom:1px solid #ddd;">Test</th><th style="text-align:left; padding:8px; border-bottom:1px solid #ddd;">Ordered At</th><th style="text-align:right; padding:8px; border-bottom:1px solid #ddd;">Action</th></tr>';
+      let html = `
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+          <span style="font-size: 0.85rem; color: var(--text-muted);">${pending.length} pending test(s)</span>
+          <button id="btn-bulk-delete-orders" class="btn btn-danger btn-sm" style="display: none;" onclick="app.bulkDeleteOrders()">
+            Remove Selected (<span id="selected-orders-count">0</span>)
+          </button>
+        </div>
+        <table style="width:100%; border-collapse:collapse; font-size:0.9rem;">
+          <thead>
+            <tr style="background: #f8fafc;">
+              <th style="width:36px; text-align:center; padding:8px; border-bottom:1px solid #ddd;">
+                <input type="checkbox" id="select-all-pending-tests" onchange="app.toggleSelectAllPendingOrders(this.checked)">
+              </th>
+              <th style="text-align:left; padding:8px; border-bottom:1px solid #ddd;">Test</th>
+              <th style="text-align:left; padding:8px; border-bottom:1px solid #ddd;">Ordered At</th>
+              <th style="text-align:right; padding:8px; border-bottom:1px solid #ddd;">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+      `;
       pending.forEach(o => {
         html += `
           <tr>
+            <td style="text-align:center; padding:8px; border-bottom:1px solid #ddd;">
+              <input type="checkbox" class="pending-order-checkbox" value="${o.order_id}" onchange="app.onPendingOrderSelectionChange()">
+            </td>
             <td style="padding:8px; border-bottom:1px solid #ddd;"><strong>${this.escape(o.test_name)}</strong><br><small style="color:var(--text-muted);">Order ID: ${o.order_id}</small></td>
             <td style="padding:8px; border-bottom:1px solid #ddd;">${o.ordered_at}</td>
             <td style="padding:8px; border-bottom:1px solid #ddd; text-align:right;">
@@ -1254,12 +1275,65 @@ const app = {
           </tr>
         `;
       });
-      html += '</table>';
+      html += '</tbody></table>';
       container.innerHTML = html;
     } catch (e) {
       console.error(e);
       container.innerHTML = 'Error loading pending tests.';
     }
+  },
+
+  toggleSelectAllPendingOrders(checked) {
+    const checkboxes = document.querySelectorAll('.pending-order-checkbox');
+    checkboxes.forEach(cb => cb.checked = checked);
+    this.onPendingOrderSelectionChange();
+  },
+
+  onPendingOrderSelectionChange() {
+    const selected = document.querySelectorAll('.pending-order-checkbox:checked');
+    const all = document.querySelectorAll('.pending-order-checkbox');
+    const selectAllCb = document.getElementById('select-all-pending-tests');
+    if (selectAllCb) {
+      selectAllCb.checked = all.length > 0 && selected.length === all.length;
+    }
+    const btn = document.getElementById('btn-bulk-delete-orders');
+    const countSpan = document.getElementById('selected-orders-count');
+    if (btn && countSpan) {
+      countSpan.textContent = selected.length;
+      btn.style.display = selected.length > 0 ? 'inline-block' : 'none';
+    }
+  },
+
+  async bulkDeleteOrders() {
+    const selected = Array.from(document.querySelectorAll('.pending-order-checkbox:checked')).map(cb => parseInt(cb.value, 10));
+    if (selected.length === 0) return;
+
+    this.confirmAction(
+      "Remove Pending Tests",
+      `Are you sure you want to remove ${selected.length} selected pending test order(s)?`,
+      async () => {
+        try {
+          const res = await fetch('/api/orders/bulk', {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ order_ids: selected })
+          });
+          if (res.ok) {
+            const data = await res.json();
+            this.showNotificationModal("Success", `Removed ${data.deleted_order_ids.length} test order(s).`, false);
+            if (this.currentClientId) {
+              await this.loadPendingTests(this.currentClientId);
+            }
+          } else {
+            const err = await res.json();
+            this.showNotificationModal("Error", err.detail || "Failed to remove test orders.", true);
+          }
+        } catch(e) {
+          console.error(e);
+          this.showNotificationModal("Error", "Server error.", true);
+        }
+      }
+    );
   },
 
   async loadHistoricalVisits(pid) {
@@ -1274,17 +1348,39 @@ const app = {
         return;
       }
       
+      const isAdmin = this.currentUser && (this.currentUser.role === 'admin' || this.currentUser.role === 'superadmin');
       let html = '';
+      if (isAdmin) {
+        html += `
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; width: 100%; max-width: 800px;">
+            <label style="display: flex; align-items: center; gap: 6px; font-size: 0.85rem; cursor: pointer; font-weight: 600;">
+              <input type="checkbox" id="select-all-visits" onchange="app.toggleSelectAllVisits(this.checked)"> Select All Visits
+            </label>
+            <button id="btn-bulk-delete-visits" class="btn btn-danger btn-sm" style="display: none;" onclick="app.bulkDeleteVisits()">
+              Delete Selected (<span id="selected-visits-count">0</span>)
+            </button>
+          </div>
+        `;
+      }
       visits.forEach(v => {
         const labNumStr = v.lab_number ? `(${this.escape(v.lab_number)})` : '(Pending Lab No)';
-        const isAdmin = this.currentUser && (this.currentUser.role === 'admin' || this.currentUser.role === 'superadmin');
-        const gridCols = isAdmin ? '4fr 1fr 1fr 1fr' : '4fr 1fr 1fr';
-        html += `<div style="display: grid; grid-template-columns: ${gridCols}; gap: 8px; margin-bottom: 8px; max-width: 800px;">
-                  <button class="btn btn-secondary btn-sm" style="text-align: left;" onclick="app.viewReport(${v.visit_id})">Visit ${v.visit_id} ${labNumStr} - ${v.created_at.split(' ')[0]}</button>
-                  <button class="btn btn-secondary btn-sm" onclick="app.openEditVisitModal(${v.visit_id})">Edit</button>
-                  <button class="btn btn-primary btn-sm" onclick="app.showAddTestModal(${v.visit_id})">Add Tests</button>
-                  ${isAdmin ? `<button class="btn btn-danger btn-sm" onclick="app.deleteVisit(${v.visit_id})">Delete</button>` : ''}
-                 </div>`;
+        if (isAdmin) {
+          html += `<div style="display: grid; grid-template-columns: 36px 4fr 1fr 1fr 1fr; gap: 8px; align-items: center; margin-bottom: 8px; width: 100%; max-width: 800px;">
+                    <div style="text-align: center;">
+                      <input type="checkbox" class="visit-checkbox" value="${v.visit_id}" onchange="app.onVisitSelectionChange()">
+                    </div>
+                    <button class="btn btn-secondary btn-sm" style="text-align: left;" onclick="app.viewReport(${v.visit_id})">Visit ${v.visit_id} ${labNumStr} - ${v.created_at.split(' ')[0]}</button>
+                    <button class="btn btn-secondary btn-sm" onclick="app.openEditVisitModal(${v.visit_id})">Edit</button>
+                    <button class="btn btn-primary btn-sm" onclick="app.showAddTestModal(${v.visit_id})">Add Tests</button>
+                    <button class="btn btn-danger btn-sm" onclick="app.deleteVisit(${v.visit_id})">Delete</button>
+                   </div>`;
+        } else {
+          html += `<div style="display: grid; grid-template-columns: 4fr 1fr 1fr; gap: 8px; margin-bottom: 8px; width: 100%; max-width: 800px;">
+                    <button class="btn btn-secondary btn-sm" style="text-align: left;" onclick="app.viewReport(${v.visit_id})">Visit ${v.visit_id} ${labNumStr} - ${v.created_at.split(' ')[0]}</button>
+                    <button class="btn btn-secondary btn-sm" onclick="app.openEditVisitModal(${v.visit_id})">Edit</button>
+                    <button class="btn btn-primary btn-sm" onclick="app.showAddTestModal(${v.visit_id})">Add Tests</button>
+                   </div>`;
+        }
       });
       container.innerHTML = html;
     } catch(e) {
@@ -1293,7 +1389,60 @@ const app = {
     }
   },
 
-  
+  toggleSelectAllVisits(checked) {
+    const checkboxes = document.querySelectorAll('.visit-checkbox');
+    checkboxes.forEach(cb => cb.checked = checked);
+    this.onVisitSelectionChange();
+  },
+
+  onVisitSelectionChange() {
+    const selected = document.querySelectorAll('.visit-checkbox:checked');
+    const all = document.querySelectorAll('.visit-checkbox');
+    const selectAllCb = document.getElementById('select-all-visits');
+    if (selectAllCb) {
+      selectAllCb.checked = all.length > 0 && selected.length === all.length;
+    }
+    const btn = document.getElementById('btn-bulk-delete-visits');
+    const countSpan = document.getElementById('selected-visits-count');
+    if (btn && countSpan) {
+      countSpan.textContent = selected.length;
+      btn.style.display = selected.length > 0 ? 'inline-block' : 'none';
+    }
+  },
+
+  async bulkDeleteVisits() {
+    const selected = Array.from(document.querySelectorAll('.visit-checkbox:checked')).map(cb => parseInt(cb.value, 10));
+    if (selected.length === 0) return;
+
+    this.confirmAction(
+      "Delete Selected Visits",
+      `Are you sure you want to delete ${selected.length} selected visit(s)? All associated test orders and results will be removed. This action cannot be undone.`,
+      async () => {
+        try {
+          const res = await fetch('/api/visits/bulk', {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ visit_ids: selected })
+          });
+          if (res.ok) {
+            const data = await res.json();
+            this.showNotificationModal("Success", `Deleted ${data.deleted_visit_ids.length} visit(s).`, false);
+            if (this.currentClientId) {
+              await this.loadHistoricalVisits(this.currentClientId);
+              await this.loadPendingTests(this.currentClientId);
+            }
+          } else {
+            const err = await res.json();
+            this.showNotificationModal("Error", err.detail || "Failed to delete visits.", true);
+          }
+        } catch(e) {
+          console.error(e);
+          this.showNotificationModal("Error", "Server error.", true);
+        }
+      }
+    );
+  },
+
   deleteVisit(visitId) {
     this.confirmAction(
       "Delete Visit",

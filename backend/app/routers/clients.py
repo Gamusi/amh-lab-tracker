@@ -4,7 +4,7 @@ from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from ..database import get_db
 from ..auth import get_current_user
-from ..schemas import VisitCreate, TestResultCreate, ParameterResultItem, AddOrdersRequest, ClientUpdate
+from ..schemas import VisitCreate, TestResultCreate, ParameterResultItem, AddOrdersRequest, ClientUpdate, BulkOrderDeleteRequest, BulkVisitDeleteRequest
 from ..evaluator import evaluate_result
 
 logger = logging.getLogger("amh_clients")
@@ -292,6 +292,31 @@ def add_orders_to_visit(visit_id: int, req: AddOrdersRequest, conn: sqlite3.Conn
     conn.commit()
     logger.info(f"Successfully added orders {added_order_ids} to visit {visit_id}")
     return {"status": "orders_added", "visit_id": visit_id, "order_ids": added_order_ids}
+
+@router.delete("/api/orders/bulk")
+def bulk_delete_orders(req: BulkOrderDeleteRequest, conn: sqlite3.Connection = Depends(get_db), current_user: dict = Depends(get_current_user)):
+    logger.info(f"User '{current_user['username']}' is bulk deleting orders: {req.order_ids}")
+    cur = conn.cursor()
+    deleted_ids = []
+    skipped_ids = []
+    
+    for order_id in req.order_ids:
+        cur.execute("SELECT status FROM test_orders WHERE id = ?", (order_id,))
+        row = cur.fetchone()
+        if row and row["status"] == "pending":
+            cur.execute("DELETE FROM test_orders WHERE id = ?", (order_id,))
+            deleted_ids.append(order_id)
+        else:
+            skipped_ids.append(order_id)
+            
+    if deleted_ids:
+        now_str = datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%d %H:%M:%S")
+        cur.execute("INSERT INTO audit_log (user_id, action, detail, timestamp) VALUES (?, 'DELETE_ORDERS_BULK', ?, ?)",
+                    (current_user["id"], f"Bulk deleted pending test orders: {deleted_ids}", now_str))
+        
+    conn.commit()
+    logger.info(f"Bulk deleted orders result - deleted: {deleted_ids}, skipped: {skipped_ids}")
+    return {"status": "deleted", "deleted_order_ids": deleted_ids, "skipped_order_ids": skipped_ids}
 
 @router.delete("/api/orders/{order_id}")
 def delete_order(order_id: int, conn: sqlite3.Connection = Depends(get_db), current_user: dict = Depends(get_current_user)):
@@ -720,6 +745,41 @@ def get_visit_details(visit_id: int, conn: sqlite3.Connection = Depends(get_db),
     data = dict(visit_row)
     data["orders"] = orders
     return data
+
+@router.delete("/api/visits/bulk")
+def bulk_delete_visits(req: BulkVisitDeleteRequest, conn: sqlite3.Connection = Depends(get_db), current_user: dict = Depends(get_current_user)):
+    if current_user["role"] not in ["admin", "superadmin"]:
+        raise HTTPException(status_code=403, detail="Only admins can delete visits")
+        
+    logger.info(f"Admin '{current_user['username']}' is bulk deleting visits: {req.visit_ids}")
+    cur = conn.cursor()
+    deleted_ids = []
+    skipped_ids = []
+    now_str = datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%d %H:%M:%S")
+    
+    for visit_id in req.visit_ids:
+        cur.execute("SELECT id, is_deleted FROM visits WHERE id = ?", (visit_id,))
+        visit_row = cur.fetchone()
+        if not visit_row or visit_row["is_deleted"] == 1:
+            skipped_ids.append(visit_id)
+            continue
+            
+        cur.execute("SELECT id FROM test_orders WHERE visit_id = ?", (visit_id,))
+        orders = cur.fetchall()
+        for o in orders:
+            cur.execute("DELETE FROM test_results WHERE order_id = ?", (o["id"],))
+            
+        cur.execute("DELETE FROM test_orders WHERE visit_id = ?", (visit_id,))
+        cur.execute("UPDATE visits SET is_deleted = 1 WHERE id = ?", (visit_id,))
+        cur.execute(
+            "INSERT INTO audit_log (user_id, action, detail, timestamp) VALUES (?, 'DELETE_VISIT', ?, ?)",
+            (current_user["id"], f"Soft-deleted visit ID {visit_id} and removed associated test orders (bulk)", now_str)
+        )
+        deleted_ids.append(visit_id)
+        
+    conn.commit()
+    logger.info(f"Bulk deleted visits result - deleted: {deleted_ids}, skipped: {skipped_ids}")
+    return {"status": "deleted", "deleted_visit_ids": deleted_ids, "skipped_visit_ids": skipped_ids}
 
 @router.delete("/api/visits/{visit_id}")
 def delete_visit(visit_id: int, conn: sqlite3.Connection = Depends(get_db), current_user: dict = Depends(get_current_user)):
