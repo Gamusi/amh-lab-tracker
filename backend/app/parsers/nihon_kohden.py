@@ -27,71 +27,148 @@ CBC_PARAMETER_DEFINITIONS = [
     {"name": "PLT Distribution Width (PDW)", "unit": "%"}
 ]
 
+# Matches a standalone CBC result field: optional whitespace, number, optional flag, optional whitespace.
+# e.g. " 4.1  ", "30.4* ", "6.92H ", " 175  ", "0.13L "
+_VALUE_FIELD_RE = re.compile(r'^\s*(\d+(?:\.\d+)?)\s*([*HLhl])?\s*$')
+_YEAR_RE = re.compile(r'^20\d{2}$')
+_TWO_DIGIT_RE = re.compile(r'^\d{1,2}$')
+
+
+def _isolate_results_record(raw_text: str) -> Optional[str]:
+    """
+    The MEK-7222 outputs two records per sample, separated by \\n:
+      Record 1 (patient results):  starts with [host] [Send]<STX>MEK-7222
+      Record 2 (reference ranges): starts with [host] [Send]<STX>EXP
+    Returns the patient-results record as a raw string (CR-delimited fields intact).
+    Returns None if only an EXP record is present (no patient data to parse).
+    """
+    lines = raw_text.split('\n')
+    for line in lines:
+        # Must contain MEK-7222 and must NOT be the EXP reference-ranges record
+        if 'MEK-7222' in line and 'EXP' not in line and line.strip():
+            return line
+    # No suitable line found — do NOT fall back to an EXP line
+    return None
+
+
+
 def parse_nihon_kohden_output(raw_text: str) -> Dict[str, Any]:
     """
-    Parses raw transmission output from Nihon Kohden MEK-7222 / MEK series hematology analyzer.
-    Extracts Sample ID, timestamp, device model, and sequential CBC parameters with hardware flags.
-    Robust against arbitrary clipboard prefixes, log wrappers, missing headers, tabs, or whitespace variance.
+    Parses raw serial/clipboard output from Nihon Kohden MEK-7222 hematology analyzer.
+
+    Real protocol format (discovered from reference files):
+    - STX (0x02) at record start, ETX (0x03) at record end.
+    - Fields are delimited by bare CR (\\r, 0x0D).
+    - Date is split across three consecutive CR-fields: YYYY \\r MM \\r DD
+    - Time is split across three consecutive CR-fields: HH \\r MM \\r SS
+      with a possible empty/whitespace field between date and time.
+    - Result values are individual CR-fields, e.g. " 4.1  \\r30.4* \\r..."
+    - A 3-digit status/run code (e.g. "102") immediately precedes the values.
+    - Record 2 (reference ranges) starts with EXP and is discarded.
     """
     if not raw_text or not isinstance(raw_text, str):
         return {"status": "error", "detail": "Empty or invalid raw text input"}
 
-    clean_text = raw_text.strip()
-    if not clean_text:
+    if not raw_text.strip():
         return {"status": "error", "detail": "No content to parse"}
 
-    # Extract sample ID: 5 to 8 digits
+    # Strip STX (0x02), ETX (0x03), and other non-printable control chars
+    # but preserve CR (\r = 0x0D) and LF (\n = 0x0A) which are structural.
+    clean_text = re.sub(r'[\x00-\x09\x0b\x0c\x0e-\x1f\x7f]', '', raw_text)
+
+    # Isolate the patient-results record (line 1, not the EXP reference-ranges line)
+    record = _isolate_results_record(clean_text)
+    if not record:
+        return {"status": "error", "detail": "No content to parse"}
+
+    # Split into fields on CR
+    fields = [f.strip() for f in record.split('\r')]
+
+    # --- Sample ID ---
+    # The sample ID is a 6-8 digit field (distinct from 5-digit machine codes like 01024, 01536).
     sample_id = None
-    sample_match = re.search(r"\b(\d{5,8})\b", clean_text)
-    if sample_match:
-        sample_id = sample_match.group(1)
-
-    # Extract date & time: YYYYMMDD and HHMMSS (e.g. 20260817 and 145705)
-    timestamp = None
-    date_match = re.search(r"\b(20\d{6})\b\s+\b(\d{6})", clean_text)
-    if date_match:
-        d_str = date_match.group(1)
-        t_str = date_match.group(2)
-        timestamp = f"{d_str[:4]}-{d_str[4:6]}-{d_str[6:8]} {t_str[:2]}:{t_str[2:4]}:{t_str[4:6]}"
-        # Result values are on the SAME line as the timestamp.
-        # Grab only that line to avoid reference ranges from a second [Send] line.
-        search_scope = clean_text[date_match.end():]
-        first_newline = search_scope.find('\n')
-        if first_newline != -1:
-            search_scope = search_scope[:first_newline]
-    else:
-        # No timestamp found — pick the line with the most flagged numeric values
-        # (flags: *, H, L) — that is almost certainly the results line.
-        lines = clean_text.splitlines()
-        best_line = clean_text
-        best_flag_count = 0
-        for line in lines:
-            flag_count = len(re.findall(r'\d+(?:\.\d+)?[*HLhl]', line))
-            if flag_count > best_flag_count:
-                best_flag_count = flag_count
-                best_line = line
-        search_scope = best_line
-
-    # Extract all numeric values with optional flags (*, H, L, etc.)
-    # Matches tokens like: 4.1, 30.4*, 6.92H, 76.2L, 175, 0.13L
-    raw_tokens = re.findall(r"(\d+(?:\.\d+)?)\s*([*HLhl])?", search_scope)
-
-    # Build clean token list
-    filtered_tokens = []
-    for num_str, flag_str in raw_tokens:
-        flag_clean = flag_str.upper() if flag_str else None
-        filtered_tokens.append((num_str, flag_clean))
-
-    # Strip any leading 3-digit integer status/run codes (e.g. 102, 100, 001).
-    # A status code is a pure integer (no decimal), value 100-999, no flag.
-    while filtered_tokens:
-        candidate, flag = filtered_tokens[0]
-        is_integer = '.' not in candidate
-        is_status_code = is_integer and 100 <= int(candidate) <= 999 and flag is None
-        if is_status_code:
-            filtered_tokens = filtered_tokens[1:]
-        else:
+    for f in fields:
+        if re.match(r'^\d{6,8}$', f):
+            sample_id = f
             break
+    if not sample_id:
+        # Broader fallback: any 5-8 digit standalone field
+        for f in fields:
+            if re.match(r'^\d{5,8}$', f):
+                sample_id = f
+                break
+
+    # --- Timestamp ---
+    # Find the year field (20XX), then collect month, day, [gap?], hour, min, sec.
+    timestamp = None
+    year_idx = None
+    for i, f in enumerate(fields):
+        if _YEAR_RE.match(f):
+            year_idx = i
+            break
+
+    time_end_idx = year_idx if year_idx is not None else 0
+
+    if year_idx is not None:
+        try:
+            year = fields[year_idx]
+            month = fields[year_idx + 1].zfill(2)
+            day = fields[year_idx + 2].zfill(2)
+
+            # Scan forward from year+3 for hour, minute, second (1-2 digit fields),
+            # skipping empty/whitespace-only gap fields.
+            time_parts: List[str] = []
+            j = year_idx + 3
+            while j < len(fields) and len(time_parts) < 3:
+                candidate = fields[j]
+                if _TWO_DIGIT_RE.match(candidate):
+                    time_parts.append(candidate.zfill(2))
+                    time_end_idx = j
+                elif candidate == '':
+                    pass  # gap between date and time
+                else:
+                    # Non-empty non-numeric: we've overshot
+                    if time_parts:
+                        break
+                j += 1
+
+            if len(time_parts) == 3:
+                timestamp = f"{year}-{month}-{day} {time_parts[0]}:{time_parts[1]}:{time_parts[2]}"
+        except (IndexError, ValueError):
+            pass
+
+    # --- Result values ---
+    # Start scanning from just after the last time field.
+    # Skip leading 3-digit integer status/run codes (e.g. "102").
+    # Collect fields that match the value pattern; stop at the first
+    # non-empty, non-numeric field (start of the flags/morphology section).
+    filtered_tokens: List[tuple] = []
+    started_values = False
+
+    for i in range(time_end_idx + 1, len(fields)):
+        f = fields[i]
+        m = _VALUE_FIELD_RE.match(f)
+        if m:
+            num_str = m.group(1)
+            flag_str = m.group(2)
+            flag_clean = flag_str.upper() if flag_str else None
+
+            if not started_values:
+                # Skip leading status code(s): integer, 100-999, no flag
+                if '.' not in num_str and flag_clean is None and 100 <= int(num_str) <= 999:
+                    continue
+                started_values = True
+
+            filtered_tokens.append((num_str, flag_clean))
+
+            # Stop once we have all 22 — avoids bleeding into flag columns
+            if len(filtered_tokens) == len(CBC_PARAMETER_DEFINITIONS):
+                break
+        elif started_values:
+            if f:
+                # Non-empty non-numeric field after values started → end of values
+                break
+            # Empty gap — continue
 
     if len(filtered_tokens) < 18:
         return {
@@ -99,11 +176,11 @@ def parse_nihon_kohden_output(raw_text: str) -> Dict[str, Any]:
             "detail": (
                 f"Could not extract sufficient CBC parameters. "
                 f"Found {len(filtered_tokens)} numeric tokens after parsing. "
-                f"Ensure you paste the complete analyzer output line containing the results."
+                f"Ensure you paste the complete analyzer output including the results line."
             )
         }
 
-    # Map up to 22 parameters (take only the first 22 tokens)
+    # --- Map to parameter definitions ---
     parsed_parameters: List[Dict[str, Any]] = []
     limit = min(len(filtered_tokens), len(CBC_PARAMETER_DEFINITIONS))
     for i in range(limit):
