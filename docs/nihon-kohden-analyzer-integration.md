@@ -186,18 +186,18 @@ The entire Complete Blood Count (CBC) report is formatted on **one single dedica
 | Platelets Count                | 175       | (10^3 / uL)    |          | [ 150-400 ]                |
 +--------------------------------+-----------+----------------+----------+----------------------------+
 | RELATIVE DIFFERENTIAL (%)      |           |                |          |                            |
-| Neutrophils                    | 30.4      | %              | Panic *  | [ 40.0-65.0 ]              |
-| Lymphocytes                    | 55.3      | %              | Panic *  | [ 19.2-49.5 ]              |
-| Monocytes                      | 10.0      | %              | Panic *  | [ 4.5-12.1 ]               |
-| Eosinophils                    | 2.7       | %              | Panic *  | [ 1.0-12.0 ]               |
-| Basophils                      | 1.6       | %              | Panic *  | [ 0.0-2.0 ]                |
+| Neutrophils                    | 30.4      | %              | *        | [ 40.0-65.0 ]              |
+| Lymphocytes                    | 55.3      | %              | *        | [ 19.2-49.5 ]              |
+| Monocytes                      | 10.0      | %              | *        | [ 4.5-12.1 ]               |
+| Eosinophils                    | 2.7       | %              | *        | [ 1.0-12.0 ]               |
+| Basophils                      | 1.6       | %              | *        | [ 0.0-2.0 ]                |
 +--------------------------------+-----------+----------------+----------+----------------------------+
 | ABSOLUTE DIFFERENTIAL (10^9/uL)|           |                |          |                            |
-| Neutrophils                    | 1.3       | 10^9 / uL      | Panic *  | [ 2.0-7.0 ]                |
-| Lymphocytes                    | 2.3       | 10^9 / uL      | Panic *  | [ 1.0-4.8 ]                |
-| Monocytes                      | 0.4       | 10^9 / uL      | Panic *  | [ 0.2-1.0 ]                |
-| Eosinophils                    | 0.1       | 10^9 / uL      | Panic *  | [ 0.0-0.5 ]                |
-| Basophils                      | 0.1       | 10^9 / uL      | Panic *  | [ 0.0-0.2 ]                |
+| Neutrophils                    | 1.3       | 10^9 / uL      | *        | [ 2.0-7.0 ]                |
+| Lymphocytes                    | 2.3       | 10^9 / uL      | *        | [ 1.0-4.8 ]                |
+| Monocytes                      | 0.4       | 10^9 / uL      | *        | [ 0.2-1.0 ]                |
+| Eosinophils                    | 0.1       | 10^9 / uL      | *        | [ 0.0-0.5 ]                |
+| Basophils                      | 0.1       | 10^9 / uL      | *        | [ 0.0-0.2 ]                |
 +--------------------------------+-----------+----------------+----------+----------------------------+
 | RBC & PLATELET INDICES         |           |                |          |                            |
 | RBC Distribution Width (RDW)   | 12.9      | %              |          | [ 11.0-16.0 ]              |
@@ -225,7 +225,7 @@ The entire Complete Blood Count (CBC) report is formatted on **one single dedica
 
 1. **Technician Review Gate**: Never automatically persist analyzer output to the database without explicit user confirmation in the result entry modal.
 2. **Structural Control Character Preservation**: Sanitization steps must preserve `\r` and `\n` while stripping non-printable ASCII bytes (`\x00-\x09`, `\x0b-\x0c`, `\x0e-\x1f`, `\x7f`).
-3. **Hardware Flag & Range Preservation**: Machine flags (`*` for panic/uncertainty, `H` for high, `L` for low) and calibrated reference ranges must be reported as-is without alteration.
+3. **Hardware Flag & Range Preservation**: Machine flags (`*`, `H` for high, `L` for low) and calibrated reference ranges must be reported as-is without alteration.
 4. **Single-Page CBC Layout**: The PDF generator must always render the complete 22-parameter CBC report on a single dedicated page matching `docs/reference/rptrchemcour.pdf`.
 5. **No Emojis & Clean UI Standards**: In accordance with `docs/BEST_PRACTICES.md`, no emojis or pill badges may be introduced to the analyzer UI or logs.
 

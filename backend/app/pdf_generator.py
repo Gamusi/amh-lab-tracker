@@ -208,9 +208,9 @@ def _build_cbc_table(order_data: dict, cbc_test: dict) -> list:
         # Format flag: Low, High, *, etc.
         flag_display = ""
         if flag_val:
-            if flag_val == "L": flag_display = "Low"
-            elif flag_val == "H": flag_display = "High"
-            elif flag_val == "*": flag_display = "Panic *"
+            if flag_val in ("L", "Low"): flag_display = "Low"
+            elif flag_val in ("H", "High"): flag_display = "High"
+            elif flag_val == "*": flag_display = "*"
             else: flag_display = str(flag_val)
 
         return [display_name, str(res_val), str(unit_val or ""), flag_display, f"[ {ref_val} ]" if ref_val else ""]
