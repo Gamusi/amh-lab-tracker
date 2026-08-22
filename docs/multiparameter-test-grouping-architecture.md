@@ -2,10 +2,11 @@
 
 ## 1. Executive Summary & Context
 
-Clinical laboratory medicine relies heavily on composite diagnostic panels where a single clinical order encompasses multiple discrete biochemical, hematological, or microbiological parameters. Examples in the AMH Lab Tracker include:
-- **Complete Blood Count (CBC)**: 22 distinct quantitative parameters spanning red cell, white cell, differential, and platelet indices.
-- **Urinalysis**: 10 chemical strip analytes (pH, Protein, Glucose, Leukocytes, Nitrites, Ketones, Urobilinogen, Bilirubin, Blood, Specific Gravity) combined with macroscopic and microscopic examination findings.
-- **Renal Function Tests (RFTs / Basic Metabolic Panel)**: Urea, Creatinine, Electrolytes (Sodium, Potassium, Chloride).
+Clinical laboratory medicine relies heavily on composite diagnostic panels where a single clinical order encompasses multiple discrete biochemical, hematological, or microbiological parameters. Key panels in the AMH Lab Tracker include:
+- **Complete Blood Count (CBC)**: 22 distinct quantitative parameters spanning red cell, white cell, differential, and platelet indices. While automated hematology analyzers measure and derive these parameters as a single unified analytical process, it is critical to identify and track each parameter independently; in clinical pathology, deviations from normal are rarely uniform across all analytes—specific parameters deviate under disease states (e.g., isolated erythrocytosis, selective neutropenia, thrombocytopenia) while others remain entirely normal.
+- **Urinalysis**: 10 chemical strip analytes (pH, Protein, Glucose, Leukocytes, Nitrites, Ketones, Urobilinogen, Bilirubin, Blood, Specific Gravity) combined with macroscopic and microscopic examination findings. Reported as one composite test with multiple separately measured parameters, each providing distinct clinical insight into renal function, systemic metabolism, hepatic clearance, and urinary tract infections.
+- **Renal Function Tests (RFTs)**: Urea, Creatinine (with optional estimated Glomerular Filtration Rate).
+- **Electrolyte Panel**: Sodium (Na⁺), Potassium (K⁺), Chloride (Cl⁻). Maintained as a separate diagnostic panel from RFTs to allow targeted electrolyte management or combined renal-metabolic profiling.
 - **Liver Function Tests (LFTs)**: Total Bilirubin, Direct Bilirubin, ALT, AST, Alkaline Phosphatase, Total Protein, Albumin.
 - **Lipid Profile**: Total Cholesterol, Triglycerides, HDL Cholesterol, LDL Cholesterol.
 - **HIV Testing Service (HTS)**: Multi-step algorithm consisting of Screening Assay (Determine), Confirmatory Assay (Stat-Pak), and Tie-Breaker (SD Bioline).
@@ -43,9 +44,11 @@ The system separates test categorization into two relational levels:
 ```
 
 #### Clinical & Technical Justification
-- **Single-Click Ordering vs Granular Results**: Clinicians order a single panel (e.g., "Urinalysis" or "CBC") rather than 10 to 22 individual tests. At the workbench level, lab technologists require individual input fields for each discrete analyte.
-- **Normalized Storage & Scalability**: Storing parameter values as structured child rows in `test_results` rather than arbitrary JSON blobs allows direct relational querying, statistical aggregation, automated reference range evaluation, and audit tracking per parameter.
+- **Single-Click Ordering with Unified Panel Integrity**: Clinicians order a single composite panel (e.g., "Complete Blood Count (CBC)" or "Urinalysis") under a single visit order. The system never fragments multi-parameter tests into separate visits or separate test orders.
+- **Granular Discrete Parameter Review**: At the workbench level, lab technologists enter and review results in a dedicated multi-field interface where each parameter displays its own value, unit, and machine/evaluator flag.
+- **Normalized Storage & Scalability**: Storing parameter values as structured child rows in `test_results` linked to a single `test_orders.id` enables direct relational querying, automated reference range comparison, and audit tracking per parameter while keeping the visit structure unified.
 - **Flexible Catalog Management**: Lab administrators can add, reorder, or update individual parameters of a panel (e.g., adjusting reference ranges or units) in `test_parameters` without breaking existing visit orders or historic reports.
+
 
 ---
 

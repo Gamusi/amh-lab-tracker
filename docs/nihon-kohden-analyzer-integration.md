@@ -1,10 +1,15 @@
 # Nihon Kohden MEK-7222 Hematology Analyzer Integration & Parser
 
-## 1. Executive Summary & Context
+## 1. Executive Summary & Operational Context
 
 The Complete Blood Count (CBC) is the highest-volume multi-parameter diagnostic test in the clinical laboratory, consisting of 22 sequential numeric parameters and morphological flags. Manual transcription of 22 parameters per client sample from analyzer printouts or screen displays into a LIMS introduces significant transcription risk, cognitive fatigue, and administrative delay.
 
-The AMH Lab Tracker integrates automated output parsing for the **Nihon Kohden MEK-7222 / Celltac series** (and compatible MEK-7300 serial communication formats). This module enables laboratory technologists to capture raw analyzer transmission streams via serial clipboard paste, instantaneously extracting Sample IDs, transmission timestamps, hardware flags, and all 22 CBC parameters into the interactive result entry workbench.
+### 1.1 Current Laboratory Workflow & Supplier Interfacing Setup
+In the current hospital laboratory configuration:
+1. **Instrument & Interfacing Host**: The Nihon Kohden MEK-7222 / Celltac series (and MEK-7300 series) hematology analyzer is connected via an RS-232 serial cable to a dedicated laboratory workstation running the supplier's proprietary Windows interfacing software (e.g., `NIHON KOHDEN 7300.exe` / `Interfacing.mdb`).
+2. **Data Capture**: When the analyzer completes a blood sample run, the supplier interfacing application receives and displays the raw transmission log containing the sample ID, timestamp, and results.
+3. **AMH Lab Tracker Import**: Rather than relying on fragile direct database hooks or proprietary ODBC drivers, the technologist simply copies the raw transmission text from the supplier interfacing window, clicks `[ Paste from Analyzer ]` inside the CBC result entry modal in AMH Lab Tracker, and pastes the content.
+4. **Automated Population**: AMH Lab Tracker instantly parses the text, extracts the Sample ID and all 22 parameter values along with their machine-calibrated flags, and populates the editable result entry form for technologist inspection before saving.
 
 ---
 
@@ -12,7 +17,7 @@ The AMH Lab Tracker integrates automated output parsing for the **Nihon Kohden M
 
 ### 2.1 Serial Protocol Characteristics
 
-The Nihon Kohden MEK-7222 analyzer transmits sample data over an RS-232 serial interface using standard ASCII control characters and carriage-return delimited fields:
+The Nihon Kohden MEK-7222 analyzer transmits sample data over an RS-232 serial stream using standard ASCII control characters and bare carriage-return delimited fields:
 
 | Element | ASCII Hex | Representation | Function |
 | :--- | :--- | :--- | :--- |
@@ -21,25 +26,32 @@ The Nihon Kohden MEK-7222 analyzer transmits sample data over an RS-232 serial i
 | **CR** | `0x0D` | `\r` | Field Delimiter (Bare Carriage Return) |
 | **LF** | `0x0A` | `\n` | Record Delimiter (Line Feed) |
 
-### 2.2 Dual Record Structure
+---
+
+### 2.2 Dual Record Structure & Calibrated Reference Intervals
 
 Each sample transmission consists of two distinct records separated by a newline (`\n`):
 
-1. **Record 1 (Patient Test Results)**: Starts with `[host] [Send]<STX>MEK-7222` and contains client sample identification, acquisition timestamp, run status code, 22 numerical parameters with machine flags, and morphology alert distributions.
-2. **Record 2 (Analyzer Reference Ranges)**: Starts with `[host] [Send]<STX>EXP` and transmits internal factory reference intervals. **This record must be discarded by the parser** to prevent token bloat and numeric collisions.
+1. **Record 1 (Patient Test Results)**: Starts with `[host] [Send]<STX>MEK-7222` and contains client sample identification, acquisition timestamp, run status code, 22 numerical parameters with instrument-derived flags (`*`, `H`, `L`), and morphology alert distributions.
+2. **Record 2 (Analyzer-Calibrated Reference Intervals)**: Starts with `[host] [Send]<STX>EXP` and transmits the instrument's preset low and high reference limits for each parameter (e.g., `4.0 9.0` for WBC, `12.0 18.0` for Hb, `150 350` for PLT).
 
 ```
 +-----------------------------------------------------------------------------------------+
-| RECORD 1 (Patient Data):                                                                |
+| RECORD 1 (Patient Numerical Results & Machine Flags):                                   |
 | [host] [Send]<STX>MEK-7222\r   22\r01024\rCLOSED\rCBC + Diff\r01\rBLOOD\r01\r0002413\r |
 | V03-02\rV04-02\rV03-01\r01536\r1\r\r2026\r08\r17\r\r14\r57\r05\r102\r                   |
 |  4.1\r30.4*\r55.3*\r10.0*\r 2.7*\r 1.6*\r 1.3*\r 2.3*\r 0.4*\r 0.1*\r 0.1*\r           |
 | 6.92H\r16.9\r52.7H\r76.2L\r24.4L\r32.1\r12.9\r 175\r0.13L\r 7.6\r17.6H\r<flags...><ETX>  |
 +-----------------------------------------------------------------------------------------+
-| RECORD 2 (Factory Reference Intervals - Ignored):                                       |
+| RECORD 2 (Analyzer-Preset Reference Thresholds):                                        |
 | [host] [Send]<STX>EXP\r00512\rMEK-7222\r01\r... 4.0\r 9.0\r28.0\r78.0...\r<ETX>         |
 +-----------------------------------------------------------------------------------------+
 ```
+
+#### Clinical Principle: Capturing Machine Calibration As-Is
+The hematology analyzer is calibrated to operate with its own verified reference intervals, and the instrument's hardware flags (`*`, `H`, `L`) are directly derived from these preset intervals. AMH Lab Tracker captures the raw output as calculated and flagged by the instrument without recalculating or altering the clinical values. 
+
+The parser isolates Record 1 to extract the patient values and hardware flags, while referencing the calibrated standard ranges to guarantee complete alignment with the instrument's official output.
 
 ---
 
@@ -107,7 +119,7 @@ Seq  Database Parameter Name                      Unit       Clinical Category
 ### 3.1 Dual-Mode Stream Parser (`_extract_fields`)
 
 #### The Problem
-When raw serial data is captured directly from an RS-232 COM port stream, fields are separated by bare carriage returns (`\r`). However, when laboratory technologists copy output from terminal software or host viewers and paste it into a web browser `<textarea>`, the operating system clipboard and browser DOM automatically normalize bare `\r` characters into newline characters (`\n`).
+When raw serial data is captured directly from an RS-232 COM port stream, fields are separated by bare carriage returns (`\r`). However, when laboratory technologists copy output from the supplier interfacing window and paste it into a web browser `<textarea>`, the operating system clipboard and browser DOM automatically normalize bare `\r` characters into newline characters (`\n`).
 
 #### Technical Solution
 `backend/app/parsers/nihon_kohden.py` implements a dual-mode extractor that dynamically inspects input characteristics:
@@ -148,19 +160,52 @@ def _extract_fields(raw_text: str) -> List[str]:
 - **Zero Local Client Drivers**: Traditional LIMS require proprietary COM port listener services, Windows background daemons, or MS Access ODBC bridges (`Interfacing.mdb`). This creates brittle installation dependencies on client PCs.
 - **Network Agnostic & Offline Resilient**: The in-modal clipboard capture works across modern web browsers without local installation, specialized browser extensions, or administrative OS privileges.
 - **Technician-in-the-Loop Verification**: Direct automatic writing to the database bypasses clinical review. In-modal capture pre-populates editable form rows, highlighting panic flags (`*`, `H`, `L`), allowing the technologist to inspect, calibrate, or manually adjust any parameter before saving.
+- **Unified Single-Visit Integrity**: Parsing does not create independent visits or fragmented records. All 22 parameters are attached to the existing CBC order within the active visit.
 
 ---
 
-### 3.3 Dedicated ReportLab PDF Formatting
+### 3.3 Dedicated Single-Page ReportLab PDF Formatting
 
-#### Justification
-A 22-parameter CBC report exceeds the standard tabular constraints of regular chemistry or rapid diagnostic tests. To match standard laboratory printing conventions (e.g., matching the reference template `rptrchemcour.pdf`), the PDF generation engine (`backend/app/pdf_generator.py`) generates a dedicated **HAEMATOLOGY CBC REPORT** page organized into 4 logical clinical sections:
-1. **Main Indices**: WBC, RBC, Hb, HCT, MCV, MCH, MCHC, PLT.
-2. **Relative Differential (%)**: Neutrophils, Lymphocytes, Monocytes, Eosinophils, Basophils.
-3. **Absolute Differential (10⁹/µL)**: Neutrophils, Lymphocytes, Monocytes, Eosinophils, Basophils.
-4. **RBC & Platelet Indices**: RDW, PCT, MPV, PDW.
+#### Strict Clinical Standard (`docs/reference/rptrchemcour.pdf`)
+The entire Complete Blood Count (CBC) report is formatted on **one single dedicated page** in the generated PDF report. The table structure exactly mirrors the clinical reference standard (`docs/reference/rptrchemcour.pdf`):
 
-Columns include: `Test`, `Result`, `Units`, `Flag` (`Low`, `High`, `Panic *`), and `Ref. Ranges`.
+```
++-----------------------------------------------------------------------------------------------------+
+|                                      HAEMATOLOGY CBC REPORT                                         |
++-----------------------------------------------------------------------------------------------------+
+| Test Name                      | Result    | Units          | Flag     | Ref. Ranges                |
++--------------------------------+-----------+----------------+----------+----------------------------+
+| MAIN INDICES                   |           |                |          |                            |
+| Total WBC Count                | 4.1       | (10^3 / uL)    |          | [ 6.0-14.0 ]               |
+| Red Blood Cells (RBC)          | 6.92      | (10^6 / uL)    | High     | [ 4.00 -5.20 ]             |
+| Hemoglobin (Hb)                | 16.9      | g/dL           |          | [ 11.5-15.5 ]              |
+| Hematocrit (HCT)               | 52.7      | %              | High     | [ 35.0-45.0 ]              |
+| Mean Cell Volume (MCV)         | 76.2      | fL             | Low      | [ 77.0-95.0 ]              |
+| Mean Cell Hb (MCH)             | 24.4      | pg             | Low      | [ 23.0-31.0 ]              |
+| Mean Cell Hb Conc.(MCHC)       | 32.1      | g/dL           |          | [ 28.0-33.0 ]              |
+| Platelets Count                | 175       | (10^3 / uL)    |          | [ 150-400 ]                |
++--------------------------------+-----------+----------------+----------+----------------------------+
+| RELATIVE DIFFERENTIAL (%)      |           |                |          |                            |
+| Neutrophils                    | 30.4      | %              | Panic *  | [ 40.0-65.0 ]              |
+| Lymphocytes                    | 55.3      | %              | Panic *  | [ 19.2-49.5 ]              |
+| Monocytes                      | 10.0      | %              | Panic *  | [ 4.5-12.1 ]               |
+| Eosinophils                    | 2.7       | %              | Panic *  | [ 1.0-12.0 ]               |
+| Basophils                      | 1.6       | %              | Panic *  | [ 0.0-2.0 ]                |
++--------------------------------+-----------+----------------+----------+----------------------------+
+| ABSOLUTE DIFFERENTIAL (10^9/uL)|           |                |          |                            |
+| Neutrophils                    | 1.3       | 10^9 / uL      | Panic *  | [ 2.0-7.0 ]                |
+| Lymphocytes                    | 2.3       | 10^9 / uL      | Panic *  | [ 1.0-4.8 ]                |
+| Monocytes                      | 0.4       | 10^9 / uL      | Panic *  | [ 0.2-1.0 ]                |
+| Eosinophils                    | 0.1       | 10^9 / uL      | Panic *  | [ 0.0-0.5 ]                |
+| Basophils                      | 0.1       | 10^9 / uL      | Panic *  | [ 0.0-0.2 ]                |
++--------------------------------+-----------+----------------+----------+----------------------------+
+| RBC & PLATELET INDICES         |           |                |          |                            |
+| RBC Distribution Width (RDW)   | 12.9      | %              |          | [ 11.0-16.0 ]              |
+| Thrombocrit (PCT)              | 0.13      | %              | Low      | [ 0.15-0.50 ]              |
+| Mean Platelet Volume (MPV)     | 7.6       | fL             |          | [ 7.0-11.0 ]               |
+| PLT Distribution Width (PDW)   | 17.6      | %              | High     | [ 15.0-17.0 ]              |
++--------------------------------+-----------+----------------+----------+----------------------------+
+```
 
 ---
 
@@ -171,7 +216,7 @@ Columns include: `Test`, `Result`, `Units`, `Flag` (`Low`, `High`, `Panic *`), a
 | **Parser Engine** | `backend/app/parsers/nihon_kohden.py` | Pure Python tokenizer and regular expression engine with zero external third-party dependencies. |
 | **Integration API** | `backend/app/routers/integrations.py` | FastAPI route `POST /api/integrations/parse-analyzer-output` with schema validation and authentication guards. |
 | **Frontend UI Controller** | `frontend/static/js/app.js` | Modal paste drawer toggle, clipboard async dispatch, and DOM element population across `.modal-param-row`. |
-| **Clinical PDF Renderer** | `backend/app/pdf_generator.py` | ReportLab flowables, categorized section tables, keep-together flowables, and signature block rendering. |
+| **Clinical PDF Renderer** | `backend/app/pdf_generator.py` | ReportLab flowables, categorized 4-section table, keep-together flowables, and signature block rendering on a single dedicated page. |
 | **Test Suite** | `tests/test_nihon_kohden_parser.py`, `tests/test_integrations_api.py`, `tests/test_pdf_cbc_report.py` | Pytest fixtures covering raw serial streams, clipboard text, edge cases, and PDF layout validation. |
 
 ---
@@ -180,8 +225,8 @@ Columns include: `Test`, `Result`, `Units`, `Flag` (`Low`, `High`, `Panic *`), a
 
 1. **Technician Review Gate**: Never automatically persist analyzer output to the database without explicit user confirmation in the result entry modal.
 2. **Structural Control Character Preservation**: Sanitization steps must preserve `\r` and `\n` while stripping non-printable ASCII bytes (`\x00-\x09`, `\x0b-\x0c`, `\x0e-\x1f`, `\x7f`).
-3. **Hardware Flag Preservation**: Machine flags (`*` for panic/uncertainty, `H` for high, `L` for low) must be extracted and preserved alongside numeric values for clinician decision support.
-4. **Reference Range Record Rejection**: Any record identified with the `EXP` header must be discarded to prevent contamination of patient parameter values.
+3. **Hardware Flag & Range Preservation**: Machine flags (`*` for panic/uncertainty, `H` for high, `L` for low) and calibrated reference ranges must be reported as-is without alteration.
+4. **Single-Page CBC Layout**: The PDF generator must always render the complete 22-parameter CBC report on a single dedicated page matching `docs/reference/rptrchemcour.pdf`.
 5. **No Emojis & Clean UI Standards**: In accordance with `docs/BEST_PRACTICES.md`, no emojis or pill badges may be introduced to the analyzer UI or logs.
 
 ---
@@ -194,3 +239,4 @@ Columns include: `Test`, `Result`, `Units`, `Flag` (`Low`, `High`, `Panic *`), a
    - Human Diagnostics Humalyzer & HumaCount series.
    - Sysmex XP / XN hematology analyzers.
 3. **Standard ASTM E1381 / E1394 & HL7 v2 Interfacing**: Implement a bidirectional background microservice supporting full ASTM/HL7 protocols for automated query and batch result uploads across hospital local area networks.
+
