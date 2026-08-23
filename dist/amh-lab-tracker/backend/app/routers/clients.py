@@ -464,7 +464,13 @@ def enter_result(req: TestResultCreate, conn: sqlite3.Connection = Depends(get_d
         for pr in req.parameter_results:
             cur.execute("SELECT parameter_name FROM test_parameters WHERE id = ?", (pr.parameter_id,))
             param_row = cur.fetchone()
-            param_name = param_row["parameter_name"] if param_row else ""
+            if param_row:
+                param_name = param_row["parameter_name"]
+            else:
+                # Fallback: parameter_id may refer to a child test in the tests table (e.g. urinalysis sub-parameters)
+                cur.execute("SELECT name FROM tests WHERE id = ?", (pr.parameter_id,))
+                t_row = cur.fetchone()
+                param_name = t_row["name"] if t_row else ""
 
             eval_dict = evaluate_result(param_name, pr.result_value, dob, sex, today)
             pr_is_positive = eval_dict.get("is_abnormal", False)

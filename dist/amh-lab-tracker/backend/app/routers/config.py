@@ -26,6 +26,21 @@ def get_test_parameters(test_id: int, conn: sqlite3.Connection = Depends(get_db)
     cur.execute("SELECT id, test_id, parameter_name, unit, ref_range, sort_order FROM test_parameters WHERE test_id = ? ORDER BY sort_order, id", (test_id,))
     return [dict(r) for r in cur.fetchall()]
 
+@router.get("/tests/{test_id}/children")
+def get_test_children(test_id: int, conn: sqlite3.Connection = Depends(get_db), current_user: dict = Depends(get_current_user)):
+    """Return all active child sub-parameters of a panel test, ordered by sort_order."""
+    cur = conn.cursor()
+    cur.execute(
+        """SELECT id, name, section_id, is_tracked, parent_rollup_id, sort_order,
+                  result_type, default_unit, secondary_unit, options
+           FROM tests
+           WHERE parent_rollup_id = ? AND is_active = 1
+           ORDER BY sort_order, id""",
+        (test_id,)
+    )
+    return [dict(r) for r in cur.fetchall()]
+
+
 @router.post("/tests")
 def create_test(req: TestCreate, admin_user: dict = Depends(require_admin), conn: sqlite3.Connection = Depends(get_db)):
     cur = conn.cursor()

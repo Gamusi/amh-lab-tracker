@@ -2008,33 +2008,56 @@ const app = {
     
     // Tailored Forms
     if (nameLower.includes('urinalysis')) {
-       // URINALYSIS FULL MODAL
-       singleContainer.innerHTML = `
-         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
-           <div>
-             <h5 style="margin-top:0; color: var(--primary-color);">Macroscopy & Chemistry</h5>
-             <label>Appearance:</label> <select id="ua-app"><option>Clear</option><option>Slightly Turbid</option><option>Turbid</option></select><br>
-             <label>Color:</label> <select id="ua-col"><option>Yellow</option><option>Straw</option><option>Amber</option><option>Red</option><option>Brown</option></select><br>
-             <label>Specific Gravity:</label> <input type="number" step="0.005" id="ua-sg" value="1.015"><br>
-             <label>pH:</label> <input type="number" step="0.5" id="ua-ph" value="6.0"><br>
-             <label>Proteins:</label> <select id="ua-pro"><option>Nil</option><option>Trace</option><option>1+</option><option>2+</option><option>3+</option><option>4+</option></select><br>
-             <label>Glucose:</label> <select id="ua-glu"><option>Nil</option><option>Trace</option><option>1+</option><option>2+</option><option>3+</option><option>4+</option></select><br>
-             <label>Bilirubin:</label> <select id="ua-bil"><option>Nil</option><option>1+</option><option>2+</option><option>3+</option></select><br>
-             <label>Urobilinogen:</label> <select id="ua-uro"><option>Normal</option><option>1+</option><option>2+</option><option>3+</option></select><br>
-             <label>Ketones:</label> <select id="ua-ket"><option>Nil</option><option>Trace</option><option>1+</option><option>2+</option><option>3+</option></select><br>
-             <label>Blood:</label> <select id="ua-bld"><option>Nil</option><option>Trace</option><option>1+</option><option>2+</option><option>3+</option></select><br>
-             <label>Nitrites:</label> <select id="ua-nit"><option>Negative</option><option>Positive</option></select><br>
-             <label>Leukocytes:</label> <select id="ua-leu"><option>Nil</option><option>Trace</option><option>1+</option><option>2+</option><option>3+</option></select>
-           </div>
-           <div>
-             <h5 style="margin-top:0; color: var(--primary-color);">Microscopy</h5>
-             <label>Pus Cells (WBCs):</label> <input type="text" id="ua-pus" placeholder="e.g. 0-2 / hpf"><br>
-             <label>RBCs:</label> <input type="text" id="ua-rbc" placeholder="e.g. 0-1 / hpf"><br>
-             <label>Epithelial Cells:</label> <select id="ua-epi"><option>Few</option><option>Moderate</option><option>Plenty</option></select><br>
-             <label>Casts & Crystals:</label> <input type="text" id="ua-cas" placeholder="e.g. Calcium oxalate (++)">
-           </div>
-         </div>
-       `;
+       // URINALYSIS FULL MODAL — 3-section panel via API sub-parameters
+       singleContainer.style.display = 'none';
+       paramsContainer.style.display = 'block';
+       // Fetch sub-parameters from the API (same endpoint as CBC uses via children/tests)
+       var uaParamRes = yield fetch('/api/config/tests/' + testId + '/children');
+       var uaParams = [];
+       if (uaParamRes.ok) {
+         uaParams = yield uaParamRes.json();
+       }
+       // Sort by sort_order
+       uaParams.sort(function(a, b) { return (a.sort_order || 0) - (b.sort_order || 0); });
+
+       // Section groupings by sort_order
+       // Macroscopy: 1-2, Microscopy: 3-7, Dipstick: 8-17
+       var UA_SECTIONS = [
+         { label: 'Macroscopy', min: 1, max: 2 },
+         { label: 'Microscopy', min: 3, max: 7 },
+         { label: 'Dry Chemistry Dipstick', min: 8, max: 17 }
+       ];
+
+       var uaHtml = '';
+       UA_SECTIONS.forEach(function(sec) {
+         var secParams = uaParams.filter(function(p) {
+           var so = p.sort_order || 0;
+           return so >= sec.min && so <= sec.max;
+         });
+         if (!secParams.length) return;
+         uaHtml += '<div style="margin-bottom: 18px;">';
+         uaHtml += '<h5 style="margin: 0 0 10px 0; padding-bottom: 4px; border-bottom: 1px solid var(--border-color); color: var(--primary-color);">' + sec.label + '</h5>';
+         uaHtml += '<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px 18px;">';
+         secParams.forEach(function(p) {
+           var opts = [];
+           try { if (p.options) opts = JSON.parse(p.options); } catch(e) {}
+           var inputHtml = '';
+           if (opts && opts.length > 0) {
+             var optsHtml = opts.map(function(o) {
+               return '<option value="' + o.replace(/"/g, '&quot;') + '">' + o + '</option>';
+             }).join('');
+             inputHtml = '<select class="modal-param-val" style="width:100%; padding:6px 8px; border:1px solid var(--border-color); border-radius:4px; font-size:0.85rem;">' + optsHtml + '</select>';
+           } else {
+             inputHtml = '<input type="text" class="modal-param-val" placeholder="Value" style="width:100%; padding:6px 8px; border:1px solid var(--border-color); border-radius:4px; font-size:0.85rem;">';
+           }
+           uaHtml += '<div class="modal-param-row" data-param-id="' + p.id + '" style="display:flex; flex-direction:column; gap:3px;">';
+           uaHtml += '<label style="font-size:0.8rem; font-weight:600; color:var(--text-dark);">' + p.name + '</label>';
+           uaHtml += inputHtml;
+           uaHtml += '</div>';
+         });
+         uaHtml += '</div></div>';
+       });
+       paramsContainer.innerHTML = uaHtml;
     } else if (nameLower.includes('widal')) {
        singleContainer.innerHTML = `
          <label>Result:</label>
@@ -2169,9 +2192,7 @@ const app = {
               paramResults.push({ parameter_id: pid, result_value: pval });
             }
          });
-       } else if (nameLower.includes('urinalysis')) {
-         finalVal = `App: ${document.getElementById('ua-app').value}, Col: ${document.getElementById('ua-col').value}, SG: ${document.getElementById('ua-sg').value}, pH: ${document.getElementById('ua-ph').value}, Pro: ${document.getElementById('ua-pro').value}, Glu: ${document.getElementById('ua-glu').value}, Bil: ${document.getElementById('ua-bil').value}, Uro: ${document.getElementById('ua-uro').value}, Ket: ${document.getElementById('ua-ket').value}, Bld: ${document.getElementById('ua-bld').value}, Nit: ${document.getElementById('ua-nit').value}, Leu: ${document.getElementById('ua-leu').value} | Microscopy -> WBC: ${document.getElementById('ua-pus').value}, RBC: ${document.getElementById('ua-rbc').value}, Epi: ${document.getElementById('ua-epi').value}, Cas: ${document.getElementById('ua-cas').value}`;
-       } else if (nameLower.includes('widal')) {
+        } else if (nameLower.includes('widal')) {
          const res = document.getElementById('widal-res').value;
          const tit = document.getElementById('widal-tit-val').value;
          finalVal = res === 'Positive' && tit ? `${res} (${tit})` : res;

@@ -5,7 +5,7 @@ from .database import get_connection, init_db
 # Auto-generated from amh-comprehensive-test-reporting-specifications.md
 SECTIONS = ['Hematology', 'Serology & Clinical Immunology', 'Clinical Biochemistry', 'Urinalysis Profile', 'Parasitology & Stool Diagnostics', 'Microbiology & Tuberculosis', 'Blood Transfusion & Immunohematology']
 
-PANELS = {'Complete Blood Count (CBC)': ['Total WBC Count (White Blood Cells)', 'Red Blood Cells (RBC)', 'Hemoglobin (Hb)', 'Hematocrit (HCT)', 'Mean Cell Volume (MCV)', 'Mean Cell Hb (MCH)', 'Mean Cell Hb Conc (MCHC)', 'Platelets Count (PLT)', 'Neutrophils (%) [Relative Count]', 'Lymphocytes (%) [Relative Count]', 'Monocytes (%) [Relative Count]', 'Eosinophils (%) [Relative Count]', 'Basophils (%) [Relative Count]', 'Neutrophils (Absolute Count)', 'Lymphocytes (Absolute Count)', 'Monocytes (Absolute Count)', 'Eosinophils (Absolute Count)', 'Basophils (Absolute Count)', 'RBC Distribution Width (RDW)', 'Thrombocrit (PCT)', 'Mean Platelet Volume (MPV)', 'PLT Distribution Width (PDW)'], 'LFTS': ['ALT / SGPT (Alanine Aminotransferase)', 'AST / SGOT (Aspartate Aminotransferase)', 'Alkaline Phosphatase (ALP)', 'Total Bilirubin', 'Direct Bilirubin', 'Total Protein', 'Serum Albumin', 'Gamma-Glutamyl Transferase (GGT)', 'Total Cholesterol'], 'RFTS': ['Serum Urea', 'Serum Creatinine', 'Serum Uric Acid'], 'CARDIAC': ['Troponin I (cTnI)', 'Troponin T (cTnT)', 'CK-MB (Creatine Kinase-MB)', 'BNP / NT-proBNP', 'D-Dimer', 'LDH (Lactate Dehydrogenase)'], 'ELECTROLYTES': ['Serum Potassium (K+)', 'Serum Sodium (Na+)', 'Serum Chloride (Cl-)', 'Bicarbonate (HCO3-)'], 'URINALYSIS': ['Macroscopy (Physical Profile)', 'Specific Gravity (S.G)', 'PH', 'Proteins (Albuminuria Screening)', 'Glucose (Glucosuria Screening)', 'Bilirubin (Bilirubinuria)', 'Urobilinogen', 'Ketones (Ketonuria)', 'Blood (Hematuria/Hemoglobinuria)', 'Nitrates (Nitrite Screening)', 'Leukocytes (Leukocyte Esterase)', 'Microscopy (Sediment Cytology)'], 'STOOL ANALYSIS': ['Stool Analysis (Macroscopy)', 'Stool Analysis (Microscopy)', 'Stool Occult Blood'], 'HIV Testing Service': ['Determine', 'Stat-Pak', 'SD Bioline']}
+PANELS = {'Complete Blood Count (CBC)': ['Total WBC Count (White Blood Cells)', 'Red Blood Cells (RBC)', 'Hemoglobin (Hb)', 'Hematocrit (HCT)', 'Mean Cell Volume (MCV)', 'Mean Cell Hb (MCH)', 'Mean Cell Hb Conc (MCHC)', 'Platelets Count (PLT)', 'Neutrophils (%) [Relative Count]', 'Lymphocytes (%) [Relative Count]', 'Monocytes (%) [Relative Count]', 'Eosinophils (%) [Relative Count]', 'Basophils (%) [Relative Count]', 'Neutrophils (Absolute Count)', 'Lymphocytes (Absolute Count)', 'Monocytes (Absolute Count)', 'Eosinophils (Absolute Count)', 'Basophils (Absolute Count)', 'RBC Distribution Width (RDW)', 'Thrombocrit (PCT)', 'Mean Platelet Volume (MPV)', 'PLT Distribution Width (PDW)'], 'LFTS': ['ALT / SGPT (Alanine Aminotransferase)', 'AST / SGOT (Aspartate Aminotransferase)', 'Alkaline Phosphatase (ALP)', 'Total Bilirubin', 'Direct Bilirubin', 'Total Protein', 'Serum Albumin', 'Gamma-Glutamyl Transferase (GGT)', 'Total Cholesterol'], 'RFTS': ['Serum Urea', 'Serum Creatinine', 'Serum Uric Acid'], 'CARDIAC': ['Troponin I (cTnI)', 'Troponin T (cTnT)', 'CK-MB (Creatine Kinase-MB)', 'BNP / NT-proBNP', 'D-Dimer', 'LDH (Lactate Dehydrogenase)'], 'ELECTROLYTES': ['Serum Potassium (K+)', 'Serum Sodium (Na+)', 'Serum Chloride (Cl-)', 'Bicarbonate (HCO3-)'], 'URINALYSIS': ['Color', 'Turbidity', 'Pus Cells (WBCs)', 'Red Blood Cells (RBCs)', 'Epithelial Cells', 'Casts', 'Crystals', 'Specific Gravity (S.G)', 'PH', 'Proteins (Albuminuria Screening)', 'Glucose (Glucosuria Screening)', 'Bilirubin (Bilirubinuria)', 'Urobilinogen', 'Ketones (Ketonuria)', 'Blood (Hematuria/Hemoglobinuria)', 'Nitrates (Nitrite Screening)', 'Leukocytes (Leukocyte Esterase)'], 'STOOL ANALYSIS': ['Stool Analysis (Macroscopy)', 'Stool Analysis (Microscopy)', 'Stool Occult Blood'], 'HIV Testing Service': ['Determine', 'Stat-Pak', 'SD Bioline']}
 
 TESTS = [
     {'name': 'Complete Blood Count (CBC)', 'section': 'Hematology', 'is_tracked': 1, 'result_type': 'panel', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': None, 'parent_name': None, 'sort_order': 0},
@@ -95,18 +95,26 @@ TESTS = [
     {'name': 'Serum Sodium (Na+)', 'section': 'Clinical Biochemistry', 'is_tracked': 0, 'result_type': 'quantitative', 'default_unit': 'mmol/L', 'secondary_unit': None, 'ref_range': None, 'options': None, 'parent_name': 'ELECTROLYTES', 'sort_order': 2},
     {'name': 'Serum Chloride (Cl-)', 'section': 'Clinical Biochemistry', 'is_tracked': 0, 'result_type': 'quantitative', 'default_unit': 'mmol/L', 'secondary_unit': None, 'ref_range': None, 'options': None, 'parent_name': 'ELECTROLYTES', 'sort_order': 3},
     {'name': 'Bicarbonate (HCO3-)', 'section': 'Clinical Biochemistry', 'is_tracked': 0, 'result_type': 'quantitative', 'default_unit': 'mmol/L', 'secondary_unit': None, 'ref_range': None, 'options': None, 'parent_name': 'ELECTROLYTES', 'sort_order': 4},
-    {'name': 'Macroscopy (Physical Profile)', 'section': 'Urinalysis Profile', 'is_tracked': 0, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['Clear Straw', 'Clear Yellow', 'Turbid Yellow', 'Amber', 'Red (Hematuria)', 'Brown'], 'parent_name': 'URINALYSIS', 'sort_order': 1},
-    {'name': 'Specific Gravity (S.G)', 'section': 'Urinalysis Profile', 'is_tracked': 0, 'result_type': 'quantitative', 'default_unit': 'Ratio', 'secondary_unit': None, 'ref_range': None, 'options': None, 'parent_name': 'URINALYSIS', 'sort_order': 2},
-    {'name': 'PH', 'section': 'Urinalysis Profile', 'is_tracked': 0, 'result_type': 'quantitative', 'default_unit': 'pH', 'secondary_unit': None, 'ref_range': None, 'options': None, 'parent_name': 'URINALYSIS', 'sort_order': 3},
-    {'name': 'Proteins (Albuminuria Screening)', 'section': 'Urinalysis Profile', 'is_tracked': 0, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['Nil', 'Trace', '1+', '2+', '3+', '4+'], 'parent_name': 'URINALYSIS', 'sort_order': 4},
-    {'name': 'Glucose (Glucosuria Screening)', 'section': 'Urinalysis Profile', 'is_tracked': 0, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['Nil', 'Trace', '1+', '2+', '3+', '4+'], 'parent_name': 'URINALYSIS', 'sort_order': 5},
-    {'name': 'Bilirubin (Bilirubinuria)', 'section': 'Urinalysis Profile', 'is_tracked': 0, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['Nil', '1+', '2+', '3+'], 'parent_name': 'URINALYSIS', 'sort_order': 6},
-    {'name': 'Urobilinogen', 'section': 'Urinalysis Profile', 'is_tracked': 0, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['Normal', '1+', '2+', '3+'], 'parent_name': 'URINALYSIS', 'sort_order': 7},
-    {'name': 'Ketones (Ketonuria)', 'section': 'Urinalysis Profile', 'is_tracked': 0, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['Nil', 'Trace', '1+', '2+', '3+'], 'parent_name': 'URINALYSIS', 'sort_order': 8},
-    {'name': 'Blood (Hematuria/Hemoglobinuria)', 'section': 'Urinalysis Profile', 'is_tracked': 0, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['Nil', 'Trace', '1+', '2+', '3+'], 'parent_name': 'URINALYSIS', 'sort_order': 9},
-    {'name': 'Nitrates (Nitrite Screening)', 'section': 'Urinalysis Profile', 'is_tracked': 0, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['Negative', 'Positive'], 'parent_name': 'URINALYSIS', 'sort_order': 10},
-    {'name': 'Leukocytes (Leukocyte Esterase)', 'section': 'Urinalysis Profile', 'is_tracked': 0, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['Nil', 'Trace', '1+', '2+', '3+'], 'parent_name': 'URINALYSIS', 'sort_order': 11},
-    {'name': 'Microscopy (Sediment Cytology)', 'section': 'Urinalysis Profile', 'is_tracked': 0, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['Nil', 'Pus cells 0-2 / hpf', 'Pus cells 5-10 / hpf', 'Pus cells 10-15 / hpf', 'Pus cells plenty', 'RBCs 0-1 / hpf', 'RBCs 5-10 / hpf', 'Epithelial cells few', 'Epithelial cells moderate', 'Calcium oxalate crystals (++)', 'Triple phosphate crystals (++)'], 'parent_name': 'URINALYSIS', 'sort_order': 12},
+    # --- URINALYSIS: Macroscopy (sort_order 1-2) ---
+    {'name': 'Color', 'section': 'Urinalysis Profile', 'is_tracked': 0, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['Straw', 'Yellow', 'Amber', 'Red', 'Brown'], 'parent_name': 'URINALYSIS', 'sort_order': 1},
+    {'name': 'Turbidity', 'section': 'Urinalysis Profile', 'is_tracked': 0, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['Clear', 'Slightly Turbid', 'Turbid'], 'parent_name': 'URINALYSIS', 'sort_order': 2},
+    # --- URINALYSIS: Microscopy / Sediment Cytology (sort_order 3-7) — all lpf ---
+    {'name': 'Pus Cells (WBCs)', 'section': 'Urinalysis Profile', 'is_tracked': 0, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['Not Seen', '1-2 / lpf', '3-4 / lpf', '5-10 / lpf', '10-15 / lpf', '>15 / lpf'], 'parent_name': 'URINALYSIS', 'sort_order': 3},
+    {'name': 'Red Blood Cells (RBCs)', 'section': 'Urinalysis Profile', 'is_tracked': 0, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['Not Seen', '1-2 / lpf', '3-5 / lpf', '5-10 / lpf', '>10 / lpf'], 'parent_name': 'URINALYSIS', 'sort_order': 4},
+    {'name': 'Epithelial Cells', 'section': 'Urinalysis Profile', 'is_tracked': 0, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['Not Seen', 'Few', 'Moderate', 'Plenty'], 'parent_name': 'URINALYSIS', 'sort_order': 5},
+    {'name': 'Casts', 'section': 'Urinalysis Profile', 'is_tracked': 0, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['Not Seen', 'Hyaline Casts (0-1 / lpf)', 'Granular Casts', 'Waxy Casts', 'RBC Casts', 'WBC Casts'], 'parent_name': 'URINALYSIS', 'sort_order': 6},
+    {'name': 'Crystals', 'section': 'Urinalysis Profile', 'is_tracked': 0, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['Not Seen', 'Calcium Oxalate (++)', 'Triple Phosphate (++)', 'Uric Acid Crystals'], 'parent_name': 'URINALYSIS', 'sort_order': 7},
+    # --- URINALYSIS: Dry Chemistry Dipstick — Siemens Multistix (sort_order 8-17) ---
+    {'name': 'Specific Gravity (S.G)', 'section': 'Urinalysis Profile', 'is_tracked': 0, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['1.000', '1.005', '1.010', '1.015', '1.020', '1.025', '1.030'], 'parent_name': 'URINALYSIS', 'sort_order': 8},
+    {'name': 'PH', 'section': 'Urinalysis Profile', 'is_tracked': 0, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['5.0', '6.0', '6.5', '7.0', '7.5', '8.0', '8.5'], 'parent_name': 'URINALYSIS', 'sort_order': 9},
+    {'name': 'Proteins (Albuminuria Screening)', 'section': 'Urinalysis Profile', 'is_tracked': 0, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['Nil', 'Trace (15 mg/dL)', '1+ (30 mg/dL)', '2+ (100 mg/dL)', '3+ (300 mg/dL)', '4+ (\u22652000 mg/dL)'], 'parent_name': 'URINALYSIS', 'sort_order': 10},
+    {'name': 'Glucose (Glucosuria Screening)', 'section': 'Urinalysis Profile', 'is_tracked': 0, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['Nil', 'Trace (100 mg/dL)', '1+ (250 mg/dL)', '2+ (500 mg/dL)', '3+ (1000 mg/dL)', '4+ (\u22652000 mg/dL)'], 'parent_name': 'URINALYSIS', 'sort_order': 11},
+    {'name': 'Bilirubin (Bilirubinuria)', 'section': 'Urinalysis Profile', 'is_tracked': 0, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['Nil', 'Small (+)', 'Moderate (++)', 'Large (+++)'], 'parent_name': 'URINALYSIS', 'sort_order': 12},
+    {'name': 'Urobilinogen', 'section': 'Urinalysis Profile', 'is_tracked': 0, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['Normal (1.0 EU/dL)', '2.0 EU/dL', '4.0 EU/dL', '8.0 EU/dL'], 'parent_name': 'URINALYSIS', 'sort_order': 13},
+    {'name': 'Ketones (Ketonuria)', 'section': 'Urinalysis Profile', 'is_tracked': 0, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['Nil', 'Trace (5 mg/dL)', '1+ (15 mg/dL)', '2+ (40 mg/dL)', '3+ (80 mg/dL)', '4+ (160 mg/dL)'], 'parent_name': 'URINALYSIS', 'sort_order': 14},
+    {'name': 'Blood (Hematuria/Hemoglobinuria)', 'section': 'Urinalysis Profile', 'is_tracked': 0, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['Nil', 'Non-Hemolyzed Trace', 'Hemolyzed Trace', '1+ (Small)', '2+ (Moderate)', '3+ (Large)'], 'parent_name': 'URINALYSIS', 'sort_order': 15},
+    {'name': 'Nitrates (Nitrite Screening)', 'section': 'Urinalysis Profile', 'is_tracked': 0, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['Negative', 'Positive'], 'parent_name': 'URINALYSIS', 'sort_order': 16},
+    {'name': 'Leukocytes (Leukocyte Esterase)', 'section': 'Urinalysis Profile', 'is_tracked': 0, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['Nil', 'Trace', '1+ (Small)', '2+ (Moderate)', '3+ (Large)'], 'parent_name': 'URINALYSIS', 'sort_order': 17},
     {'name': 'Stool Analysis (Macroscopy)', 'section': 'Parasitology & Stool Diagnostics', 'is_tracked': 0, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['Formed, No blood/mucus', 'Semi-formed, No blood/mucus', 'Loose', 'Watery', 'Blood present', 'Mucus present', 'Blood and mucus present'], 'parent_name': 'STOOL ANALYSIS', 'sort_order': 1},
     {'name': 'Stool Analysis (Microscopy)', 'section': 'Parasitology & Stool Diagnostics', 'is_tracked': 0, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['No ova, cysts, or trophozoites seen', 'E. histolytica cysts seen', 'E. histolytica trophozoites seen', 'G. lamblia cysts seen', 'G. lamblia trophozoites seen', 'Hookworm ova seen', 'Ascaris lumbricoides ova seen', 'Schistosoma mansoni ova seen', 'Trichuris trichiura ova seen'], 'parent_name': 'STOOL ANALYSIS', 'sort_order': 2},
     {'name': 'Stool Occult Blood', 'section': 'Parasitology & Stool Diagnostics', 'is_tracked': 0, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['Negative', 'Positive'], 'parent_name': 'STOOL ANALYSIS', 'sort_order': 3},
@@ -145,7 +153,7 @@ def seed_database():
     # Rename migrations
     cur.execute("UPDATE tests SET name = 'Complete Blood Count (CBC)' WHERE name = 'CBC'")
     cur.execute("UPDATE tests SET name = 'HIV Testing Service' WHERE name = 'HIV (MoH Three-Test Algorithm)'")
-    
+
     # Clean relative count test names
     rel_names = [
         ('Neutrophils (%) \\[Relative Count\\]', 'Neutrophils (%) [Relative Count]'),
@@ -157,7 +165,34 @@ def seed_database():
     for old_n, new_n in rel_names:
         cur.execute("UPDATE tests SET name = ? WHERE name = ?", (new_n, old_n))
 
+    # Urinalysis structure migration — remove old parameters replaced by the new tripartite structure
+    old_urinalysis_params = [
+        'Macroscopy (Physical Profile)',   # replaced by Color + Turbidity
+        'Microscopy (Sediment Cytology)',  # replaced by 5 individual microscopy sub-parameters
+    ]
+    for old_param in old_urinalysis_params:
+        # Delete result values referencing this test, then the test itself
+        cur.execute("""
+            DELETE FROM test_results WHERE parameter_id IN (
+                SELECT id FROM tests WHERE name = ?
+            )
+        """, (old_param,))
+        cur.execute("DELETE FROM tests WHERE name = ?", (old_param,))
+
+    # Migrate Specific Gravity and PH from quantitative to options
+    cur.execute("""
+        UPDATE tests SET result_type = 'options', default_unit = NULL,
+            options = '["1.000","1.005","1.010","1.015","1.020","1.025","1.030"]'
+        WHERE name = 'Specific Gravity (S.G)'
+    """)
+    cur.execute("""
+        UPDATE tests SET result_type = 'options', default_unit = NULL,
+            options = '["5.0","6.0","6.5","7.0","7.5","8.0","8.5"]'
+        WHERE name = 'PH'
+    """)
+
     conn.commit()
+
 
     test_id_map = {}
 
