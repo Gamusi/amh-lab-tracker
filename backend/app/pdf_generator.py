@@ -35,11 +35,12 @@ def _build_metadata_table(order_data: dict) -> Table:
     t = Table(data, colWidths=[90, 150, 80, 160])
     t.setStyle(TableStyle([
         ('FONTNAME', (0,0), (-1,-1), 'Helvetica'),
+        ('FONTSIZE', (0,0), (-1,-1), 8.5),
         ('FONTNAME', (0,0), (0,-1), 'Helvetica-Bold'), # Left labels
         ('FONTNAME', (2,0), (2,-1), 'Helvetica-Bold'), # Right labels
         ('ALIGN', (0,0), (-1,-1), 'LEFT'),
-        ('BOTTOMPADDING', (0,0), (-1,-1), 4),
-        ('TOPPADDING', (0,0), (-1,-1), 4),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 2),
+        ('TOPPADDING', (0,0), (-1,-1), 2),
     ]))
     return t
 
@@ -55,7 +56,7 @@ def _build_department_table(dept_name: str, tests: list) -> KeepTogether:
         
     data.append(["Test", "Result", "Unit", "Flag", "Reference"])
     
-    result_style = ParagraphStyle(name="ResultStyle", fontName="Helvetica", fontSize=10, leading=12)
+    result_style = ParagraphStyle(name="ResultStyle", fontName="Helvetica", fontSize=9, leading=11)
     
     for t in tests:
         res_text = str(t.get("result") or "")
@@ -72,9 +73,10 @@ def _build_department_table(dept_name: str, tests: list) -> KeepTogether:
     
     style_cmds = [
         ('FONTNAME', (0,0), (-1,-1), 'Helvetica'),
+        ('FONTSIZE', (0,0), (-1,-1), 8.5),
         ('ALIGN', (0,0), (-1,-1), 'LEFT'),
-        ('BOTTOMPADDING', (0,0), (-1,-1), 4),
-        ('TOPPADDING', (0,0), (-1,-1), 4),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 3),
+        ('TOPPADDING', (0,0), (-1,-1), 3),
     ]
     
     header_row_idx = 1 if show_dept else 0
@@ -88,9 +90,9 @@ def _build_department_table(dept_name: str, tests: list) -> KeepTogether:
     
     t.setStyle(TableStyle(style_cmds))
     
-    return KeepTogether([t, Spacer(1, 15)])
+    return KeepTogether([t, Spacer(1, 10)])
 
-def _build_signatures_table(order_data: dict) -> KeepTogether:
+def _build_signatures_table(order_data: dict, compact: bool = False) -> KeepTogether:
     tech = str(order_data.get("technician_name") or "").strip()
     verified = str(order_data.get("verified_by") or "").strip()
     
@@ -104,13 +106,16 @@ def _build_signatures_table(order_data: dict) -> KeepTogether:
     t = Table(data, colWidths=[240, 240])
     t.setStyle(TableStyle([
         ('FONTNAME', (0,0), (-1,-1), 'Helvetica-Bold'),
+        ('FONTSIZE', (0,0), (-1,-1), 8.5),
         ('ALIGN', (0,0), (0,-1), 'LEFT'),
         ('ALIGN', (1,0), (1,-1), 'LEFT'),
         ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-        ('BOTTOMPADDING', (0,0), (-1,-1), 6),
-        ('TOPPADDING', (0,0), (-1,-1), 6),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 2),
+        ('TOPPADDING', (0,0), (-1,-1), 2),
     ]))
-    return KeepTogether([Spacer(1, 15), t])
+    spacer_h = 6 if compact else 12
+    return KeepTogether([Spacer(1, spacer_h), t])
+
 
 def _build_urinalysis_table(urinalysis_test: dict) -> KeepTogether:
     data = [["Urinalysis Parameters", "Result"]]
@@ -163,57 +168,157 @@ def _build_urinalysis_table(urinalysis_test: dict) -> KeepTogether:
     ]))
     return KeepTogether([t, Spacer(1, 15)])
 
+def _build_cbc_patient_header(order_data: dict) -> Table:
+    client_no = str(order_data.get("client_number") or order_data.get("client_id") or "")
+    date_val = str(order_data.get("ordered_date") or order_data.get("date") or "")
+    if "-" in date_val:
+        parts = date_val.split("-")
+        if len(parts) == 3 and len(parts[0]) == 4:
+            date_val = f"{parts[1]}/{parts[2]}/{parts[0]}"
+            
+    ref_by = str(order_data.get("requested_by") or order_data.get("ordered_by") or "")
+    name = str(order_data.get("full_name") or "")
+    age = str(order_data.get("age") or "")
+    sex = str(order_data.get("sex") or "")
+    if sex.lower().startswith("m"):
+        sex = "M"
+    elif sex.lower().startswith("f"):
+        sex = "F"
+    lab_no = str(order_data.get("lab_number") or "")
+    ward = str(order_data.get("ward_of_origin") or "OPD")
+    
+    data = [
+        ["Client No :", client_no, "Name :", name, "Lab No :", lab_no],
+        ["Dated     :", date_val, "Age  :", age, "Ward/OPD :", ward],
+        ["Ref. By   :", ref_by, "Sex  :", sex, "Specimen :", "Blood"]
+    ]
+    
+    t = Table(data, colWidths=[70, 95, 45, 135, 70, 65])
+    t.setStyle(TableStyle([
+        ('FONTNAME', (0,0), (-1,-1), 'Courier'),
+        ('FONTSIZE', (0,0), (-1,-1), 8.5),
+        ('FONTNAME', (0,0), (0,-1), 'Courier-Bold'),
+        ('FONTNAME', (2,0), (2,-1), 'Courier-Bold'),
+        ('FONTNAME', (4,0), (4,-1), 'Courier-Bold'),
+        ('ALIGN', (0,0), (-1,-1), 'LEFT'),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 2),
+        ('TOPPADDING', (0,0), (-1,-1), 2),
+    ]))
+    return t
+
+def _normalize_unit(unit_str: str) -> str:
+    if not unit_str:
+        return ""
+    u = unit_str.strip()
+    u = u.replace("10³", "10^3").replace("10⁶", "10^6").replace("10⁹", "10^9")
+    u = u.replace("µL", "uL").replace("μL", "uL")
+    if "10^3" in u and "(" not in u:
+        return "(10^3 / uL)"
+    if "10^6" in u and "(" not in u:
+        return "(10^6 / uL)"
+    if "10^9" in u and "(" not in u:
+        return "(10^9 / uL)"
+    return u
+
+def _build_cbc_footer(order_data: dict, cbc_test: dict) -> Table:
+    time_str = ""
+    date_str = str(order_data.get("ordered_date") or order_data.get("date") or "")
+    if "-" in date_str:
+        parts = date_str.split("-")
+        if len(parts) == 3 and len(parts[0]) == 4:
+            date_str = f"{parts[1]}/{parts[2]}/{parts[0]}"
+            
+    timestamp = cbc_test.get("timestamp") or order_data.get("analyzer_timestamp") or ""
+    if timestamp and " " in timestamp:
+        t_parts = timestamp.split(" ")
+        time_str = t_parts[1]
+    elif timestamp:
+        time_str = timestamp
+    else:
+        time_str = "12:00:00"
+        
+    tech = str(order_data.get("technician_name") or "").strip()
+    if tech and tech.lower() not in ["technologist signature", "technologist", "signature"]:
+        sig_label = f"Technologist Signature ({tech})"
+    else:
+        sig_label = "Technologist Signature"
+    
+    data = [
+        [time_str, date_str, sig_label]
+    ]
+    t = Table(data, colWidths=[100, 140, 240])
+    t.setStyle(TableStyle([
+        ('FONTNAME', (0,0), (-1,-1), 'Courier'),
+        ('FONTSIZE', (0,0), (-1,-1), 8.5),
+        ('ALIGN', (0,0), (0,-1), 'LEFT'),
+        ('ALIGN', (1,0), (1,-1), 'LEFT'),
+        ('ALIGN', (2,0), (2,-1), 'RIGHT'),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 2),
+        ('TOPPADDING', (0,0), (-1,-1), 2),
+    ]))
+    return t
+
 def _build_cbc_table(order_data: dict, cbc_test: dict) -> list:
-    # Build distinct sections exactly matching the clinical reporting standard:
-    # 1. Main Indices (WBC, RBC, Hb, HCT, MCV, MCH, MCHC, PLT)
-    # 2. Differential Relative (%)
-    # 3. Differential Absolute (10^9 / uL)
-    # 4. RBC / Platelet Indices (RDW, PCT, MPV, PDW)
     flowables = []
     
-    title_style = ParagraphStyle(
+    # Title box with border
+    header_table = Table([[Paragraph("HAEMATOLOGY CBC REPORT", ParagraphStyle(
         name='CBCTitle',
-        fontName='Helvetica-Bold',
-        fontSize=12,
-        leading=14,
+        fontName='Courier-Bold',
+        fontSize=10.5,
+        leading=12,
         alignment=TA_CENTER,
         textColor=colors.black
-    )
-    
-    # Title box with border
-    header_table = Table([[Paragraph("HAEMATOLOGY CBC REPORT", title_style)]], colWidths=[480])
+    ))]], colWidths=[480])
     header_table.setStyle(TableStyle([
         ('BOX', (0,0), (-1,-1), 1, colors.black),
-        ('TOPPADDING', (0,0), (-1,-1), 5),
-        ('BOTTOMPADDING', (0,0), (-1,-1), 5),
+        ('TOPPADDING', (0,0), (-1,-1), 3.5),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 3.5),
         ('ALIGN', (0,0), (-1,-1), 'CENTER'),
     ]))
     flowables.append(header_table)
-    flowables.append(Spacer(1, 8))
+    flowables.append(Spacer(1, 4))
     
     params = cbc_test.get("parameters", [])
-    params_map = {p.get("name", "").strip().lower(): p for p in params}
+    params_map = {}
+    for p in params:
+        p_name = (p.get("name") or p.get("test_name") or "").strip().lower()
+        if p_name:
+            params_map[p_name] = p
 
-    def get_row(name, display_name, def_unit, def_ref):
+    # Determine demographic category (Child vs Adult)
+    age_str = str(order_data.get("age") or "").lower()
+    is_child = False
+    if "m" in age_str or "d" in age_str:
+        is_child = True
+    else:
+        digits = "".join([c for c in age_str if c.isdigit()])
+        if digits and int(digits) < 18:
+            is_child = True
+    demo_category = "Child" if is_child else "Adult"
+
+    def get_row(name_matcher, display_name, def_unit, def_ref):
         match = None
         for k, v in params_map.items():
-            if name.lower() in k:
+            if name_matcher.lower() in k:
                 match = v
                 break
-        res_val = match.get("result", "") if match else ""
-        unit_val = match.get("unit", def_unit) if match else def_unit
+        res_val = match.get("result", match.get("value", "")) if match else ""
+        raw_unit = match.get("unit", def_unit) if match else def_unit
+        unit_val = _normalize_unit(raw_unit)
         flag_val = match.get("flag", "") if match else ""
-        ref_val = match.get("reference", def_ref) if match else def_ref
+        ref_val = match.get("reference_range") or match.get("reference") or def_ref if match else def_ref
         
         # Format flag: Low, High, *, etc.
         flag_display = ""
         if flag_val:
-            if flag_val in ("L", "Low"): flag_display = "Low"
-            elif flag_val in ("H", "High"): flag_display = "High"
+            if flag_val in ("L", "Low", "l"): flag_display = "Low"
+            elif flag_val in ("H", "High", "h"): flag_display = "High"
             elif flag_val == "*": flag_display = "*"
             else: flag_display = str(flag_val)
 
         return [display_name, str(res_val), str(unit_val or ""), flag_display, f"[ {ref_val} ]" if ref_val else ""]
+
 
     # Section 1: Main Indices
     sec1 = [
@@ -254,6 +359,7 @@ def _build_cbc_table(order_data: dict, cbc_test: dict) -> list:
     ]
 
     table_data = [
+        ["", "", "", "", demo_category],
         ["Test", "Result", "Units", "Flag", "Ref. Ranges"]
     ]
     
@@ -267,25 +373,29 @@ def _build_cbc_table(order_data: dict, cbc_test: dict) -> list:
     table_data.append(divider)
     table_data.extend(sec4)
 
-    t = Table(table_data, colWidths=[150, 65, 85, 60, 120])
+    t = Table(table_data, colWidths=[160, 55, 75, 50, 140])
     t.setStyle(TableStyle([
-        ('FONTNAME', (0,0), (-1,-1), 'Helvetica'),
-        ('FONTSIZE', (0,0), (-1,-1), 8.5),
-        ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0,0), (-1,0), 9),
-        ('LINEBELOW', (0,0), (-1,0), 1, colors.black),
+        ('FONTNAME', (0,0), (-1,-1), 'Courier'),
+        ('FONTSIZE', (0,0), (-1,-1), 8),
+        ('FONTNAME', (0,1), (-1,1), 'Courier-Bold'),
+        ('FONTSIZE', (0,1), (-1,1), 8.5),
+        ('FONTNAME', (4,0), (4,0), 'Courier-Bold'),
+        ('ALIGN', (4,0), (4,0), 'CENTER'),
+        ('LINEBELOW', (0,1), (-1,1), 1, colors.black),
         ('ALIGN', (0,0), (-1,-1), 'LEFT'),
-        ('ALIGN', (1,1), (1,-1), 'RIGHT'),
-        ('ALIGN', (3,1), (3,-1), 'CENTER'),
-        ('ALIGN', (4,1), (4,-1), 'CENTER'),
-        ('BOTTOMPADDING', (0,0), (-1,-1), 2.5),
-        ('TOPPADDING', (0,0), (-1,-1), 2.5),
-        ('FONTNAME', (1,1), (1,-1), 'Helvetica-Bold'),
+        ('ALIGN', (1,2), (1,-1), 'RIGHT'),
+        ('ALIGN', (2,2), (2,-1), 'CENTER'),
+        ('ALIGN', (3,2), (3,-1), 'CENTER'),
+        ('ALIGN', (4,2), (4,-1), 'CENTER'),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 1.6),
+        ('TOPPADDING', (0,0), (-1,-1), 1.6),
+        ('FONTNAME', (1,2), (1,-1), 'Courier-Bold'),
     ]))
     
     flowables.append(t)
-    flowables.append(Spacer(1, 10))
+    flowables.append(Spacer(1, 8))
     return flowables
+
 
 from reportlab.platypus import PageBreak
 
@@ -296,15 +406,15 @@ def generate_pdf(order_data: dict, results_data: list) -> bytes:
         pagesize=A4, 
         leftMargin=SAFE_MARGIN_X, 
         rightMargin=SAFE_MARGIN_X, 
-        topMargin=200,
-        bottomMargin=120
+        topMargin=145,
+        bottomMargin=65
     )
     
     title_style = ParagraphStyle(
         name='ReportTitle',
         fontName='Helvetica-Bold',
-        fontSize=14,
-        leading=18,
+        fontSize=13,
+        leading=16,
         alignment=TA_CENTER,
         textColor=colors.black
     )
@@ -313,7 +423,13 @@ def generate_pdf(order_data: dict, results_data: list) -> bytes:
     
     # Check for CBC
     cbc_test = None
+    cbc_params_collected = []
     other_departments = []
+    
+    cbc_param_keywords = [
+        "wbc", "rbc", "hemoglobin", "hb", "hematocrit", "hct", "mcv", "mch", "mchc", "rdw",
+        "platelet", "plt", "pct", "mpv", "pdw", "neutrophil", "lymphocyte", "monocyte", "eosinophil", "basophil"
+    ]
     
     for dept_data in results_data:
         dept_name = dept_data.get("department", "UNKNOWN")
@@ -324,18 +440,29 @@ def generate_pdf(order_data: dict, results_data: list) -> bytes:
             t_name = str(t.get("test_name") or "").lower()
             if "cbc" in t_name or "complete blood count" in t_name:
                 cbc_test = t
+            elif any(k in t_name for k in cbc_param_keywords):
+                cbc_params_collected.append(t)
             else:
                 filtered_tests.append(t)
                 
         if filtered_tests:
             other_departments.append({"department": dept_name, "tests": filtered_tests})
 
+    # If CBC test exists or child params collected, ensure parameters array is complete
+    if cbc_test or cbc_params_collected:
+        if not cbc_test:
+            cbc_test = {"test_name": "Complete Blood Count (CBC)", "parameters": []}
+        
+        existing_params = cbc_test.get("parameters", [])
+        if not existing_params and cbc_params_collected:
+            cbc_test["parameters"] = cbc_params_collected
+
     # If we have other tests, render main report page first
     if other_departments or not cbc_test:
         flowables.append(Paragraph("Laboratory Report", title_style))
-        flowables.append(Spacer(1, 12))
+        flowables.append(Spacer(1, 8))
         flowables.append(_build_metadata_table(order_data))
-        flowables.append(Spacer(1, 15))
+        flowables.append(Spacer(1, 10))
         
         urinalysis_test = None
         for dept_data in other_departments:
@@ -380,15 +507,17 @@ def generate_pdf(order_data: dict, results_data: list) -> bytes:
 
     # Render dedicated CBC page if present
     if cbc_test:
-        flowables.append(_build_metadata_table(order_data))
-        flowables.append(Spacer(1, 10))
+        flowables.append(_build_cbc_patient_header(order_data))
+        flowables.append(Spacer(1, 6))
         flowables.extend(_build_cbc_table(order_data, cbc_test))
-        flowables.append(_build_signatures_table(order_data))
+        flowables.append(_build_cbc_footer(order_data, cbc_test))
     
     doc.build(flowables, onFirstPage=_draw_background_hook, onLaterPages=_draw_background_hook)
     
     return buffer.getvalue()
 
 generate_report_pdf = generate_pdf
+
+
 
 

@@ -245,12 +245,16 @@ def get_visit_report_pdf(visit_id: int, db: sqlite3.Connection = Depends(get_db)
     
     cur.execute("""
         SELECT 
+            to_ord.id AS order_id,
+            t.id AS test_id,
             t.name AS test_name, 
+            t.parent_rollup_id,
             tr.result_value, 
             t.ref_range,
             t.default_unit,
             s.name AS section_name, 
             to_ord.ordered_at, 
+            to_ord.sample_id,
             tr.entered_at,
             u_enter.full_name AS entered_by_name,
             u_ord.full_name AS ordered_by_name,
@@ -271,15 +275,48 @@ def get_visit_report_pdf(visit_id: int, db: sqlite3.Connection = Depends(get_db)
     if not rows:
         raise HTTPException(status_code=400, detail="No completed test results found for this visit. Enter results before printing.")
     
+    # Query any test_results linked to test_parameters for this visit
+    cur.execute("""
+        SELECT 
+            tr.order_id,
+            tp.parameter_name, 
+            tr.result_value, 
+            tr.result_unit, 
+            tp.unit AS default_unit, 
+            tp.ref_range, 
+            tr.is_positive
+        FROM test_results tr
+        JOIN test_parameters tp ON tr.parameter_id = tp.id
+        JOIN test_orders to_ord ON tr.order_id = to_ord.id
+        WHERE to_ord.visit_id = ?
+        ORDER BY tp.sort_order, tp.id
+    """, (visit_id,))
+    param_rows = cur.fetchall()
+    params_by_order = {}
+    for pr in param_rows:
+        oid = pr["order_id"]
+        if oid not in params_by_order:
+            params_by_order[oid] = []
+        params_by_order[oid].append({
+            "name": pr["parameter_name"],
+            "result": pr["result_value"],
+            "unit": pr["result_unit"] or pr["default_unit"] or "",
+            "reference_range": pr["ref_range"] or "",
+            "flag": _compute_flag(pr["result_value"], pr["ref_range"])
+        })
+
     results_by_section = {}
     ordered_date = None
     technician_name = None
     verified_by = None
+    analyzer_sample_id = None
+    analyzer_timestamp = None
     
     for row in rows:
         test_name = row["test_name"]
         result_value = row["result_value"]
         section_name = row["section_name"]
+        order_id = row["order_id"]
             
         if not ordered_date and row["ordered_at"]:
             ordered_date = row["ordered_at"][:10]
@@ -287,18 +324,27 @@ def get_visit_report_pdf(visit_id: int, db: sqlite3.Connection = Depends(get_db)
             technician_name = row["entered_by_name"] or row["ordered_by_name"]
         if not verified_by and row["verified_by_name"]:
             verified_by = row["verified_by_name"]
+        if not analyzer_sample_id and row["sample_id"]:
+            analyzer_sample_id = row["sample_id"]
+        if not analyzer_timestamp and row["entered_at"]:
+            analyzer_timestamp = row["entered_at"]
             
         test_data = {
             "test_name": test_name,
             "result": result_value,
             "unit": row["default_unit"] or "",
             "reference": row["ref_range"] or "",
-            "flag": _compute_flag(result_value, row["ref_range"])
+            "reference_range": row["ref_range"] or "",
+            "flag": _compute_flag(result_value, row["ref_range"]),
+            "sample_id": row["sample_id"] or "",
+            "timestamp": row["entered_at"] or "",
+            "parameters": params_by_order.get(order_id, [])
         }
         
         if section_name not in results_by_section:
             results_by_section[section_name] = []
         results_by_section[section_name].append(test_data)
+
         
     results_data = []
     for sec_name, tests in results_by_section.items():
@@ -325,8 +371,11 @@ def get_visit_report_pdf(visit_id: int, db: sqlite3.Connection = Depends(get_db)
         "ordered_by": clinician_name,
         "ordered_date": ordered_date or (visit_row["visit_created_at"][:10] if visit_row["visit_created_at"] else ""),
         "technician_name": technician_name or "",
-        "verified_by": verified_by or ""
+        "verified_by": verified_by or "",
+        "analyzer_sample_id": analyzer_sample_id or "",
+        "analyzer_timestamp": analyzer_timestamp or ""
     }
+
     
     pdf_bytes = generate_pdf(order_data, results_data)
     return Response(content=pdf_bytes, media_type="application/pdf")
