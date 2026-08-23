@@ -1,0 +1,58 @@
+================================================================================
+  AMH LAB TRACKER — HOSPITAL LABORATORY SYSTEM
+  Ahmadiyya Muslim Hospital, Mbale, Uganda
+================================================================================
+
+This package contains the complete offline AMH Lab Tracker system.
+No internet connection is required.
+
+--------------------------------------------------------------------------------
+1. FIRST TIME SETUP (DO THIS ONCE ON A NEW PC)
+--------------------------------------------------------------------------------
+Step 1: Install Python (if not already installed)
+        - Run Python installer (Python 3.11 or higher).
+        - IMPORTANT: Make sure to check the box: "Add Python to PATH"
+
+Step 2: Double-click "setup.bat"
+        - This will automatically install all offline packages, set up the
+          local database, and create a shortcut on your Desktop.
+        - If any error occurs, check "setup_debug.log" in this folder.
+
+--------------------------------------------------------------------------------
+2. DAILY OPERATION (STARTING THE SYSTEM)
+--------------------------------------------------------------------------------
+- Double-click the "AMH Lab Tracker" shortcut on your Desktop
+  OR double-click "run.bat" in this folder.
+- Your web browser will open automatically at: http://127.0.0.1:8756/
+- Keep the black server window open while using the system.
+
+--------------------------------------------------------------------------------
+3. DEFAULT LOGIN CREDENTIALS
+--------------------------------------------------------------------------------
+- Administrator Account:
+  Username: admin
+  Password: amh_admin2026
+
+- Laboratory Technician Account:
+  Username: tech1
+  Password: amh_tech2026
+
+--------------------------------------------------------------------------------
+4. HOW TO UPDATE / DEPLOY MODIFIED FILES
+--------------------------------------------------------------------------------
+- To deploy an updated file (such as a parser or UI fix), simply copy and
+  paste the modified file into its corresponding folder (e.g. backend/ or frontend/).
+- Restart the system by running "run.bat".
+- Your patient and test database in the "data/" folder will NOT be affected.
+
+--------------------------------------------------------------------------------
+5. TROUBLESHOOTING
+--------------------------------------------------------------------------------
+- If setup.bat displays an error about Python:
+  Re-run your Python installer, click "Modify", and ensure "Add Python to PATH"
+  is enabled.
+- If port 8756 is occupied:
+  "run.bat" will automatically detect and clear any stuck ghost process on launch.
+- If you need assistance or review setup errors:
+  Open "setup_debug.log" in Notepad to view the installation log.
+================================================================================

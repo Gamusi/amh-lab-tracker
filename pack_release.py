@@ -69,7 +69,7 @@ def pack():
         "setup.bat",
         "run.bat",
         "install.py",
-        "README.md"
+        "INSTRUCTIONS.txt"
     ]
     for f in include_files:
         src = os.path.join(BASE_DIR, f)
