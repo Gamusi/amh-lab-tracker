@@ -25,5 +25,5 @@ docs/superpowers/
 superpowers/
 dist/
 offline_packages/
-wheels/
-*.zip
+*.whl
+

@@ -37,13 +37,25 @@ def pack():
     os.makedirs(STAGE_DIR, exist_ok=True)
 
     # Folders to include
-    include_dirs = ["backend", "frontend", "assets", "docs", "launcher"]
+    include_dirs = ["backend", "frontend", "assets", "launcher"]
     for d in include_dirs:
         src = os.path.join(BASE_DIR, d)
         dst = os.path.join(STAGE_DIR, d)
         if os.path.exists(src):
-            shutil.copytree(src, dst, ignore=shutil.ignore_patterns("__pycache__", "*.pyc", ".pytest_cache"))
+            shutil.copytree(src, dst, ignore=shutil.ignore_patterns(
+                "__pycache__", "*.pyc", ".pytest_cache", "*.db", "*.log"
+            ))
             print(f"   [+] Copied folder: {d}/")
+
+    # Copy docs but exclude heavy reference material (drivers, PDFs, binaries)
+    docs_src = os.path.join(BASE_DIR, "docs")
+    docs_dst = os.path.join(STAGE_DIR, "docs")
+    if os.path.exists(docs_src):
+        shutil.copytree(docs_src, docs_dst, ignore=shutil.ignore_patterns(
+            "reference", "sample_outputs", "*.pdf", "*.exe", "*.zip"
+        ))
+        print("   [+] Copied folder: docs/ (excluding reference/ and sample_outputs/)")
+
 
     # Copy offline wheels
     if os.path.exists(WHEELS_DIR) and os.listdir(WHEELS_DIR):
