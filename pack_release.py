@@ -28,7 +28,7 @@ def pack():
     os.makedirs(WHEELS_DIR, exist_ok=True)
     print("\n1. Checking / downloading offline dependency wheels...")
     req_file = os.path.join(BASE_DIR, "requirements.txt")
-    run_cmd(f"{sys.executable} -m pip download -r requirements.txt -d \"{WHEELS_DIR}\"")
+    run_cmd(f"{sys.executable} -m pip download -r requirements.txt --python-version 3.11 --platform win_amd64 --only-binary=:all: -d \"{WHEELS_DIR}\"")
 
     # 2. Clean and create stage directory
     print("\n2. Staging files for release...")
@@ -36,7 +36,7 @@ def pack():
         shutil.rmtree(DIST_DIR)
     os.makedirs(STAGE_DIR, exist_ok=True)
 
-    # Folders to include
+    # Folders to include (pure runtime only - no docs or planning artifacts)
     include_dirs = ["backend", "frontend", "assets", "launcher"]
     for d in include_dirs:
         src = os.path.join(BASE_DIR, d)
@@ -45,16 +45,7 @@ def pack():
             shutil.copytree(src, dst, ignore=shutil.ignore_patterns(
                 "__pycache__", "*.pyc", ".pytest_cache", "*.db", "*.log"
             ))
-            print(f"   [+] Copied folder: {d}/")
-
-    # Copy docs but exclude heavy reference material (drivers, PDFs, binaries)
-    docs_src = os.path.join(BASE_DIR, "docs")
-    docs_dst = os.path.join(STAGE_DIR, "docs")
-    if os.path.exists(docs_src):
-        shutil.copytree(docs_src, docs_dst, ignore=shutil.ignore_patterns(
-            "reference", "sample_outputs", "*.pdf", "*.exe", "*.zip"
-        ))
-        print("   [+] Copied folder: docs/ (excluding reference/ and sample_outputs/)")
+            print(f"   [+] Copied runtime folder: {d}/")
 
 
     # Copy offline wheels

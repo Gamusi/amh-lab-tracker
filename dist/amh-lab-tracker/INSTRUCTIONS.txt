@@ -27,15 +27,14 @@ Step 2: Double-click "setup.bat"
 - Keep the black server window open while using the system.
 
 --------------------------------------------------------------------------------
-3. DEFAULT LOGIN CREDENTIALS
+3. USER ACCOUNTS & FIRST-RUN SETUP
 --------------------------------------------------------------------------------
-- Administrator Account:
-  Username: admin
-  Password: amh_admin2026
-
-- Laboratory Technician Account:
-  Username: tech1
-  Password: amh_tech2026
+- No default accounts or passwords exist in the system for security.
+- On your first launch, navigate to http://127.0.0.1:8756/ and click "Register".
+- Fill in your staff details (Full Name, Username, Cadre, Password).
+- The FIRST user account created automatically becomes the active Super Administrator.
+- Subsequent staff registrations will be placed in pending status until approved
+  by the Administrator from the User Management panel.
 
 --------------------------------------------------------------------------------
 4. HOW TO UPDATE / DEPLOY MODIFIED FILES

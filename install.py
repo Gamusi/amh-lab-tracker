@@ -37,8 +37,8 @@ def install():
     print("\n" + "=" * 60)
     print("  INSTALLATION COMPLETE!")
     print("  - Launch the app using 'run.bat' (or Desktop shortcut)")
-    print("  - Default Admin Credentials: username 'admin', password 'amh_admin2026'")
-    print("  - Default Tech Credentials:  username 'tech1', password 'amh_tech2026'")
+    print("  - On first launch, navigate to http://127.0.0.1:8756/ and click 'Register'")
+    print("  - The FIRST account registered automatically becomes the Super Administrator")
     print("  - Database File: data/amh_lab.db")
     print("=" * 60)
 

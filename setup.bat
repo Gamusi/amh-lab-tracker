@@ -150,9 +150,9 @@ echo [4/4] Setup Completed Successfully!
 echo Setup completed successfully at %TIME% >> "%LOG_FILE%"
 echo ============================================================
 echo.
-echo Default Administrator Login:
-echo   Username: admin
-echo   Password: amh_admin2026
+echo First-Time Account Setup:
+echo   Open the app, click "Register", and create your account.
+echo   The FIRST account created automatically becomes the Super Administrator.
 echo.
 echo You can start the app at any time using the Desktop shortcut
 echo or by double-clicking run.bat in this folder.
