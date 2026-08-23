@@ -1,3 +1,30 @@
+// ES6 async/await polyfill runner for legacy browser engines (Edge 12-14, older WebViews)
+function __async(generatorFunc) {
+  return function() {
+    var self = this;
+    var args = arguments;
+    return new Promise(function(resolve, reject) {
+      var gen = generatorFunc.apply(self, args);
+      function step(key, arg) {
+        var info;
+        try {
+          info = gen[key](arg);
+        } catch (error) {
+          return reject(error);
+        }
+        if (info.done) {
+          return resolve(info.value);
+        }
+        Promise.resolve(info.value).then(
+          function(val) { step('next', val); },
+          function(err) { step('throw', err); }
+        );
+      }
+      step('next');
+    });
+  };
+}
+
 const app = {
   currentUser: null,
   currentView: 'clients',
@@ -34,9 +61,9 @@ const app = {
     return this.icons[name] || '';
   },
 
-  init: async function() {
-    await this.loadTheme();
-    await this.checkAuth();
+  init: __async(function*() {
+    yield this.loadTheme();
+    yield this.checkAuth();
     this.setupInactivityListeners();
     
     document.addEventListener('keydown', (e) => {
@@ -50,11 +77,11 @@ const app = {
     });
   },
 
-  loadTheme: async function() {
+  loadTheme: __async(function*() {
     try {
-      const res = await fetch('/assets/branding/theme.json');
+      const res = yield fetch('/assets/branding/theme.json');
       if (res.ok) {
-        this.theme = await res.json();
+        this.theme = yield res.json();
         document.getElementById('app-title').textContent = this.theme.app_title || 'AMH Lab Tracker';
         document.getElementById('facility-name').textContent = this.theme.facility_name || '';
         document.getElementById('footer-text').textContent = this.theme.footer_text || '';
@@ -67,11 +94,11 @@ const app = {
     }
   },
 
-  checkAuth: async function() {
+  checkAuth: __async(function*() {
     try {
-      const res = await fetch('/api/auth/me');
+      const res = yield fetch('/api/auth/me');
       if (res.ok) {
-        this.currentUser = await res.json();
+        this.currentUser = yield res.json();
         this.renderUserNav();
         document.getElementById('login-modal').style.display = 'none';
         document.getElementById('app-nav').style.display = 'flex';
@@ -100,7 +127,7 @@ const app = {
     this.showLoginForm();
   },
 
-  handleLogin: async function(event) {
+  handleLogin: __async(function*(event) {
     event.preventDefault();
     const u = document.getElementById('login-username').value;
     const p = document.getElementById('login-password').value;
@@ -108,14 +135,14 @@ const app = {
     errDiv.style.display = 'none';
 
     try {
-      const res = await fetch('/api/auth/login', {
+      const res = yield fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username: u, password: p })
       });
 
       if (res.ok) {
-        const data = await res.json();
+        const data = yield res.json();
         this.currentUser = data.user;
         document.getElementById('login-modal').style.display = 'none';
         document.getElementById('app-nav').style.display = 'flex';
@@ -128,7 +155,7 @@ const app = {
           this.navigate('clients');
         }
       } else {
-        const err = await res.json();
+        const err = yield res.json();
         errDiv.textContent = err.detail || 'Login failed';
         errDiv.style.display = 'block';
       }
@@ -138,9 +165,9 @@ const app = {
     }
   },
 
-  handleLogout: async function() {
+  handleLogout: __async(function*() {
     this.stopInactivityTimer();
-    await fetch('/api/auth/logout', { method: 'POST' });
+    yield fetch('/api/auth/logout', { method: 'POST' });
     this.showLogin();
   },
 
@@ -160,7 +187,7 @@ const app = {
     }
   },
 
-  handleChangePassword: async function(event) {
+  handleChangePassword: __async(function*(event) {
     event.preventDefault();
     const oldPassword = document.getElementById('reset-old-password').value;
     const newPassword = document.getElementById('reset-new-password').value;
@@ -182,7 +209,7 @@ const app = {
     }
 
     try {
-      const res = await fetch('/api/auth/change-password', {
+      const res = yield fetch('/api/auth/change-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -200,7 +227,7 @@ const app = {
         this.showNotificationModal("Success", 'Password changed successfully!', false);
         this.navigate('clients');
       } else {
-        const err = await res.json();
+        const err = yield res.json();
         errDiv.textContent = err.detail || 'Failed to change password.';
         errDiv.style.display = 'block';
       }
@@ -225,7 +252,7 @@ const app = {
     document.getElementById('login-error').style.display = 'none';
   },
 
-  handleRegister: async function(event) {
+  handleRegister: __async(function*(event) {
     event.preventDefault();
     const fullname = document.getElementById('register-fullname').value;
     const username = document.getElementById('register-username').value;
@@ -238,14 +265,14 @@ const app = {
     successDiv.style.display = 'none';
 
     try {
-      const res = await fetch('/api/auth/register', {
+      const res = yield fetch('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ full_name: fullname, username: username, password: password, cadre: cadre })
       });
 
       if (res.ok) {
-        const data = await res.json();
+        const data = yield res.json();
         if (data.is_active) {
           successDiv.textContent = 'Super Admin account registered successfully! Redirecting...';
         } else {
@@ -257,7 +284,7 @@ const app = {
           this.showLoginForm();
         }, 3000);
       } else {
-        const err = await res.json();
+        const err = yield res.json();
         errDiv.textContent = err.detail || 'Registration failed';
         errDiv.style.display = 'block';
       }
@@ -461,7 +488,7 @@ const app = {
   },
 
   // Daily Log View
-  renderDailyLog: async function(container) {
+  renderDailyLog: __async(function*(container) {
     const today = new Date().toISOString().split('T')[0];
     container.innerHTML = `
       <div class="card">
@@ -493,14 +520,14 @@ const app = {
         </div>
       </div>
     `;
-    await this.loadDailyLogData(today);
+    yield this.loadDailyLogData(today);
   },
 
-  loadDailyLogData: async function(dateStr) {
+  loadDailyLogData: __async(function*(dateStr) {
     try {
-      const res = await fetch(`/api/daily-log?date=${dateStr}`);
+      const res = yield fetch(`/api/daily-log?date=${dateStr}`);
       if (!res.ok) throw new Error('API returned ' + res.status);
-      const data = await res.json();
+      const data = yield res.json();
       
       if (data.today_check) {
         const doneEl = document.getElementById('summary-done');
@@ -593,7 +620,7 @@ const app = {
     }
   },
 
-  saveDailyLogData: async function() {
+  saveDailyLogData: __async(function*() {
     const dateStr = document.getElementById('log-date').value;
     const entries = [];
 
@@ -610,7 +637,7 @@ const app = {
     });
 
     try {
-      const res = await fetch('/api/daily-log', {
+      const res = yield fetch('/api/daily-log', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ entry_date: dateStr, entries: entries })
@@ -628,7 +655,7 @@ const app = {
   },
 
   // Reports View
-  renderReports: async function(container) {
+  renderReports: __async(function*(container) {
     const today = new Date().toISOString().split('T')[0];
     container.innerHTML = `
       <div class="card">
@@ -660,7 +687,7 @@ const app = {
         </div>
       </div>
     `;
-    await this.loadReportData();
+    yield this.loadReportData();
   },
 
   exportReportCSV: function() {
@@ -697,14 +724,14 @@ const app = {
     this.showNotificationModal("Success", 'Report CSV exported successfully!', false);
   },
 
-  loadReportData: async function() {
+  loadReportData: __async(function*() {
     const pType = document.getElementById('report-period-type').value;
     const rDate = document.getElementById('report-ref-date').value;
 
     try {
-      const res = await fetch(`/api/reports?period_type=${pType}&reference_date=${rDate}`);
+      const res = yield fetch(`/api/reports?period_type=${pType}&reference_date=${rDate}`);
       if (!res.ok) throw new Error('API returned ' + res.status);
-      const data = await res.json();
+      const data = yield res.json();
 
       const rContainer = document.getElementById('report-content-container');
       let html = `
@@ -758,7 +785,7 @@ const app = {
   },
 
   // Trends View
-  renderTrends: async function(container) {
+  renderTrends: __async(function*(container) {
     container.innerHTML = `
       <div class="card">
         <div class="card-header">
@@ -787,7 +814,7 @@ const app = {
         </div>
       </div>
     `;
-    await this.loadTrendsData();
+    yield this.loadTrendsData();
   },
 
   exportTrendsCSV: function() {
@@ -814,14 +841,14 @@ const app = {
     this.showNotificationModal("Success", 'Trends CSV exported successfully!', false);
   },
 
-  loadTrendsData: async function() {
+  loadTrendsData: __async(function*() {
     const fy = document.getElementById('trend-from-year').value;
     const ty = document.getElementById('trend-to-year').value;
 
     try {
-      const res = await fetch(`/api/trends?from_year=${fy}&to_year=${ty}`);
+      const res = yield fetch(`/api/trends?from_year=${fy}&to_year=${ty}`);
       if (!res.ok) throw new Error('API returned ' + res.status);
-      const data = await res.json();
+      const data = yield res.json();
 
       let headers = '<th>Month</th>';
       data.sections.forEach(s => { headers += `<th style="text-align: right;">${this.escape(s)}</th>`; });
@@ -856,7 +883,7 @@ const app = {
   },
 
   // Test Reports View
-  renderClients: async function(container) {
+  renderClients: __async(function*(container) {
     container.innerHTML = `
       <div class="card">
         <div class="card-header">
@@ -887,14 +914,14 @@ const app = {
         </div>
       </div>
     `;
-    await this.searchClients('');
+    yield this.searchClients('');
   },
 
-  searchClients: async function(q) {
+  searchClients: __async(function*(q) {
     try {
-      const res = await fetch(`/api/clients?query=${encodeURIComponent(q || '')}`);
+      const res = yield fetch(`/api/clients?query=${encodeURIComponent(q || '')}`);
       if (!res.ok) throw new Error('API returned ' + res.status);
-      const clients = await res.json();
+      const clients = yield res.json();
 
       const box = document.getElementById('client-list-box');
       if (clients.length === 0) {
@@ -919,7 +946,7 @@ const app = {
     }
   },
 
-  selectClient: async function(pid, pnum, pname, psex) {
+  selectClient: __async(function*(pid, pnum, pname, psex) {
     this.currentClientId = pid;
     this.currentClientData = { id: pid, client_number: pnum, full_name: pname, sex: psex };
     const box = document.getElementById('client-detail-box');
@@ -991,18 +1018,18 @@ const app = {
       </div>
     `;
 
-    await this.loadWards();
-    await this.loadClinicians();
-    await this.loadTestOptionsMulti();
-    await this.loadPendingTests(pid);
-    await this.loadHistoricalVisits(pid);
+    yield this.loadWards();
+    yield this.loadClinicians();
+    yield this.loadTestOptionsMulti();
+    yield this.loadPendingTests(pid);
+    yield this.loadHistoricalVisits(pid);
   },
 
-  loadTestOptions: async function() {
+  loadTestOptions: __async(function*() {
     try {
-      const res = await fetch('/api/config/tests');
+      const res = yield fetch('/api/config/tests');
       if (!res.ok) throw new Error('API returned ' + res.status);
-      const tests = await res.json();
+      const tests = yield res.json();
 
       const selectEl = document.getElementById('order-test-select');
       if (!selectEl) return;
@@ -1020,12 +1047,12 @@ const app = {
     }
   },
 
-  onTestSelectChange: async function(testId) {
+  onTestSelectChange: __async(function*(testId) {
     if (!testId) return;
     try {
-      const res = await fetch(`/api/config/tests/${testId}/parameters`);
+      const res = yield fetch(`/api/config/tests/${testId}/parameters`);
       if (!res.ok) throw new Error('API returned ' + res.status);
-      const params = await res.json();
+      const params = yield res.json();
 
       const container = document.getElementById('test-parameters-container');
       const singleGroup = document.getElementById('single-result-group');
@@ -1056,7 +1083,7 @@ const app = {
     }
   },
 
-  submitShiftAudit: async function() {
+  submitShiftAudit: __async(function*() {
     const dateStr = document.getElementById('log-date') ? document.getElementById('log-date').value : new Date().toISOString().split('T')[0];
     const sysTotal = parseInt(document.getElementById('sys-total-done').textContent, 10) || 0;
     const paperVal = parseInt(document.getElementById('paper-register-input').value, 10);
@@ -1067,7 +1094,7 @@ const app = {
     }
 
     try {
-      const res = await fetch('/api/daily-log/verify', {
+      const res = yield fetch('/api/daily-log/verify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1078,7 +1105,7 @@ const app = {
       });
 
       if (res.ok) {
-        const data = await res.json();
+        const data = yield res.json();
         this.showNotificationModal('Audit Recorded', `Shift audit recorded: ${data.match} (System: ${sysTotal}, Register: ${paperVal})`, data.match !== 'MATCH');
       } else {
         this.showNotificationModal("Error", 'Failed to record shift audit.', true);
@@ -1088,11 +1115,11 @@ const app = {
     }
   },
 
-  loadWards: async function() {
+  loadWards: __async(function*() {
     try {
-      const res = await fetch('/api/config/wards?active_only=true');
+      const res = yield fetch('/api/config/wards?active_only=true');
       if (!res.ok) throw new Error('API returned ' + res.status);
-      const wards = await res.json();
+      const wards = yield res.json();
       const sel = document.getElementById('visit-ward');
       if (!sel) return;
       sel.innerHTML = '';
@@ -1108,11 +1135,11 @@ const app = {
     }
   },
 
-  loadClinicians: async function() {
+  loadClinicians: __async(function*() {
     try {
-      const res = await fetch('/api/config/clinicians');
+      const res = yield fetch('/api/config/clinicians');
       if (!res.ok) throw new Error('API returned ' + res.status);
-      const clinicians = await res.json();
+      const clinicians = yield res.json();
       const sel = document.getElementById('visit-clinician');
       if (!sel) return;
       sel.innerHTML = '<option value="">(None)</option>';
@@ -1125,17 +1152,17 @@ const app = {
   },
 
 
-  loadTestOptionsMulti: async function() {
+  loadTestOptionsMulti: __async(function*() {
     try {
       if (!this.sections) {
          try {
-           const sres = await fetch('/api/config/sections');
-           if (sres.ok) this.sections = await sres.json();
+           const sres = yield fetch('/api/config/sections');
+           if (sres.ok) this.sections = yield sres.json();
          } catch(e) { this.sections = []; }
       }
-      const res = await fetch('/api/config/tests');
+      const res = yield fetch('/api/config/tests');
       if (!res.ok) throw new Error('API returned ' + res.status);
-      const tests = await res.json();
+      const tests = yield res.json();
       
       this.testCatalog = tests;
       
@@ -1185,7 +1212,7 @@ const app = {
       }
     });
   },
-  createVisit: async function(pid) {
+  createVisit: __async(function*(pid) {
     const ward = document.getElementById('visit-ward').value;
     const clinician = document.getElementById('visit-clinician').value;
     const orderCat = document.getElementById('visit-order-category') ? document.getElementById('visit-order-category').value : 'in-house';
@@ -1206,7 +1233,7 @@ const app = {
       };
       if (clinician) payload.clinician_id = parseInt(clinician, 10);
       
-      const res = await fetch('/api/visits', {
+      const res = yield fetch('/api/visits', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -1215,8 +1242,8 @@ const app = {
         this.showNotificationModal("Success", 'Visit and orders created successfully!', false);
         // Uncheck all
         document.querySelectorAll('input[name="visit-test-cb"]').forEach(cb => cb.checked = false);
-        await this.loadPendingTests(pid);
-        await this.loadHistoricalVisits(pid);
+        yield this.loadPendingTests(pid);
+        yield this.loadHistoricalVisits(pid);
       } else {
         this.showNotificationModal("Error", 'Failed to create visit.', true);
       }
@@ -1224,13 +1251,13 @@ const app = {
       this.showNotificationModal("Error", 'Error creating visit.', true);
     }
   },
-  loadPendingTests: async function(pid) {
+  loadPendingTests: __async(function*(pid) {
     const container = document.getElementById('pending-tests-container');
     if (!container) return;
     try {
-      const res = await fetch(`/api/clients/${pid}/orders`);
+      const res = yield fetch(`/api/clients/${pid}/orders`);
       if (!res.ok) throw new Error('API returned ' + res.status);
-      const orders = await res.json();
+      const orders = yield res.json();
       const pending = orders.filter(o => o.status === 'pending');
       
       if (pending.length === 0) {
@@ -1304,28 +1331,28 @@ const app = {
     }
   },
 
-  bulkDeleteOrders: async function() {
+  bulkDeleteOrders: __async(function*() {
     const selected = Array.from(document.querySelectorAll('.pending-order-checkbox:checked')).map(cb => parseInt(cb.value, 10));
     if (selected.length === 0) return;
 
     this.confirmAction(
       "Remove Pending Tests",
       `Are you sure you want to remove ${selected.length} selected pending test order(s)?`,
-      async () => {
+      __async(function*() {
         try {
-          const res = await fetch('/api/orders/bulk', {
+          const res = yield fetch('/api/orders/bulk', {
             method: 'DELETE',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ order_ids: selected })
           });
           if (res.ok) {
-            const data = await res.json();
+            const data = yield res.json();
             this.showNotificationModal("Success", `Removed ${data.deleted_order_ids.length} test order(s).`, false);
             if (this.currentClientId) {
-              await this.loadPendingTests(this.currentClientId);
+              yield this.loadPendingTests(this.currentClientId);
             }
           } else {
-            const err = await res.json();
+            const err = yield res.json();
             this.showNotificationModal("Error", err.detail || "Failed to remove test orders.", true);
           }
         } catch(e) {
@@ -1336,13 +1363,13 @@ const app = {
     );
   },
 
-  loadHistoricalVisits: async function(pid) {
+  loadHistoricalVisits: __async(function*(pid) {
     const container = document.getElementById('historical-visits-container');
     if (!container) return;
     try {
-      const res = await fetch(`/api/clients/${pid}/visits`);
+      const res = yield fetch(`/api/clients/${pid}/visits`);
       if (!res.ok) throw new Error('API returned ' + res.status);
-      const visits = await res.json();
+      const visits = yield res.json();
       if (visits.length === 0) {
         container.innerHTML = '<div style="color:var(--text-muted);">No historical visits found.</div>';
         return;
@@ -1410,29 +1437,29 @@ const app = {
     }
   },
 
-  bulkDeleteVisits: async function() {
+  bulkDeleteVisits: __async(function*() {
     const selected = Array.from(document.querySelectorAll('.visit-checkbox:checked')).map(cb => parseInt(cb.value, 10));
     if (selected.length === 0) return;
 
     this.confirmAction(
       "Delete Selected Visits",
       `Are you sure you want to delete ${selected.length} selected visit(s)? All associated test orders and results will be removed. This action cannot be undone.`,
-      async () => {
+      __async(function*() {
         try {
-          const res = await fetch('/api/visits/bulk', {
+          const res = yield fetch('/api/visits/bulk', {
             method: 'DELETE',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ visit_ids: selected })
           });
           if (res.ok) {
-            const data = await res.json();
+            const data = yield res.json();
             this.showNotificationModal("Success", `Deleted ${data.deleted_visit_ids.length} visit(s).`, false);
             if (this.currentClientId) {
-              await this.loadHistoricalVisits(this.currentClientId);
-              await this.loadPendingTests(this.currentClientId);
+              yield this.loadHistoricalVisits(this.currentClientId);
+              yield this.loadPendingTests(this.currentClientId);
             }
           } else {
-            const err = await res.json();
+            const err = yield res.json();
             this.showNotificationModal("Error", err.detail || "Failed to delete visits.", true);
           }
         } catch(e) {
@@ -1447,17 +1474,17 @@ const app = {
     this.confirmAction(
       "Delete Visit",
       `Are you sure you want to delete this visit? All associated test orders and results will be removed. This action cannot be undone.`,
-      async () => {
+      __async(function*() {
         try {
-          const res = await fetch(`/api/visits/${visitId}`, { method: 'DELETE' });
+          const res = yield fetch(`/api/visits/${visitId}`, { method: 'DELETE' });
           if (res.ok) {
             this.showNotificationModal("Success", "Visit deleted successfully.", false);
             if (this.currentClientId) {
-              await this.loadHistoricalVisits(this.currentClientId);
-              await this.loadPendingTests(this.currentClientId);
+              yield this.loadHistoricalVisits(this.currentClientId);
+              yield this.loadPendingTests(this.currentClientId);
             }
           } else {
-            const err = await res.json();
+            const err = yield res.json();
             this.showNotificationModal("Error", err.detail || "Failed to delete visit.", true);
           }
         } catch(e) {
@@ -1486,11 +1513,11 @@ const app = {
     else ageInput.placeholder = "e.g. 25, 25y";
   },
 
-  openEditClientModal: async function(clientId) {
+  openEditClientModal: __async(function*(clientId) {
     try {
-      const res = await fetch(`/api/clients/${clientId}`);
+      const res = yield fetch(`/api/clients/${clientId}`);
       if (!res.ok) throw new Error("Failed to fetch client");
-      const data = await res.json();
+      const data = yield res.json();
 
       document.getElementById('edit-client-id').value = clientId;
       document.getElementById('edit-client-name').value = data.full_name || '';
@@ -1510,7 +1537,7 @@ const app = {
     }
   },
 
-  submitEditClient: async function(event) {
+  submitEditClient: __async(function*(event) {
     event.preventDefault();
     const clientId = document.getElementById('edit-client-id').value;
     const full_name = document.getElementById('edit-client-name').value.trim();
@@ -1523,13 +1550,13 @@ const app = {
     if (age_string) payload.age_string = age_string;
 
     try {
-      const res = await fetch(`/api/clients/${clientId}`, {
+      const res = yield fetch(`/api/clients/${clientId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
       if (res.ok) {
-        const updated = await res.json();
+        const updated = yield res.json();
         document.getElementById('edit-client-modal').style.display = 'none';
         // Update header name live
         const nameSpan = document.getElementById('client-header-name');
@@ -1542,10 +1569,10 @@ const app = {
           this.currentClientData.age_category = updated.age_category || age_category;
         }
         // Refresh client list so search shows updated name
-        await this.searchClients('');
+        yield this.searchClients('');
         this.showNotificationModal("Success", "Client details updated successfully.", false);
       } else {
-        const err = await res.json();
+        const err = yield res.json();
         this.showNotificationModal("Error", err.detail || "Failed to update client.", true);
       }
     } catch(e) {
@@ -1553,11 +1580,11 @@ const app = {
     }
   },
 
-  openEditVisitModal: async function(visitId) {
+  openEditVisitModal: __async(function*(visitId) {
     try {
-      const res = await fetch(`/api/visits/${visitId}`);
+      const res = yield fetch(`/api/visits/${visitId}`);
       if (!res.ok) throw new Error('Failed to load visit details');
-      const data = await res.json();
+      const data = yield res.json();
       
       document.getElementById('edit-visit-id').value = visitId;
       
@@ -1565,8 +1592,8 @@ const app = {
       const wardSelect = document.getElementById('edit-visit-ward');
       wardSelect.innerHTML = '';
       try {
-        const wRes = await fetch('/api/config/wards?active_only=true');
-        const wards = await wRes.json();
+        const wRes = yield fetch('/api/config/wards?active_only=true');
+        const wards = yield wRes.json();
         wards.forEach(w => {
           const opt = document.createElement('option');
           opt.value = w.name;
@@ -1580,8 +1607,8 @@ const app = {
       const clinSelect = document.getElementById('edit-visit-clinician');
       clinSelect.innerHTML = '<option value="">-- None --</option>';
       try {
-        const cRes = await fetch('/api/config/clinicians');
-        const clins = await cRes.json();
+        const cRes = yield fetch('/api/config/clinicians');
+        const clins = yield cRes.json();
         clins.forEach(cl => {
           const opt = document.createElement('option');
           opt.value = cl.id;
@@ -1637,7 +1664,7 @@ const app = {
     }
   },
 
-  submitEditVisit: async function(e) {
+  submitEditVisit: __async(function*(e) {
     e.preventDefault();
     const visitId = document.getElementById('edit-visit-id').value;
     const ward = document.getElementById('edit-visit-ward').value;
@@ -1645,7 +1672,7 @@ const app = {
     const orderCat = document.getElementById('edit-visit-order-category').value;
 
     try {
-      const res = await fetch(`/api/visits/${visitId}`, {
+      const res = yield fetch(`/api/visits/${visitId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1658,10 +1685,10 @@ const app = {
         this.showNotificationModal("Success", "Visit details updated successfully.", false);
         document.getElementById('edit-visit-modal').style.display = 'none';
         if (this.currentClientId) {
-          await this.loadHistoricalVisits(this.currentClientId);
+          yield this.loadHistoricalVisits(this.currentClientId);
         }
       } else {
-        const err = await res.json();
+        const err = yield res.json();
         this.showNotificationModal("Error", err.detail || "Failed to update visit.", true);
       }
     } catch(err) {
@@ -1669,7 +1696,7 @@ const app = {
     }
   },
 
-  showAddTestModal: async function(visitId) {
+  showAddTestModal: __async(function*(visitId) {
     document.getElementById('add-test-visit-id').value = visitId;
     document.getElementById('add-test-search').value = '';
     const container = document.getElementById('add-tests-container');
@@ -1678,8 +1705,8 @@ const app = {
 
     if (!this.sections || this.sections.length === 0) {
       try {
-        const sres = await fetch('/api/config/sections');
-        if (sres.ok) this.sections = await sres.json();
+        const sres = yield fetch('/api/config/sections');
+        if (sres.ok) this.sections = yield sres.json();
       } catch(e) { this.sections = []; }
     }
 
@@ -1695,8 +1722,8 @@ const app = {
 
     if (!this.testCatalog || this.testCatalog.length === 0) {
       try {
-        const res = await fetch('/api/config/tests');
-        if (res.ok) this.testCatalog = await res.json();
+        const res = yield fetch('/api/config/tests');
+        if (res.ok) this.testCatalog = yield res.json();
       } catch(e) {}
     }
     
@@ -1731,7 +1758,7 @@ const app = {
     });
   },
 
-  submitAddTests: async function() {
+  submitAddTests: __async(function*() {
     const visitId = document.getElementById('add-test-visit-id').value;
     const orderCat = document.getElementById('add-test-order-category').value;
     const checkboxes = document.querySelectorAll('input[name="add-test-cb"]:checked');
@@ -1743,7 +1770,7 @@ const app = {
     }
     
     try {
-      const res = await fetch(`/api/visits/${visitId}/orders`, {
+      const res = yield fetch(`/api/visits/${visitId}/orders`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ test_ids: selectedTests, order_category: orderCat })
@@ -1752,10 +1779,10 @@ const app = {
         this.showNotificationModal("Success", "Tests added to visit successfully.", false);
         document.getElementById('add-test-modal').style.display = 'none';
         if (this.currentClientId) {
-           await this.loadPendingTests(this.currentClientId);
+           yield this.loadPendingTests(this.currentClientId);
         }
       } else {
-        const err = await res.json();
+        const err = yield res.json();
         this.showNotificationModal("Error", err.detail || "Failed to add tests.", true);
       }
     } catch(e) {
@@ -1764,17 +1791,17 @@ const app = {
   },
 
 
-  removeOrder: async function(orderId) {
-    app.confirmAction("Confirm Removal", "Are you sure you want to remove this pending test?", async () => {
+  removeOrder: __async(function*(orderId) {
+    app.confirmAction("Confirm Removal", "Are you sure you want to remove this pending test?", __async(function*() {
       try {
-        const res = await fetch(`/api/orders/${orderId}`, { method: 'DELETE' });
+        const res = yield fetch(`/api/orders/${orderId}`, { method: 'DELETE' });
         if (res.ok) {
           app.showNotificationModal("Success", "Test order removed.", false);
           if (app.currentClientId) {
-            await app.loadPendingTests(app.currentClientId);
+            yield app.loadPendingTests(app.currentClientId);
           }
         } else {
-          const err = await res.json();
+          const err = yield res.json();
           app.showNotificationModal("Error", err.detail || "Failed to remove test order.", true);
         }
       } catch(e) {
@@ -1798,7 +1825,7 @@ const app = {
     }
   },
 
-  parseAndPopulateAnalyzerData: async function() {
+  parseAndPopulateAnalyzerData: __async(function*() {
     const rawText = document.getElementById('analyzer-raw-input').value.trim();
     const statusSpan = document.getElementById('analyzer-parse-status');
     if (!rawText) {
@@ -1807,19 +1834,19 @@ const app = {
     }
 
     try {
-      const res = await fetch('/api/integrations/parse-analyzer-output', {
+      const res = yield fetch('/api/integrations/parse-analyzer-output', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ analyzer_type: 'nihon_kohden', raw_text: rawText })
       });
 
       if (!res.ok) {
-        const err = await res.json();
+        const err = yield res.json();
         this.showNotificationModal("Parsing Failed", err.detail || "Failed to parse analyzer output.", true);
         return;
       }
 
-      const data = await res.json();
+      const data = yield res.json();
       if (data.status !== 'success' || !data.parameters) {
         this.showNotificationModal("Error", "No parameters extracted from output.", true);
         return;
@@ -1856,7 +1883,7 @@ const app = {
     }
   },
 
-  showEnterResultModal: async function(orderId, testId, testName, existingVal = null, existingUnit = null, visitId = null) {
+  showEnterResultModal: __async(function*(orderId, testId, testName, existingVal = null, existingUnit = null, visitId = null) {
     document.getElementById('result-entry-order-id').value = orderId;
     document.getElementById('result-entry-test-id').value = testId;
     document.getElementById('result-entry-visit-id').value = visitId || '';
@@ -1889,8 +1916,8 @@ const app = {
     // Ensure testCatalog is loaded
     if (!this.testCatalog || this.testCatalog.length === 0) {
       try {
-        const res = await fetch('/api/config/tests');
-        if (res.ok) this.testCatalog = await res.json();
+        const res = yield fetch('/api/config/tests');
+        if (res.ok) this.testCatalog = yield res.json();
       } catch(e) {}
     }
     
@@ -1993,10 +2020,10 @@ const app = {
         }
         // Check for test parameters from test_parameters table
         try {
-          const paramRes = await fetch(`/api/config/tests/${testId}/parameters`);
+          const paramRes = yield fetch(`/api/config/tests/${testId}/parameters`);
           let paramsList = [];
           if (paramRes.ok) {
-            paramsList = await paramRes.json();
+            paramsList = yield paramRes.json();
           }
 
           if (paramsList && paramsList.length > 0) {
@@ -2047,7 +2074,7 @@ const app = {
         };
     });
     
-    form.onsubmit = async (e) => {
+    form.onsubmit = __async(function*(e) {
        e.preventDefault();
        
        let finalVal = null;
@@ -2090,7 +2117,7 @@ const app = {
            const isEditMode = document.getElementById('result-entry-is-edit') ? document.getElementById('result-entry-is-edit').value === '1' : false;
            const editReason = document.getElementById('result-entry-reason') ? document.getElementById('result-entry-reason').value.trim() : '';
 
-           const res = await fetch('/api/clients/results', {
+           const res = yield fetch('/api/clients/results', {
              method: 'POST',
              headers: { 'Content-Type': 'application/json' },
              body: JSON.stringify({
@@ -2101,7 +2128,7 @@ const app = {
              })
            });
            if (!res.ok) {
-             const err = await res.json();
+             const err = yield res.json();
              app.showNotificationModal("Error", err.detail || "Failed to save results.", true);
              return;
            }
@@ -2130,13 +2157,13 @@ const app = {
               result_unit: selectedUnit,
               edit_reason: isEditMode ? editReason : null
             };
-            const res = await fetch('/api/clients/results', {
+            const res = yield fetch('/api/clients/results', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify(payload)
             });
             if (!res.ok) {
-              const err = await res.json();
+              const err = yield res.json();
               this.showNotificationModal("Error", err.detail || "Failed to save result.", true);
               return;
             }
@@ -2145,13 +2172,13 @@ const app = {
          this.showNotificationModal("Success", "Result saved successfully!", false);
          document.getElementById('result-entry-modal').style.display = 'none';
          if (this.currentClientId) {
-            await this.loadPendingTests(this.currentClientId);
-            await this.loadHistoricalVisits(this.currentClientId);
+            yield this.loadPendingTests(this.currentClientId);
+            yield this.loadHistoricalVisits(this.currentClientId);
          }
          // Also refresh the edit visit modal tests list if it's currently open
          const editVisitId = (document.getElementById('edit-visit-id') ? document.getElementById('edit-visit-id').value : null);
          if (editVisitId && (document.getElementById('edit-visit-modal') ? document.getElementById('edit-visit-modal').style.display : null) !== 'none') {
-           await this.openEditVisitModal(parseInt(editVisitId, 10));
+           yield this.openEditVisitModal(parseInt(editVisitId, 10));
          }
        } catch(err) {
          this.showNotificationModal("Error", "Connection error saving result.", true);
@@ -2162,7 +2189,7 @@ const app = {
 
 
 
-  submitTestResult: async function(pid) {
+  submitTestResult: __async(function*(pid) {
     const tid = parseInt(document.getElementById('order-test-select').value, 10);
     const sampleId = document.getElementById('order-sample-id').value;
     const isPos = document.getElementById('order-result-pos').value === 'true';
@@ -2195,17 +2222,17 @@ const app = {
 
     try {
       // 1. Create order
-      const ordRes = await fetch('/api/clients/orders', {
+      const ordRes = yield fetch('/api/clients/orders', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ client_id: pid, test_id: tid, sample_id: sampleId })
       });
 
       if (!ordRes.ok) throw new Error('Order creation failed');
-      const ordData = await ordRes.json();
+      const ordData = yield ordRes.json();
 
       // 2. Submit result
-      const resRes = await fetch('/api/clients/results', {
+      const resRes = yield fetch('/api/clients/results', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -2218,7 +2245,7 @@ const app = {
 
       if (resRes.ok) {
         this.showNotificationModal("Success", 'Result recorded successfully! Daily Log auto-incremented.', false);
-        await this.loadClientOrders(pid);
+        yield this.loadClientOrders(pid);
         // Print removed to avoid race conditions
       } else {
         this.showNotificationModal("Error", 'Failed to record result.', true);
@@ -2228,7 +2255,7 @@ const app = {
     }
   },
 
-  loadClientOrders: async function(pid) {
+  loadClientOrders: __async(function*(pid) {
     const frame = document.getElementById('report-frame');
     if (frame) {
       frame.src = `/api/reports/client/${pid}/pdf`;
@@ -2255,7 +2282,7 @@ const app = {
     else ageInput.placeholder = "e.g. 25, 25y";
   },
 
-  handleRegisterClientSubmit: async function(e) {
+  handleRegisterClientSubmit: __async(function*(e) {
     e.preventDefault();
     const pname = document.getElementById('client-name').value.trim();
     const psex = document.getElementById('client-sex').value;
@@ -2301,7 +2328,7 @@ const app = {
     }
     
     try {
-      const res = await fetch('/api/clients', {
+      const res = yield fetch('/api/clients', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -2314,7 +2341,7 @@ const app = {
       });
 
       if (res.ok) {
-        const data = await res.json();
+        const data = yield res.json();
         app.showNotificationModal("Success", `Client registered successfully! Assigned ID: ${data.client_number}`, false);
         app.closeNewClientModal();
         app.searchClients('');
@@ -2328,7 +2355,7 @@ const app = {
 
   // Configuration View
 
-  renderConfig: async function(container) {
+  renderConfig: __async(function*(container) {
     const isSuperAdmin = this.currentUser && this.currentUser.role === 'superadmin';
 
     container.innerHTML = `
@@ -2388,18 +2415,18 @@ const app = {
       </details>
       ` : ''}
     `;
-    await this.loadConfigData();
-    await this.loadWardsConfig();
-    await this.loadCliniciansConfig();
+    yield this.loadConfigData();
+    yield this.loadWardsConfig();
+    yield this.loadCliniciansConfig();
   },
 
 
   
-  loadWardsConfig: async function() {
+  loadWardsConfig: __async(function*() {
     try {
-      const res = await fetch('/api/config/wards');
+      const res = yield fetch('/api/config/wards');
       if (!res.ok) throw new Error('API returned ' + res.status);
-      const wards = await res.json();
+      const wards = yield res.json();
       let rows = '';
       wards.forEach(w => {
         rows += `
@@ -2425,7 +2452,7 @@ const app = {
     } catch(e) { console.error(e); }
   },
 
-  showAddWardModal: async function() {
+  showAddWardModal: __async(function*() {
     document.getElementById('ward-modal-title').textContent = 'Add Ward';
     document.getElementById('ward-modal-id').value = '';
     document.getElementById('ward-modal-active').value = '1';
@@ -2434,7 +2461,7 @@ const app = {
     document.getElementById('ward-modal-name').focus();
   },
 
-  editWard: async function(id, oldName, isActive) {
+  editWard: __async(function*(id, oldName, isActive) {
     document.getElementById('ward-modal-title').textContent = 'Edit Ward';
     document.getElementById('ward-modal-id').value = id;
     document.getElementById('ward-modal-active').value = isActive ? '1' : '0';
@@ -2443,7 +2470,7 @@ const app = {
     document.getElementById('ward-modal-name').focus();
   },
 
-  submitWardModal: async function(e) {
+  submitWardModal: __async(function*(e) {
     e.preventDefault();
     const id = document.getElementById('ward-modal-id').value;
     const name = document.getElementById('ward-modal-name').value.trim();
@@ -2452,13 +2479,13 @@ const app = {
     try {
       let res;
       if (id) {
-        res = await fetch(`/api/config/wards/${id}`, {
+        res = yield fetch(`/api/config/wards/${id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ name, is_active: isActive })
         });
       } else {
-        res = await fetch('/api/config/wards', {
+        res = yield fetch('/api/config/wards', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ name })
@@ -2468,24 +2495,24 @@ const app = {
         document.getElementById('ward-modal').style.display = 'none';
         this.loadWardsConfig();
       } else {
-        const err = await res.json();
+        const err = yield res.json();
         this.showNotificationModal("Error", err.detail || "Failed to save ward.", true);
       }
     } catch(e) { console.error(e); }
   },
 
-  deleteWard: async function(id) {
-    app.confirmAction("Confirm Deactivation", "Are you sure you want to deactivate this ward?", async () => {
+  deleteWard: __async(function*(id) {
+    app.confirmAction("Confirm Deactivation", "Are you sure you want to deactivate this ward?", __async(function*() {
       try {
-        await fetch(`/api/config/wards/${id}`, { method: 'DELETE' });
+        yield fetch(`/api/config/wards/${id}`, { method: 'DELETE' });
         app.loadWardsConfig();
       } catch(e) { console.error(e); }
     });
   },
 
-  reactivateWard: async function(id) {
+  reactivateWard: __async(function*(id) {
     try {
-      const res = await fetch(`/api/config/wards/${id}`, {
+      const res = yield fetch(`/api/config/wards/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ is_active: true })
@@ -2493,17 +2520,17 @@ const app = {
       if (res.ok) {
         this.loadWardsConfig();
       } else {
-        const err = await res.json();
+        const err = yield res.json();
         this.showNotificationModal("Error", err.detail || "Failed to reactivate ward.", true);
       }
     } catch(e) { console.error(e); }
   },
 
-  loadCliniciansConfig: async function() {
+  loadCliniciansConfig: __async(function*() {
     try {
-      const res = await fetch('/api/config/clinicians');
+      const res = yield fetch('/api/config/clinicians');
       if (!res.ok) throw new Error('API returned ' + res.status);
-      const clinicians = await res.json();
+      const clinicians = yield res.json();
       let rows = '';
       clinicians.forEach(c => {
         rows += `
@@ -2527,11 +2554,11 @@ const app = {
     document.getElementById('clinician-modal').style.display = 'flex';
   },
 
-  submitClinicianModal: async function(event) {
+  submitClinicianModal: __async(function*(event) {
     event.preventDefault();
     const name = document.getElementById('clinician-modal-name').value;
     try {
-      const res = await fetch('/api/config/clinicians', {
+      const res = yield fetch('/api/config/clinicians', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: name, is_active: true })
@@ -2540,19 +2567,19 @@ const app = {
         document.getElementById('clinician-modal').style.display = 'none';
         app.loadCliniciansConfig();
       } else {
-        const err = await res.json();
+        const err = yield res.json();
         app.showNotificationModal("Error", err.detail || "Failed to add clinician.", true);
       }
     } catch(e) { console.error(e); }
   },
 
-  loadConfigData: async function() {
+  loadConfigData: __async(function*() {
     try {
       // 1. Load sections first so we can display names
       if (!this.sections) {
         try {
-          const secRes = await fetch('/api/config/sections');
-          if (secRes.ok) this.sections = await secRes.json();
+          const secRes = yield fetch('/api/config/sections');
+          if (secRes.ok) this.sections = yield secRes.json();
           else this.sections = [];
         } catch(e) { this.sections = []; }
       }
@@ -2560,9 +2587,9 @@ const app = {
       (this.sections || []).forEach(s => { sectionMap[s.id] = s.name; });
 
       // 2. Load test catalog
-      const res = await fetch('/api/config/tests');
+      const res = yield fetch('/api/config/tests');
       if (res.ok) {
-        const tests = await res.json();
+        const tests = yield res.json();
         this.testCatalog = tests;
 
         // Build section name lookup
@@ -2674,16 +2701,16 @@ const app = {
       }
 
       // 3. Load clinicians config
-      await this.loadCliniciansConfig();
+      yield this.loadCliniciansConfig();
 
       // 4. Load wards config
-      await this.loadWardsConfig();
+      yield this.loadWardsConfig();
 
       // 5. Load user management for admin/superadmin
       if (this.currentUser && (this.currentUser.role === 'admin' || this.currentUser.role === 'superadmin')) {
-        const userRes = await fetch('/api/auth/users');
+        const userRes = yield fetch('/api/auth/users');
         if (userRes.ok) {
-          const users = await userRes.json();
+          const users = yield userRes.json();
 
           // Split into pending and active
           const pendingUsers = users.filter(u => !u.is_active);
@@ -2817,20 +2844,20 @@ const app = {
     }
   },
 
-  approveUser: async function(userId, role, cadre) {
-    await this.saveUserUpdate(userId, { role: role || 'staff', cadre: cadre || null, is_active: true });
+  approveUser: __async(function*(userId, role, cadre) {
+    yield this.saveUserUpdate(userId, { role: role || 'staff', cadre: cadre || null, is_active: true });
     this.showNotificationModal("Success", 'User registration approved successfully!', false);
   },
 
-  rejectUser: async function(userId, username) {
-    app.confirmAction("Reject User", `Are you sure you want to reject and delete the registration for '${username}'?`, async () => {
+  rejectUser: __async(function*(userId, username) {
+    app.confirmAction("Reject User", `Are you sure you want to reject and delete the registration for '${username}'?`, __async(function*() {
       try {
-        const res = await fetch(`/api/auth/users/${userId}`, { method: 'DELETE' });
+        const res = yield fetch(`/api/auth/users/${userId}`, { method: 'DELETE' });
         if (res.ok) {
           app.showNotificationModal("Success", `Registration for '${username}' rejected and removed.`, false);
-          await app.loadConfigData();
+          yield app.loadConfigData();
         } else {
-          const err = await res.json();
+          const err = yield res.json();
           app.showNotificationModal("Error", err.detail || 'Failed to reject registration.', true);
         }
       } catch (e) {
@@ -2839,19 +2866,19 @@ const app = {
     });
   },
 
-  deactivateUser: async function(userId, role, cadre) {
-    app.confirmAction("Deactivate User", "Are you sure you want to deactivate this account?", async () => {
-      await app.saveUserUpdate(userId, { role: role, cadre: cadre || null, is_active: false });
+  deactivateUser: __async(function*(userId, role, cadre) {
+    app.confirmAction("Deactivate User", "Are you sure you want to deactivate this account?", __async(function*() {
+      yield app.saveUserUpdate(userId, { role: role, cadre: cadre || null, is_active: false });
       app.showNotificationModal("Success", 'User account deactivated.', false);
     });
   },
 
-  changeUserFields: async function(userId, isActive) {
+  changeUserFields: __async(function*(userId, isActive) {
     const roleEl = document.getElementById(`role-select-${userId}`);
     const cadreEl = document.getElementById(`cadre-select-${userId}`);
     if (!roleEl || !cadreEl) return;
     
-    await this.saveUserUpdate(userId, { role: roleEl.value, cadre: cadreEl.value || null, is_active: isActive });
+    yield this.saveUserUpdate(userId, { role: roleEl.value, cadre: cadreEl.value || null, is_active: isActive });
     this.showNotificationModal("Success", 'User details updated successfully.', false);
   },
 
@@ -2888,32 +2915,32 @@ const app = {
     input.focus();
   },
 
-  promptResetPassword: async function(userId, username, role, cadre) {
-    app.promptAction("Reset Password", `Enter a new temporary password for user '${username}' (minimum 4 characters):`, async (tempPw) => {
+  promptResetPassword: __async(function*(userId, username, role, cadre) {
+    app.promptAction("Reset Password", `Enter a new temporary password for user '${username}' (minimum 4 characters):`, __async(function*(tempPw) {
       if (tempPw.trim().length < 4) {
         app.showNotificationModal("Error", 'Password must be at least 4 characters long.', true);
         return;
       }
-      await app.saveUserUpdate(userId, { role: role, cadre: cadre || null, is_active: true, password: tempPw.trim() });
+      yield app.saveUserUpdate(userId, { role: role, cadre: cadre || null, is_active: true, password: tempPw.trim() });
       app.showNotificationModal("Success", `Password reset for '${username}'. User will be required to change it on next login.`, false);
     });
   },
 
-  saveUserUpdate: async function(userId, updateBody) {
+  saveUserUpdate: __async(function*(userId, updateBody) {
     try {
-      const res = await fetch(`/api/auth/users/${userId}`, {
+      const res = yield fetch(`/api/auth/users/${userId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updateBody)
       });
       if (res.ok) {
         if (userId === this.currentUser.id) {
-          await this.checkAuth();
+          yield this.checkAuth();
         } else {
-          await this.loadConfigData();
+          yield this.loadConfigData();
         }
       } else {
-        const err = await res.json();
+        const err = yield res.json();
         this.showNotificationModal("Error", err.detail || 'Failed to update user account.', true);
       }
     } catch (e) {
@@ -2930,7 +2957,7 @@ const app = {
     if (btn) btn.textContent = isHidden ? '-' : '+';
   },
 
-  openTestConfigModal: async function(testId = null) {
+  openTestConfigModal: __async(function*(testId = null) {
     // If editing, look up the test object from testCatalog (already loaded) or fetch it
     let test = null;
     if (testId !== null) {
@@ -2939,9 +2966,9 @@ const app = {
       }
       if (!test) {
         try {
-          const res = await fetch('/api/config/tests');
+          const res = yield fetch('/api/config/tests');
           if (res.ok) {
-            this.testCatalog = await res.json();
+            this.testCatalog = yield res.json();
             test = this.testCatalog.find(t => t.id === testId) || null;
           }
         } catch(e) {}
@@ -2951,8 +2978,8 @@ const app = {
     // Load sections if not loaded
     if (!this.sections) {
       try {
-        const res = await fetch('/api/config/sections');
-        if (res.ok) this.sections = await res.json();
+        const res = yield fetch('/api/config/sections');
+        if (res.ok) this.sections = yield res.json();
         else this.sections = [];
       } catch(e) { this.sections = []; }
     }
@@ -3002,9 +3029,9 @@ const app = {
     this.handleTestResultTypeChange();
     modal.style.display = 'flex';
     
-    form.onsubmit = async (e) => {
+    form.onsubmit = __async(function*(e) {
       e.preventDefault();
-      await this.saveTestConfig();
+      yield this.saveTestConfig();
     };
   },
 
@@ -3048,7 +3075,7 @@ const app = {
     }
   },
 
-  saveTestConfig: async function() {
+  saveTestConfig: __async(function*() {
     const id = document.getElementById('test-config-id').value;
     const name = document.getElementById('test-config-name').value.trim();
     const section_id = parseInt(document.getElementById('test-config-section').value, 10);
@@ -3074,13 +3101,13 @@ const app = {
     try {
       let res;
       if (id) {
-        res = await fetch(`/api/config/tests/${id}`, {
+        res = yield fetch(`/api/config/tests/${id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
         });
       } else {
-        res = await fetch(`/api/config/tests`, {
+        res = yield fetch(`/api/config/tests`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
@@ -3090,9 +3117,9 @@ const app = {
       if (res.ok) {
         document.getElementById('test-config-modal').style.display = 'none';
         this.showNotificationModal("Success", `Test ${id ? 'updated' : 'added'} successfully.`);
-        await this.loadConfigData();
+        yield this.loadConfigData();
       } else {
-        const err = await res.json();
+        const err = yield res.json();
         this.showNotificationModal("Error", err.detail || 'Failed to save test.', true);
       }
     } catch (e) {
@@ -3100,7 +3127,7 @@ const app = {
     }
   },
 
-  deleteTest: async function(testId) {
+  deleteTest: __async(function*(testId) {
     // Guard: block deletion of panel parent that still has children
     const hasChildren = (this.testCatalog || []).some(t => t.parent_rollup_id === testId);
     if (hasChildren) {
@@ -3112,9 +3139,9 @@ const app = {
       return;
     }
 
-    app.confirmAction("Confirm Deletion", "Are you sure you want to deactivate this test from the catalog?", async () => {
+    app.confirmAction("Confirm Deletion", "Are you sure you want to deactivate this test from the catalog?", __async(function*() {
       try {
-        const res = await fetch(`/api/config/tests/${testId}`, { method: 'DELETE' });
+        const res = yield fetch(`/api/config/tests/${testId}`, { method: 'DELETE' });
         if (res.ok) {
           app.loadConfigData();
         } else {
@@ -3127,7 +3154,7 @@ const app = {
    },
 
 
-  renderAuditLog: async function(container) {
+  renderAuditLog: __async(function*(container) {
     container.innerHTML = `
       <div class="card">
         <div class="card-header">
@@ -3139,9 +3166,9 @@ const app = {
       </div>
     `;
     try {
-      const res = await fetch('/api/audit-log');
+      const res = yield fetch('/api/audit-log');
       if (!res.ok) throw new Error('API returned ' + res.status);
-      const logs = await res.json();
+      const logs = yield res.json();
 
       let rows = '';
       logs.forEach(l => {
