@@ -1267,7 +1267,7 @@ const app = {
             <td style="padding:8px; border-bottom:1px solid #ddd;"><strong>${this.escape(o.test_name)}</strong><br><small style="color:var(--text-muted);">Order ID: ${o.order_id}</small></td>
             <td style="padding:8px; border-bottom:1px solid #ddd;">${o.ordered_at}</td>
             <td style="padding:8px; border-bottom:1px solid #ddd; text-align:right;">
-              <button class="btn btn-primary btn-sm" onclick="app.showEnterResultModal(${o.order_id}, ${o.test_id}, '${this.escape(o.test_name)}', ${o.results && o.results.length > 0 ? `'${this.escape(o.results[0].result_value || '')}'` : 'null'}, ${o.results && o.results.length > 0 && o.results[0].result_unit ? `'${this.escape(o.results[0].result_unit)}'` : 'null'})">
+              <button class="btn btn-primary btn-sm" onclick="app.showEnterResultModal(${o.order_id}, ${o.test_id}, '${this.escape(o.test_name)}', ${o.results && o.results.length > 0 ? `'${this.escape(o.results[0].result_value || '')}'` : 'null'}, ${o.results && o.results.length > 0 && o.results[0].result_unit ? `'${this.escape(o.results[0].result_unit)}'` : 'null'}, ${o.visit_id || 'null'})">
                 ${o.results && o.results.length > 0 ? 'Edit Result' : 'Enter Result'}
               </button>
               <button class="btn btn-danger btn-sm" onclick="app.removeOrder(${o.order_id})">Remove</button>
@@ -1620,7 +1620,7 @@ const app = {
                 <td style="padding:10px 12px; text-transform:capitalize; font-size:0.85rem;">${catText}</td>
                 <td style="padding:10px 12px;"><strong>${resVal}</strong>${resUnit}</td>
                 <td style="padding:10px 12px; text-align:right;">
-                  ${isAdmin ? `<button type="button" class="btn btn-secondary btn-sm" style="padding:4px 12px;" onclick="app.showEnterResultModal(${o.order_id}, ${o.test_id}, '${this.escape(o.test_name)}', '${hasResult ? this.escape(o.results[0].result_value || '') : ''}', '${hasResult && o.results[0].result_unit ? this.escape(o.results[0].result_unit) : ''}')">${hasResult ? 'Edit Result' : 'Enter Result'}</button>` : ''}
+                  ${isAdmin ? `<button type="button" class="btn btn-secondary btn-sm" style="padding:4px 12px;" onclick="app.showEnterResultModal(${o.order_id}, ${o.test_id}, '${this.escape(o.test_name)}', '${hasResult ? this.escape(o.results[0].result_value || '') : ''}', '${hasResult && o.results[0].result_unit ? this.escape(o.results[0].result_unit) : ''}', ${visitId})">${hasResult ? 'Edit Result' : 'Enter Result'}</button>` : ''}
                 </td>
               </tr>
             `;
@@ -1856,9 +1856,10 @@ const app = {
     }
   },
 
-  async showEnterResultModal(orderId, testId, testName, existingVal = null, existingUnit = null) {
+  async showEnterResultModal(orderId, testId, testName, existingVal = null, existingUnit = null, visitId = null) {
     document.getElementById('result-entry-order-id').value = orderId;
     document.getElementById('result-entry-test-id').value = testId;
+    document.getElementById('result-entry-visit-id').value = visitId || '';
     document.getElementById('result-entry-test-name').textContent = testName;
 
     const isEdit = existingVal !== null && existingVal !== undefined && existingVal !== '';
@@ -1990,38 +1991,42 @@ const app = {
               document.getElementById('result-entry-unit').value = existingUnit;
             }
         }
-       
-       // Check for child tests in testCatalog
-       try {
-         const childTests = this.testCatalog.filter(t => t.parent_rollup_id === testId);
-         if (childTests && childTests.length > 0) {
-           singleContainer.style.display = 'none';
-           paramsContainer.style.display = 'block';
-           let html = '<h5 style="color: var(--primary-color); margin-bottom: 8px;">Panel Parameters:</h5>';
-           childTests.forEach(ct => {
-             let unitDisplay = '';
-             if (ct.default_unit && ct.secondary_unit) {
-               unitDisplay = `<select class="modal-param-unit" style="padding: 2px 4px; font-size: 0.8rem; border: 1px solid var(--border-color); border-radius: 4px;">
-                 <option value="${this.escape(ct.default_unit)}">${this.escape(ct.default_unit)}</option>
-                 <option value="${this.escape(ct.secondary_unit)}">${this.escape(ct.secondary_unit)}</option>
-               </select>`;
-             } else if (ct.default_unit) {
-               unitDisplay = `<span class="modal-param-unit" data-unit="${this.escape(ct.default_unit)}" style="font-size: 0.8rem; color: var(--text-muted);">${this.escape(ct.default_unit)}</span>`;
-             }
-             html += `
-                <div style="display: grid; grid-template-columns: 1.8fr 1.1fr 1.1fr; gap: 8px; align-items: center; padding: 6px 0; border-bottom: 1px solid #edf2f7;" class="modal-param-row" data-param-id="${ct.id}">
-                  <div><strong style="font-size: 0.85rem; color: var(--text-dark);">${this.escape(ct.name)}</strong></div>
-                  <div><input type="text" class="modal-param-val" placeholder="Value" style="width: 100%; padding: 6px 8px; border: 1px solid var(--border-color); border-radius: 4px; box-sizing: border-box; font-size: 0.85rem;"></div>
-                  <div style="display: flex; gap: 4px; align-items: center;">
-                    ${unitDisplay}
-                    ${ct.ref_range ? `<span style="font-size: 0.75rem; color: var(--text-muted); white-space: nowrap;">(${this.escape(ct.ref_range)})</span>` : ''}
-                  </div>
-                </div>
-              `;
-           });
-           paramsContainer.innerHTML = html;
-         }
-       } catch(e) { console.error(e); }
+        // Check for test parameters from test_parameters table
+        try {
+          const paramRes = await fetch(`/api/config/tests/${testId}/parameters`);
+          let paramsList = [];
+          if (paramRes.ok) {
+            paramsList = await paramRes.json();
+          }
+
+          if (paramsList && paramsList.length > 0) {
+            singleContainer.style.display = 'none';
+            paramsContainer.style.display = 'block';
+            let html = '<h5 style="color: var(--primary-color); margin-bottom: 8px;">Panel Parameters:</h5>';
+            paramsList.forEach(p => {
+              let unitDisplay = '';
+              if (p.unit && p.secondary_unit) {
+                unitDisplay = `<select class="modal-param-unit" style="padding: 2px 4px; font-size: 0.8rem; border: 1px solid var(--border-color); border-radius: 4px;">
+                  <option value="${this.escape(p.unit)}">${this.escape(p.unit)}</option>
+                  <option value="${this.escape(p.secondary_unit)}">${this.escape(p.secondary_unit)}</option>
+                </select>`;
+              } else if (p.unit) {
+                unitDisplay = `<span class="modal-param-unit" data-unit="${this.escape(p.unit)}" style="font-size: 0.8rem; color: var(--text-muted);">${this.escape(p.unit)}</span>`;
+              }
+              html += `
+                 <div style="display: grid; grid-template-columns: 1.8fr 1.1fr 1.1fr; gap: 8px; align-items: center; padding: 6px 0; border-bottom: 1px solid #edf2f7;" class="modal-param-row" data-param-id="${p.id}">
+                   <div><strong style="font-size: 0.85rem; color: var(--text-dark);">${this.escape(p.parameter_name)}</strong></div>
+                   <div><input type="text" class="modal-param-val" placeholder="Value" style="width: 100%; padding: 6px 8px; border: 1px solid var(--border-color); border-radius: 4px; box-sizing: border-box; font-size: 0.85rem;"></div>
+                   <div style="display: flex; gap: 4px; align-items: center;">
+                     ${unitDisplay}
+                     ${p.ref_range ? `<span style="font-size: 0.75rem; color: var(--text-muted); white-space: nowrap;">(${this.escape(p.ref_range)})</span>` : ''}
+                   </div>
+                 </div>
+               `;
+            });
+            paramsContainer.innerHTML = html;
+          }
+        } catch(e) { console.error(e); }
     }
     document.getElementById('result-entry-modal').style.display = 'flex';
     
@@ -2060,7 +2065,7 @@ const app = {
               punit = uElem.tagName === 'SELECT' ? uElem.value : (uElem.getAttribute('data-unit') || uElem.textContent.trim());
             }
             if (pval) {
-              paramResults.push({ test_id: pid, result_value: pval, result_unit: punit });
+              paramResults.push({ parameter_id: pid, result_value: pval });
             }
          });
        } else if (nameLower.includes('urinalysis')) {
@@ -2082,28 +2087,24 @@ const app = {
        
        try {
          if (paramResults && paramResults.length > 0) {
-           // Multiple orders for child tests
-           for (const child of paramResults) {
-             const ordRes = await fetch('/api/clients/orders', {
-               method: 'POST',
-               headers: { 'Content-Type': 'application/json' },
-               body: JSON.stringify({ client_id: app.currentClientId, test_id: child.test_id })
-             });
-             if (ordRes.ok) {
-               const ordData = await ordRes.json();
-               await fetch('/api/clients/results', {
-                 method: 'POST',
-                 headers: { 'Content-Type': 'application/json' },
-                 body: JSON.stringify({ order_id: ordData.order_id, result_value: child.result_value, result_unit: child.result_unit })
-               });
-             }
-           }
-           // Submit dummy result for parent order to close it
-           await fetch('/api/clients/results', {
+           const isEditMode = document.getElementById('result-entry-is-edit') ? document.getElementById('result-entry-is-edit').value === '1' : false;
+           const editReason = document.getElementById('result-entry-reason') ? document.getElementById('result-entry-reason').value.trim() : '';
+
+           const res = await fetch('/api/clients/results', {
              method: 'POST',
              headers: { 'Content-Type': 'application/json' },
-             body: JSON.stringify({ order_id: orderId, result_value: "Panel Completed" })
+             body: JSON.stringify({
+               order_id: orderId,
+               result_value: "Completed",
+               parameter_results: paramResults,
+               edit_reason: isEditMode ? editReason : null
+             })
            });
+           if (!res.ok) {
+             const err = await res.json();
+             app.showNotificationModal("Error", err.detail || "Failed to save results.", true);
+             return;
+           }
          } else {
             // Single order
             const unitElem = document.getElementById('result-entry-unit');

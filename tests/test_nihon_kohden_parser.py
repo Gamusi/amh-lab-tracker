@@ -130,6 +130,25 @@ def test_parse_sample1_all_parameters():
     assert p["PLT Distribution Width (PDW)"]["flag"] == "H"
 
 
+def test_exp_reference_ranges():
+    res = parse_nihon_kohden_output(RAW_NIHON_SAMPLE)
+    p = {r["name"]: r for r in res["parameters"]}
+
+    assert p["Total WBC Count (White Blood Cells)"]["reference_range"] == "4.0 - 9.0"
+    assert p["Neutrophils (%) [Relative Count]"]["reference_range"] == "28.0 - 78.0"
+    assert p["Lymphocytes (%) [Relative Count]"]["reference_range"] == "17.0 - 57.0"
+    assert p["Red Blood Cells (RBC)"]["reference_range"] == "3.76 - 5.70"
+    assert p["Hemoglobin (Hb)"]["reference_range"] == "12.0 - 18.0"
+    assert p["Hematocrit (HCT)"]["reference_range"] == "33.5 - 52.0"
+    assert p["Mean Cell Volume (MCV)"]["reference_range"] == "80.0 - 100"
+    assert p["Mean Cell Hb (MCH)"]["reference_range"] == "28.0 - 32.0"
+    assert p["Mean Cell Hb Conc (MCHC)"]["reference_range"] == "31.0 - 35.0"
+    assert p["Platelets Count (PLT)"]["reference_range"] == "150 - 350"
+    assert p["Thrombocrit (PCT)"]["reference_range"] == "0.16 - 0.33"
+    assert p["Mean Platelet Volume (MPV)"]["reference_range"] == "7.0 - 11.0"
+    assert p["PLT Distribution Width (PDW)"]["reference_range"] == "15.0 - 17.0"
+
+
 # ---------------------------------------------------------------------------
 # Sample 2 — OUTPUT2.txt (MANUAL mode, different patient)
 # ---------------------------------------------------------------------------
@@ -255,4 +274,48 @@ def test_clipboard_paste_mode_values():
 
     assert p["PLT Distribution Width (PDW)"]["value"] == "18.7"
     assert p["PLT Distribution Width (PDW)"]["flag"] == "H"
+
+
+# ---------------------------------------------------------------------------
+# Display-screen copy mode — single inline lines copied from Nihon software
+# ---------------------------------------------------------------------------
+
+RAW_DISPLAY_SCREEN_PASTE = (
+    "[host] [Send]MEK-7222     2201024MANUAL      CBC + Diff  01BLOOD           MMM 0002437   V03-02  V04-02  V03-01  015361       20260821     174152134             4.2* 26.5L 45.6* 20.1*  5.2   2.6H  1.1   1.9*  0.8*  0.2   0.1  5.39* 11.8L 36.9  68.5L 21.9L 32.0  16.3H  233* 0.17   7.5  18.7H                                                                                                                                                                                                                              + +                  +               +                                                                                                                                                                                                                                                                                                                                                                                                                      \n"
+    "[host] [Send]EXP00512MEK-7222  01                                                                                                                                                                                                                          00                                 4.0 9.028.078.017.057.0 0.010.0 0.010.0 0.0 2.0 1.1 7.0 0.7 5.1 0.0 0.9 0.0 0.9 0.0 0.23.765.7012.018.033.552.080.0 10028.032.031.035.011.614.0 150 3500.160.33 7.011.015.017.0\n"
+)
+
+
+def test_display_screen_copy_mode():
+    res = parse_nihon_kohden_output(RAW_DISPLAY_SCREEN_PASTE)
+    assert res["status"] == "success"
+    assert res["sample_id"] == "0002437"
+    assert res["timestamp"] == "2026-08-21 17:41:52"
+    assert len(res["parameters"]) == 22
+
+    p = {r["name"]: r for r in res["parameters"]}
+    assert p["Total WBC Count (White Blood Cells)"]["value"] == "4.2"
+    assert p["Total WBC Count (White Blood Cells)"]["flag"] == "*"
+    assert p["Total WBC Count (White Blood Cells)"]["reference_range"] == "4.0 - 9.0"
+
+    assert p["Neutrophils (%) [Relative Count]"]["value"] == "26.5"
+    assert p["Neutrophils (%) [Relative Count]"]["flag"] == "L"
+    assert p["Neutrophils (%) [Relative Count]"]["reference_range"] == "28.0 - 78.0"
+
+    assert p["Red Blood Cells (RBC)"]["value"] == "5.39"
+    assert p["Red Blood Cells (RBC)"]["flag"] == "*"
+    assert p["Red Blood Cells (RBC)"]["reference_range"] == "3.76 - 5.70"
+
+    assert p["Hemoglobin (Hb)"]["value"] == "11.8"
+    assert p["Hemoglobin (Hb)"]["flag"] == "L"
+    assert p["Hemoglobin (Hb)"]["reference_range"] == "12.0 - 18.0"
+
+    assert p["Platelets Count (PLT)"]["value"] == "233"
+    assert p["Platelets Count (PLT)"]["flag"] == "*"
+    assert p["Platelets Count (PLT)"]["reference_range"] == "150 - 350"
+
+    assert p["PLT Distribution Width (PDW)"]["value"] == "18.7"
+    assert p["PLT Distribution Width (PDW)"]["flag"] == "H"
+    assert p["PLT Distribution Width (PDW)"]["reference_range"] == "15.0 - 17.0"
+
 

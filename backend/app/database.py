@@ -216,6 +216,42 @@ def init_db():
         except sqlite3.OperationalError:
             pass # Column already exists
 
+    # Pre-seed CBC test parameters if CBC exists in tests
+    CBC_PARAMS = [
+        ("Total WBC Count (White Blood Cells)", "10³/µL", "4.0 - 9.0", 1),
+        ("Neutrophils (%) [Relative Count]", "%", "28.0 - 78.0", 2),
+        ("Lymphocytes (%) [Relative Count]", "%", "17.0 - 57.0", 3),
+        ("Monocytes (%) [Relative Count]", "%", "0.0 - 10.0", 4),
+        ("Eosinophils (%) [Relative Count]", "%", "0.0 - 10.0", 5),
+        ("Basophils (%) [Relative Count]", "%", "0.0 - 2.0", 6),
+        ("Neutrophils (Absolute Count)", "10⁹/µL", "1.1 - 7.0", 7),
+        ("Lymphocytes (Absolute Count)", "10⁹/µL", "0.7 - 5.1", 8),
+        ("Monocytes (Absolute Count)", "10⁹/µL", "0.0 - 0.9", 9),
+        ("Eosinophils (Absolute Count)", "10⁹/µL", "0.0 - 0.9", 10),
+        ("Basophils (Absolute Count)", "10⁹/µL", "0.0 - 0.2", 11),
+        ("Red Blood Cells (RBC)", "10⁶/µL", "3.76 - 5.70", 12),
+        ("Hemoglobin (Hb)", "g/dL", "12.0 - 18.0", 13),
+        ("Hematocrit (HCT)", "%", "33.5 - 52.0", 14),
+        ("Mean Cell Volume (MCV)", "fL", "80.0 - 100", 15),
+        ("Mean Cell Hb (MCH)", "pg", "28.0 - 32.0", 16),
+        ("Mean Cell Hb Conc (MCHC)", "g/dL", "31.0 - 35.0", 17),
+        ("RBC Distribution Width (RDW)", "%", "11.6 - 14.0", 18),
+        ("Platelets Count (PLT)", "10³/µL", "150 - 350", 19),
+        ("Thrombocrit (PCT)", "%", "0.16 - 0.33", 20),
+        ("Mean Platelet Volume (MPV)", "fL", "7.0 - 11.0", 21),
+        ("PLT Distribution Width (PDW)", "%", "15.0 - 17.0", 22),
+    ]
+    cursor.execute("SELECT id FROM tests WHERE LOWER(name) LIKE '%cbc%' OR LOWER(name) LIKE '%blood count%'")
+    for cbc_row in cursor.fetchall():
+        cbc_id = cbc_row[0]
+        for pname, punit, pref, porder in CBC_PARAMS:
+            cursor.execute("SELECT id FROM test_parameters WHERE test_id = ? AND parameter_name = ?", (cbc_id, pname))
+            if not cursor.fetchone():
+                cursor.execute("""
+                    INSERT INTO test_parameters (test_id, parameter_name, unit, ref_range, sort_order)
+                    VALUES (?, ?, ?, ?, ?)
+                """, (cbc_id, pname, punit, pref, porder))
+
     conn.commit()
     conn.close()
     logger.info("Database schema initialized and migrated successfully")
