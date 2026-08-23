@@ -34,6 +34,10 @@ This document outlines the coding standards and design principles that all devel
    - If a frontend call returns an error, the error message originates from the backend. The frontend only presents it.
    - Any validation duplicated in the frontend (e.g., field presence checks before submission) is acceptable only as UX convenience, never as the authoritative gate. The backend is always the authoritative gate.
    - A 405 Method Not Allowed error means the server was not restarted after a new endpoint was added, or the route was not registered. Never work around this with client-side hacks. Restart the server and confirm the endpoint is registered.
+3. **Multi-Parameter Test Reports on Dedicated Single Pages**:
+   - Diagnostic tests with multiple sub-parameters (currently **Complete Blood Count (CBC)** and **Urinalysis**) must always render on their own dedicated, isolated page in generated PDF reports.
+   - They must never share a page or overlap with general single-parameter lab tests.
+   - All rows, sections, metadata, and signatures for a multi-parameter test must strictly fit within that single page (A4) without spilling over onto a second page. Vertical padding, table padding, row heights, and font sizes must be tuned to guarantee single-page containment across all client records.
 
 ## E. Surveillance & Incidence Tracking Standards
 

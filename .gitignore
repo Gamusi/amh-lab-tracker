@@ -18,3 +18,12 @@ scratch_parser.py
 fix.py
 *.db-shm
 *.db-wal
+sample_outputs/
+docs/superpowers/
+.superpowers/
+.pytest_cache/
+superpowers/
+dist/
+offline_packages/
+wheels/
+*.zip

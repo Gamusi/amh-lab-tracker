@@ -48,10 +48,10 @@ Each sample transmission consists of two distinct records separated by a newline
 +-----------------------------------------------------------------------------------------+
 ```
 
-#### Clinical Principle: Capturing Machine Calibration As-Is
-The hematology analyzer is calibrated to operate with its own verified reference intervals, and the instrument's hardware flags (`*`, `H`, `L`) are directly derived from these preset intervals. AMH Lab Tracker captures the raw output as calculated and flagged by the instrument without recalculating or altering the clinical values. 
+#### Clinical Principle: Capturing Machine Calibration & Calibrated Intervals
+The hematology analyzer is calibrated to operate with verified reference intervals, and the instrument's hardware flags (`*`, `H`, `L`) are directly derived from these preset intervals in the `EXP` record. Rather than discarding the `EXP` record, AMH Lab Tracker parses the `EXP` transmission to extract the exact low-high reference intervals for all 22 parameters and attaches them directly as `reference_range` metadata (e.g. `4.0 - 9.0`, `12.0 - 18.0`).
 
-The parser isolates Record 1 to extract the patient values and hardware flags, while referencing the calibrated standard ranges to guarantee complete alignment with the instrument's official output.
+The parser cleanly separates patient test values from reference limit thresholds, preventing token contamination while dynamically supplying the calibrated reference ranges to result reviews and PDF generation.
 
 ---
 
@@ -231,12 +231,16 @@ The entire Complete Blood Count (CBC) report is formatted on **one single dedica
 
 ---
 
-## 6. Potential Future Improvements
+## 6. Planned Features & Extended Capabilities (WIP)
 
-1. **WebSerial API Direct Capture**: Integrate modern browser WebSerial API to allow technologists to connect RS-232 USB-to-Serial adapters directly to the browser, capturing transmissions with a single "Read Analyzer" button without manual clipboard copying.
+1. **Direct RS-232 COM Port / WebSerial Capture & Binary Histogram Extraction**:
+   - Background `pyserial` listener daemon and in-browser WebSerial API adapter to eliminate manual copy-pasting entirely.
+   - Parsing extended binary frames from the analyzer to capture multi-channel cell volume distribution curve points (WBC, RBC, PLT histograms).
+   - Dynamic vector histogram generation inside the ReportLab PDF rendering pipeline to visually reproduce instrument curve plots alongside numerical tables.
 2. **Support for Additional Hematology & Chemistry Analyzers**:
    - Mindray BC-series (BC-2800, BC-3000, BC-5000).
    - Human Diagnostics Humalyzer & HumaCount series.
    - Sysmex XP / XN hematology analyzers.
 3. **Standard ASTM E1381 / E1394 & HL7 v2 Interfacing**: Implement a bidirectional background microservice supporting full ASTM/HL7 protocols for automated query and batch result uploads across hospital local area networks.
+
 
