@@ -88,40 +88,49 @@ The database layer bypasses heavy ORMs (like SQLAlchemy). It uses standard Pytho
 
 ---
 
-## System Requirements
+## System Requirements & Minimum Target Machine Checklist
 
-Engineered for resource-constrained environments:
+Engineered for extreme resource-constrained clinical environments:
 
-* **Processor:** Intel Core 2 Duo / Early Core i-series (or equivalent)
-* **Memory:** 2GB RAM minimum
-* **OS:** Windows 7 / Windows 10 / Lightweight Linux distributions
-* **Network:** 100% Offline (No internet required)
+| Component | Minimum Specification | Recommended / Target |
+| :--- | :--- | :--- |
+| **Processor (CPU)** | Intel Core 2 Duo / Pentium Dual-Core 1.8 GHz | Intel Core i3 / i5 or equivalent AMD |
+| **Memory (RAM)** | 2 GB RAM (Application uses < 60 MB RAM) | 4 GB+ RAM |
+| **Storage (Disk)** | 500 MB free space (Python + Wheels + SQLite DB) | 1 GB+ free space |
+| **Operating System** | Windows 7 SP1 (32-bit or 64-bit) / Lightweight Linux | Windows 10 / 11 (64-bit) |
+| **Display Resolution**| 1024 x 768 pixels (optimized high-contrast UI) | 1280 x 800 or 1920 x 1080 |
+| **Software Runtime** | Python 3.11+ (Check "Add Python to PATH" on install)| Python 3.11+ 64-bit |
+| **Web Browser** | Any installed browser (Edge, Chrome, Firefox) | Chrome / Edge (for native print dialog) |
+| **Network** | **100% Air-Gapped / Offline** (No internet required) | Isolated Localhost `127.0.0.1:8756` |
 
 ---
 
-## Air-Gapped USB Deployment
+## Air-Gapped Offline Deployment & Packaging
 
-The primary deployment strategy is designed for completely offline installation via a USB flash drive.
+The application supports completely offline 1-click deployment via a self-contained ZIP archive or portable storage.
 
-**1. Prepare the Payload (On an internet-connected PC):**
-
+### 1. Build the Release Package (On internet-connected Development PC):
 ```cmd
-:: Downloads all FastAPI/Uvicorn dependencies as .whl files
+:: Builds the standalone release archive (downloads wheels, stages assets, creates ZIP)
 pack_usb.bat
-
 ```
+*(Outputs `dist/amh-lab-tracker-release.zip` and staged folder at `dist/amh-lab-tracker/`)*
 
-**2. Install on Target PC (Air-gapped):**
-Transfer the project folder to the offline hospital computer and run the local installation:
+### 2. Install on Target Workstation (Air-Gapped Hospital PC):
+1. Transfer `dist/amh-lab-tracker-release.zip` (or the unpacked folder) to the target PC.
+2. Extract the archive (Right-click -> **Extract All...**).
+3. Ensure Python 3.11+ is installed (with **"Add Python to PATH"** checked).
+4. Double-click **`setup.bat`**:
+   - Automatically installs all 18 pre-packaged dependency wheels offline from `offline_packages/wheels/`.
+   - Initializes the local SQLite database (`data/amh_lab.db`) and seeds standard MoH catalog data.
+   - Automatically creates the **AMH Lab Tracker** shortcut on your Desktop and Startup folder.
+5. Double-click **`run.bat`** (or the Desktop shortcut) to launch the system.
 
-```cmd
-:: Installs Python packages from the local /wheels folder
-pip install --no-index --find-links=usb_drive/wheels -r requirements.txt
-
-:: Initializes DB, creates users, and places a shortcut on the Desktop
-python3 install.py
-
-```
+### 3. Incremental Updates & Maintenance:
+To deploy bugfixes or new features to an existing target installation without full reinstallation:
+- Simply copy the updated file(s) (e.g., `backend/app/parsers/nihon_kohden.py` or `frontend/static/js/app.js`) to the target installation directory.
+- Restart the server via `run.bat`.
+- The database in `data/amh_lab.db` is strictly preserved and never overwritten.
 
 ---
 

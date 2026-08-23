@@ -54,12 +54,12 @@ This document outlines the coding standards and design principles that all devel
 
 ## F. Offline Distribution & Deployment Policy
 
-AMH Lab Tracker is designed to run on airgapped workstations (no internet access) in a hospital setting. The following rules govern how the project is packaged and distributed.
+AMH Lab Tracker is designed to run even on airgapped workstations in a hospital setting. The following rules govern how the project is packaged and distributed.
 
-1. **Commit offline wheels and packages to git.** The `offline_packages/wheels/` directory (and any equivalent `usb_drive/wheels/`) contains pre-downloaded Python dependency wheels. These **must be committed to the repository** and must never be added to `.gitignore`. Pushing wheels to the remote makes it trivial to clone the repo onto a USB drive or new workstation and run `setup.bat` without any internet access.
+1. **Commit offline wheels and packages to git.** The `offline_packages/wheels/` directory (and any equivalent `usb_drive/wheels/`) contains pre-downloaded Python dependency wheels. These **must be committed to the repository** and must never be added to `.gitignore`. Pushing wheels to the remote makes it easy to clone the repo onto a USB drive or new workstation and run `setup.bat` without any internet access.
 
-2. **Commit release ZIP archives when produced.** Packaged release ZIPs (output of `pack_release.py`) may also be committed if they are the primary distribution artifact for a given release. Do not blanket-ignore `*.zip`.
+2. **Commit release ZIP archives when produced.** Packaged release ZIPs (output of `pack_release.py`) may also be committed because they are the primary distribution artifact for a given release. Do not blanket-ignore `*.zip`.
 
-3. **The owner controls `.gitignore`.** Agents and automated tooling must not add entries to `.gitignore` without explicit instruction from the repository owner. If a file or directory appears in `.gitignore` that should not be there, remove it immediately and document why it was removed. The current managed exclusions are limited to: runtime secrets (`.env`), virtual environments (`venv/`), compiled bytecode (`__pycache__/`), SQLite runtime files (`*.db`, `*.db-shm`, `*.db-wal`), local scratch/working files, and agent internal plan directories (`docs/superpowers/`, `.superpowers/`, `superpowers/`).
+3. **The owner controls `.gitignore`.** Do not modify `.gitignore` without explicit instruction from the repository owner.
 
 4. **`setup.bat` is the single entry point for new installations.** It installs dependencies from local wheels, seeds the database, and creates the desktop shortcut — all without touching the internet. Keep it working and well-tested.
