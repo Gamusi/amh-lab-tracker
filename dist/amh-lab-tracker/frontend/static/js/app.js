@@ -30,11 +30,11 @@ const app = {
     'log-out': `<svg class="lucide" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg>`
   },
 
-  icon(name) {
+  icon: function(name) {
     return this.icons[name] || '';
   },
 
-  async init() {
+  init: async function() {
     await this.loadTheme();
     await this.checkAuth();
     this.setupInactivityListeners();
@@ -50,7 +50,7 @@ const app = {
     });
   },
 
-  async loadTheme() {
+  loadTheme: async function() {
     try {
       const res = await fetch('/assets/branding/theme.json');
       if (res.ok) {
@@ -67,7 +67,7 @@ const app = {
     }
   },
 
-  async checkAuth() {
+  checkAuth: async function() {
     try {
       const res = await fetch('/api/auth/me');
       if (res.ok) {
@@ -90,7 +90,7 @@ const app = {
     }
   },
 
-  showLogin() {
+  showLogin: function() {
     this.currentUser = null;
     this.stopInactivityTimer();
     this.cleanseDOM();
@@ -100,7 +100,7 @@ const app = {
     this.showLoginForm();
   },
 
-  async handleLogin(event) {
+  handleLogin: async function(event) {
     event.preventDefault();
     const u = document.getElementById('login-username').value;
     const p = document.getElementById('login-password').value;
@@ -138,13 +138,13 @@ const app = {
     }
   },
 
-  async handleLogout() {
+  handleLogout: async function() {
     this.stopInactivityTimer();
     await fetch('/api/auth/logout', { method: 'POST' });
     this.showLogin();
   },
 
-  showResetPasswordModal() {
+  showResetPasswordModal: function() {
     const modal = document.getElementById('reset-password-modal');
     if (modal) {
       modal.style.display = 'flex';
@@ -160,7 +160,7 @@ const app = {
     }
   },
 
-  async handleChangePassword(event) {
+  handleChangePassword: async function(event) {
     event.preventDefault();
     const oldPassword = document.getElementById('reset-old-password').value;
     const newPassword = document.getElementById('reset-new-password').value;
@@ -210,7 +210,7 @@ const app = {
     }
   },
 
-  showRegisterForm(event) {
+  showRegisterForm: function(event) {
     if (event) event.preventDefault();
     document.getElementById('login-form-container').style.display = 'none';
     document.getElementById('register-form-container').style.display = 'block';
@@ -218,14 +218,14 @@ const app = {
     document.getElementById('register-success').style.display = 'none';
   },
 
-  showLoginForm(event) {
+  showLoginForm: function(event) {
     if (event) event.preventDefault();
     document.getElementById('register-form-container').style.display = 'none';
     document.getElementById('login-form-container').style.display = 'block';
     document.getElementById('login-error').style.display = 'none';
   },
 
-  async handleRegister(event) {
+  handleRegister: async function(event) {
     event.preventDefault();
     const fullname = document.getElementById('register-fullname').value;
     const username = document.getElementById('register-username').value;
@@ -267,7 +267,7 @@ const app = {
     }
   },
 
-  setupInactivityListeners() {
+  setupInactivityListeners: function() {
     const reset = () => this.resetInactivityTimer();
     window.addEventListener('mousemove', reset);
     window.addEventListener('keydown', reset);
@@ -275,11 +275,11 @@ const app = {
     window.addEventListener('scroll', reset);
   },
 
-  startInactivityTimer() {
+  startInactivityTimer: function() {
     this.resetInactivityTimer();
   },
 
-  resetInactivityTimer() {
+  resetInactivityTimer: function() {
     const now = Date.now();
     if (now - this.lastActivityTime < 5000) {
       return;
@@ -299,14 +299,14 @@ const app = {
     }
   },
 
-  stopInactivityTimer() {
+  stopInactivityTimer: function() {
     if (this.inactivityTimer) {
       clearTimeout(this.inactivityTimer);
       this.inactivityTimer = null;
     }
   },
 
-  togglePasswordVisibility(inputId) {
+  togglePasswordVisibility: function(inputId) {
     const input = document.getElementById(inputId);
     if (!input) return;
     const type = input.getAttribute('type') === 'password' ? 'text' : 'password';
@@ -322,7 +322,7 @@ const app = {
     }
   },
 
-  cleanseDOM() {
+  cleanseDOM: function() {
     // Reset all password input types back to password
     ['login-password', 'register-password', 'reset-old-password', 'reset-new-password', 'reset-confirm-password'].forEach(id => {
       const input = document.getElementById(id);
@@ -353,7 +353,7 @@ const app = {
     this.currentOrder = null;
   },
 
-  renderUserNav() {
+  renderUserNav: function() {
     const nav = document.getElementById('user-nav');
     if (!this.currentUser) return;
 
@@ -381,7 +381,7 @@ const app = {
     `;
   },
 
-  navigate(viewName) {
+  navigate: function(viewName) {
     if (this.currentUser && this.currentUser.password_reset_required) {
       this.showResetPasswordModal();
       return;
@@ -403,7 +403,7 @@ const app = {
     else if (viewName === 'audit') this.renderAuditLog(container);
   },
 
-  showNotificationModal(title, message, isError = false) {
+  showNotificationModal: function(title, message, isError = false) {
     const modal = document.getElementById('notification-modal');
     if (!modal) return;
     document.getElementById('notif-title').textContent = title;
@@ -412,7 +412,7 @@ const app = {
     modal.style.display = 'flex';
   },
 
-  confirmAction(title, message, callback) {
+  confirmAction: function(title, message, callback) {
     const modal = document.getElementById('confirm-modal');
     if (!modal) {
       if (confirm(message)) callback();
@@ -442,7 +442,7 @@ const app = {
     modal.style.display = 'flex';
   },
 
-  shiftLogDate(offsetDays) {
+  shiftLogDate: function(offsetDays) {
     const dateInput = document.getElementById('log-date');
     if (!dateInput) return;
 
@@ -461,7 +461,7 @@ const app = {
   },
 
   // Daily Log View
-  async renderDailyLog(container) {
+  renderDailyLog: async function(container) {
     const today = new Date().toISOString().split('T')[0];
     container.innerHTML = `
       <div class="card">
@@ -496,7 +496,7 @@ const app = {
     await this.loadDailyLogData(today);
   },
 
-  async loadDailyLogData(dateStr) {
+  loadDailyLogData: async function(dateStr) {
     try {
       const res = await fetch(`/api/daily-log?date=${dateStr}`);
       if (!res.ok) throw new Error('API returned ' + res.status);
@@ -593,7 +593,7 @@ const app = {
     }
   },
 
-  async saveDailyLogData() {
+  saveDailyLogData: async function() {
     const dateStr = document.getElementById('log-date').value;
     const entries = [];
 
@@ -628,7 +628,7 @@ const app = {
   },
 
   // Reports View
-  async renderReports(container) {
+  renderReports: async function(container) {
     const today = new Date().toISOString().split('T')[0];
     container.innerHTML = `
       <div class="card">
@@ -663,7 +663,7 @@ const app = {
     await this.loadReportData();
   },
 
-  exportReportCSV() {
+  exportReportCSV: function() {
     const pType = document.getElementById('report-period-type').value;
     const rDate = document.getElementById('report-ref-date').value;
     
@@ -697,7 +697,7 @@ const app = {
     this.showNotificationModal("Success", 'Report CSV exported successfully!', false);
   },
 
-  async loadReportData() {
+  loadReportData: async function() {
     const pType = document.getElementById('report-period-type').value;
     const rDate = document.getElementById('report-ref-date').value;
 
@@ -758,7 +758,7 @@ const app = {
   },
 
   // Trends View
-  async renderTrends(container) {
+  renderTrends: async function(container) {
     container.innerHTML = `
       <div class="card">
         <div class="card-header">
@@ -790,7 +790,7 @@ const app = {
     await this.loadTrendsData();
   },
 
-  exportTrendsCSV() {
+  exportTrendsCSV: function() {
     const fy = document.getElementById('trend-from-year').value;
     const ty = document.getElementById('trend-to-year').value;
     
@@ -814,7 +814,7 @@ const app = {
     this.showNotificationModal("Success", 'Trends CSV exported successfully!', false);
   },
 
-  async loadTrendsData() {
+  loadTrendsData: async function() {
     const fy = document.getElementById('trend-from-year').value;
     const ty = document.getElementById('trend-to-year').value;
 
@@ -856,7 +856,7 @@ const app = {
   },
 
   // Test Reports View
-  async renderClients(container) {
+  renderClients: async function(container) {
     container.innerHTML = `
       <div class="card">
         <div class="card-header">
@@ -890,7 +890,7 @@ const app = {
     await this.searchClients('');
   },
 
-  async searchClients(q) {
+  searchClients: async function(q) {
     try {
       const res = await fetch(`/api/clients?query=${encodeURIComponent(q || '')}`);
       if (!res.ok) throw new Error('API returned ' + res.status);
@@ -919,7 +919,7 @@ const app = {
     }
   },
 
-  async selectClient(pid, pnum, pname, psex) {
+  selectClient: async function(pid, pnum, pname, psex) {
     this.currentClientId = pid;
     this.currentClientData = { id: pid, client_number: pnum, full_name: pname, sex: psex };
     const box = document.getElementById('client-detail-box');
@@ -998,7 +998,7 @@ const app = {
     await this.loadHistoricalVisits(pid);
   },
 
-  async loadTestOptions() {
+  loadTestOptions: async function() {
     try {
       const res = await fetch('/api/config/tests');
       if (!res.ok) throw new Error('API returned ' + res.status);
@@ -1020,7 +1020,7 @@ const app = {
     }
   },
 
-  async onTestSelectChange(testId) {
+  onTestSelectChange: async function(testId) {
     if (!testId) return;
     try {
       const res = await fetch(`/api/config/tests/${testId}/parameters`);
@@ -1056,7 +1056,7 @@ const app = {
     }
   },
 
-  async submitShiftAudit() {
+  submitShiftAudit: async function() {
     const dateStr = document.getElementById('log-date') ? document.getElementById('log-date').value : new Date().toISOString().split('T')[0];
     const sysTotal = parseInt(document.getElementById('sys-total-done').textContent, 10) || 0;
     const paperVal = parseInt(document.getElementById('paper-register-input').value, 10);
@@ -1088,7 +1088,7 @@ const app = {
     }
   },
 
-  async loadWards() {
+  loadWards: async function() {
     try {
       const res = await fetch('/api/config/wards?active_only=true');
       if (!res.ok) throw new Error('API returned ' + res.status);
@@ -1108,7 +1108,7 @@ const app = {
     }
   },
 
-  async loadClinicians() {
+  loadClinicians: async function() {
     try {
       const res = await fetch('/api/config/clinicians');
       if (!res.ok) throw new Error('API returned ' + res.status);
@@ -1125,7 +1125,7 @@ const app = {
   },
 
 
-  async loadTestOptionsMulti() {
+  loadTestOptionsMulti: async function() {
     try {
       if (!this.sections) {
          try {
@@ -1171,7 +1171,7 @@ const app = {
     }
   },
 
-  filterVisitTests() {
+  filterVisitTests: function() {
     const query = document.getElementById('visit-test-search').value.toLowerCase();
     const cat = document.getElementById('visit-test-section') ? document.getElementById('visit-test-section').value : 'all';
     const rows = document.querySelectorAll('.visit-test-row');
@@ -1185,7 +1185,7 @@ const app = {
       }
     });
   },
-  async createVisit(pid) {
+  createVisit: async function(pid) {
     const ward = document.getElementById('visit-ward').value;
     const clinician = document.getElementById('visit-clinician').value;
     const orderCat = document.getElementById('visit-order-category') ? document.getElementById('visit-order-category').value : 'in-house';
@@ -1224,7 +1224,7 @@ const app = {
       this.showNotificationModal("Error", 'Error creating visit.', true);
     }
   },
-  async loadPendingTests(pid) {
+  loadPendingTests: async function(pid) {
     const container = document.getElementById('pending-tests-container');
     if (!container) return;
     try {
@@ -1283,13 +1283,13 @@ const app = {
     }
   },
 
-  toggleSelectAllPendingOrders(checked) {
+  toggleSelectAllPendingOrders: function(checked) {
     const checkboxes = document.querySelectorAll('.pending-order-checkbox');
     checkboxes.forEach(cb => cb.checked = checked);
     this.onPendingOrderSelectionChange();
   },
 
-  onPendingOrderSelectionChange() {
+  onPendingOrderSelectionChange: function() {
     const selected = document.querySelectorAll('.pending-order-checkbox:checked');
     const all = document.querySelectorAll('.pending-order-checkbox');
     const selectAllCb = document.getElementById('select-all-pending-tests');
@@ -1304,7 +1304,7 @@ const app = {
     }
   },
 
-  async bulkDeleteOrders() {
+  bulkDeleteOrders: async function() {
     const selected = Array.from(document.querySelectorAll('.pending-order-checkbox:checked')).map(cb => parseInt(cb.value, 10));
     if (selected.length === 0) return;
 
@@ -1336,7 +1336,7 @@ const app = {
     );
   },
 
-  async loadHistoricalVisits(pid) {
+  loadHistoricalVisits: async function(pid) {
     const container = document.getElementById('historical-visits-container');
     if (!container) return;
     try {
@@ -1389,13 +1389,13 @@ const app = {
     }
   },
 
-  toggleSelectAllVisits(checked) {
+  toggleSelectAllVisits: function(checked) {
     const checkboxes = document.querySelectorAll('.visit-checkbox');
     checkboxes.forEach(cb => cb.checked = checked);
     this.onVisitSelectionChange();
   },
 
-  onVisitSelectionChange() {
+  onVisitSelectionChange: function() {
     const selected = document.querySelectorAll('.visit-checkbox:checked');
     const all = document.querySelectorAll('.visit-checkbox');
     const selectAllCb = document.getElementById('select-all-visits');
@@ -1410,7 +1410,7 @@ const app = {
     }
   },
 
-  async bulkDeleteVisits() {
+  bulkDeleteVisits: async function() {
     const selected = Array.from(document.querySelectorAll('.visit-checkbox:checked')).map(cb => parseInt(cb.value, 10));
     if (selected.length === 0) return;
 
@@ -1443,7 +1443,7 @@ const app = {
     );
   },
 
-  deleteVisit(visitId) {
+  deleteVisit: function(visitId) {
     this.confirmAction(
       "Delete Visit",
       `Are you sure you want to delete this visit? All associated test orders and results will be removed. This action cannot be undone.`,
@@ -1467,7 +1467,7 @@ const app = {
       }
     );
   },
-  viewReport(visitId) {
+  viewReport: function(visitId) {
     const frame = document.getElementById('report-frame');
     if (frame) {
       frame.style.display = 'block';
@@ -1475,7 +1475,7 @@ const app = {
     }
   },
 
-  updateEditAgePlaceholder() {
+  updateEditAgePlaceholder: function() {
     const cat = document.getElementById('edit-client-category').value;
     const ageInput = document.getElementById('edit-client-age');
     if (!ageInput) return;
@@ -1486,7 +1486,7 @@ const app = {
     else ageInput.placeholder = "e.g. 25, 25y";
   },
 
-  async openEditClientModal(clientId) {
+  openEditClientModal: async function(clientId) {
     try {
       const res = await fetch(`/api/clients/${clientId}`);
       if (!res.ok) throw new Error("Failed to fetch client");
@@ -1510,7 +1510,7 @@ const app = {
     }
   },
 
-  async submitEditClient(event) {
+  submitEditClient: async function(event) {
     event.preventDefault();
     const clientId = document.getElementById('edit-client-id').value;
     const full_name = document.getElementById('edit-client-name').value.trim();
@@ -1553,7 +1553,7 @@ const app = {
     }
   },
 
-  async openEditVisitModal(visitId) {
+  openEditVisitModal: async function(visitId) {
     try {
       const res = await fetch(`/api/visits/${visitId}`);
       if (!res.ok) throw new Error('Failed to load visit details');
@@ -1637,7 +1637,7 @@ const app = {
     }
   },
 
-  async submitEditVisit(e) {
+  submitEditVisit: async function(e) {
     e.preventDefault();
     const visitId = document.getElementById('edit-visit-id').value;
     const ward = document.getElementById('edit-visit-ward').value;
@@ -1669,7 +1669,7 @@ const app = {
     }
   },
 
-  async showAddTestModal(visitId) {
+  showAddTestModal: async function(visitId) {
     document.getElementById('add-test-visit-id').value = visitId;
     document.getElementById('add-test-search').value = '';
     const container = document.getElementById('add-tests-container');
@@ -1716,7 +1716,7 @@ const app = {
     }
   },
 
-  filterAddTests() {
+  filterAddTests: function() {
     const query = document.getElementById('add-test-search').value.toLowerCase();
     const cat = document.getElementById('add-test-section') ? document.getElementById('add-test-section').value : 'all';
     const rows = document.querySelectorAll('.add-test-row');
@@ -1731,7 +1731,7 @@ const app = {
     });
   },
 
-  async submitAddTests() {
+  submitAddTests: async function() {
     const visitId = document.getElementById('add-test-visit-id').value;
     const orderCat = document.getElementById('add-test-order-category').value;
     const checkboxes = document.querySelectorAll('input[name="add-test-cb"]:checked');
@@ -1764,7 +1764,7 @@ const app = {
   },
 
 
-  async removeOrder(orderId) {
+  removeOrder: async function(orderId) {
     app.confirmAction("Confirm Removal", "Are you sure you want to remove this pending test?", async () => {
       try {
         const res = await fetch(`/api/orders/${orderId}`, { method: 'DELETE' });
@@ -1784,7 +1784,7 @@ const app = {
   },
 
 
-  toggleAnalyzerPaste(show = null) {
+  toggleAnalyzerPaste: function(show = null) {
     const container = document.getElementById('analyzer-paste-container');
     if (!container) return;
     if (show === null) {
@@ -1798,7 +1798,7 @@ const app = {
     }
   },
 
-  async parseAndPopulateAnalyzerData() {
+  parseAndPopulateAnalyzerData: async function() {
     const rawText = document.getElementById('analyzer-raw-input').value.trim();
     const statusSpan = document.getElementById('analyzer-parse-status');
     if (!rawText) {
@@ -1856,7 +1856,7 @@ const app = {
     }
   },
 
-  async showEnterResultModal(orderId, testId, testName, existingVal = null, existingUnit = null, visitId = null) {
+  showEnterResultModal: async function(orderId, testId, testName, existingVal = null, existingUnit = null, visitId = null) {
     document.getElementById('result-entry-order-id').value = orderId;
     document.getElementById('result-entry-test-id').value = testId;
     document.getElementById('result-entry-visit-id').value = visitId || '';
@@ -2149,8 +2149,8 @@ const app = {
             await this.loadHistoricalVisits(this.currentClientId);
          }
          // Also refresh the edit visit modal tests list if it's currently open
-         const editVisitId = document.getElementById('edit-visit-id')?.value;
-         if (editVisitId && document.getElementById('edit-visit-modal')?.style.display !== 'none') {
+         const editVisitId = (document.getElementById('edit-visit-id') ? document.getElementById('edit-visit-id').value : null);
+         if (editVisitId && (document.getElementById('edit-visit-modal') ? document.getElementById('edit-visit-modal').style.display : null) !== 'none') {
            await this.openEditVisitModal(parseInt(editVisitId, 10));
          }
        } catch(err) {
@@ -2162,7 +2162,7 @@ const app = {
 
 
 
-  async submitTestResult(pid) {
+  submitTestResult: async function(pid) {
     const tid = parseInt(document.getElementById('order-test-select').value, 10);
     const sampleId = document.getElementById('order-sample-id').value;
     const isPos = document.getElementById('order-result-pos').value === 'true';
@@ -2228,24 +2228,24 @@ const app = {
     }
   },
 
-  async loadClientOrders(pid) {
+  loadClientOrders: async function(pid) {
     const frame = document.getElementById('report-frame');
     if (frame) {
       frame.src = `/api/reports/client/${pid}/pdf`;
     }
   },
 
-  showNewClientModal() {
+  showNewClientModal: function() {
     document.getElementById('new-client-form').reset();
     document.getElementById('new-client-modal').style.display = 'flex';
     document.getElementById('client-name').focus();
   },
 
-  closeNewClientModal() {
+  closeNewClientModal: function() {
     document.getElementById('new-client-modal').style.display = 'none';
   },
 
-  updateAgePlaceholder() {
+  updateAgePlaceholder: function() {
     const cat = document.getElementById('client-category').value;
     const ageInput = document.getElementById('client-age');
     if (!ageInput) return;
@@ -2255,7 +2255,7 @@ const app = {
     else ageInput.placeholder = "e.g. 25, 25y";
   },
 
-  async handleRegisterClientSubmit(e) {
+  handleRegisterClientSubmit: async function(e) {
     e.preventDefault();
     const pname = document.getElementById('client-name').value.trim();
     const psex = document.getElementById('client-sex').value;
@@ -2328,7 +2328,7 @@ const app = {
 
   // Configuration View
 
-  async renderConfig(container) {
+  renderConfig: async function(container) {
     const isSuperAdmin = this.currentUser && this.currentUser.role === 'superadmin';
 
     container.innerHTML = `
@@ -2395,7 +2395,7 @@ const app = {
 
 
   
-  async loadWardsConfig() {
+  loadWardsConfig: async function() {
     try {
       const res = await fetch('/api/config/wards');
       if (!res.ok) throw new Error('API returned ' + res.status);
@@ -2425,7 +2425,7 @@ const app = {
     } catch(e) { console.error(e); }
   },
 
-  async showAddWardModal() {
+  showAddWardModal: async function() {
     document.getElementById('ward-modal-title').textContent = 'Add Ward';
     document.getElementById('ward-modal-id').value = '';
     document.getElementById('ward-modal-active').value = '1';
@@ -2434,7 +2434,7 @@ const app = {
     document.getElementById('ward-modal-name').focus();
   },
 
-  async editWard(id, oldName, isActive) {
+  editWard: async function(id, oldName, isActive) {
     document.getElementById('ward-modal-title').textContent = 'Edit Ward';
     document.getElementById('ward-modal-id').value = id;
     document.getElementById('ward-modal-active').value = isActive ? '1' : '0';
@@ -2443,7 +2443,7 @@ const app = {
     document.getElementById('ward-modal-name').focus();
   },
 
-  async submitWardModal(e) {
+  submitWardModal: async function(e) {
     e.preventDefault();
     const id = document.getElementById('ward-modal-id').value;
     const name = document.getElementById('ward-modal-name').value.trim();
@@ -2474,7 +2474,7 @@ const app = {
     } catch(e) { console.error(e); }
   },
 
-  async deleteWard(id) {
+  deleteWard: async function(id) {
     app.confirmAction("Confirm Deactivation", "Are you sure you want to deactivate this ward?", async () => {
       try {
         await fetch(`/api/config/wards/${id}`, { method: 'DELETE' });
@@ -2483,7 +2483,7 @@ const app = {
     });
   },
 
-  async reactivateWard(id) {
+  reactivateWard: async function(id) {
     try {
       const res = await fetch(`/api/config/wards/${id}`, {
         method: 'PUT',
@@ -2499,7 +2499,7 @@ const app = {
     } catch(e) { console.error(e); }
   },
 
-  async loadCliniciansConfig() {
+  loadCliniciansConfig: async function() {
     try {
       const res = await fetch('/api/config/clinicians');
       if (!res.ok) throw new Error('API returned ' + res.status);
@@ -2522,12 +2522,12 @@ const app = {
     } catch(e) { console.error(e); }
   },
   
-  showAddClinicianModal() {
+  showAddClinicianModal: function() {
     document.getElementById('clinician-modal-name').value = '';
     document.getElementById('clinician-modal').style.display = 'flex';
   },
 
-  async submitClinicianModal(event) {
+  submitClinicianModal: async function(event) {
     event.preventDefault();
     const name = document.getElementById('clinician-modal-name').value;
     try {
@@ -2546,7 +2546,7 @@ const app = {
     } catch(e) { console.error(e); }
   },
 
-  async loadConfigData() {
+  loadConfigData: async function() {
     try {
       // 1. Load sections first so we can display names
       if (!this.sections) {
@@ -2817,12 +2817,12 @@ const app = {
     }
   },
 
-  async approveUser(userId, role, cadre) {
+  approveUser: async function(userId, role, cadre) {
     await this.saveUserUpdate(userId, { role: role || 'staff', cadre: cadre || null, is_active: true });
     this.showNotificationModal("Success", 'User registration approved successfully!', false);
   },
 
-  async rejectUser(userId, username) {
+  rejectUser: async function(userId, username) {
     app.confirmAction("Reject User", `Are you sure you want to reject and delete the registration for '${username}'?`, async () => {
       try {
         const res = await fetch(`/api/auth/users/${userId}`, { method: 'DELETE' });
@@ -2839,14 +2839,14 @@ const app = {
     });
   },
 
-  async deactivateUser(userId, role, cadre) {
+  deactivateUser: async function(userId, role, cadre) {
     app.confirmAction("Deactivate User", "Are you sure you want to deactivate this account?", async () => {
       await app.saveUserUpdate(userId, { role: role, cadre: cadre || null, is_active: false });
       app.showNotificationModal("Success", 'User account deactivated.', false);
     });
   },
 
-  async changeUserFields(userId, isActive) {
+  changeUserFields: async function(userId, isActive) {
     const roleEl = document.getElementById(`role-select-${userId}`);
     const cadreEl = document.getElementById(`cadre-select-${userId}`);
     if (!roleEl || !cadreEl) return;
@@ -2855,7 +2855,7 @@ const app = {
     this.showNotificationModal("Success", 'User details updated successfully.', false);
   },
 
-  promptAction(title, message, callback) {
+  promptAction: function(title, message, callback) {
     const modal = document.getElementById('prompt-modal');
     if (!modal) {
       const result = prompt(message);
@@ -2888,7 +2888,7 @@ const app = {
     input.focus();
   },
 
-  async promptResetPassword(userId, username, role, cadre) {
+  promptResetPassword: async function(userId, username, role, cadre) {
     app.promptAction("Reset Password", `Enter a new temporary password for user '${username}' (minimum 4 characters):`, async (tempPw) => {
       if (tempPw.trim().length < 4) {
         app.showNotificationModal("Error", 'Password must be at least 4 characters long.', true);
@@ -2899,7 +2899,7 @@ const app = {
     });
   },
 
-  async saveUserUpdate(userId, updateBody) {
+  saveUserUpdate: async function(userId, updateBody) {
     try {
       const res = await fetch(`/api/auth/users/${userId}`, {
         method: 'PUT',
@@ -2921,7 +2921,7 @@ const app = {
     }
   },
 
-  togglePanelGroup(panelId) {
+  togglePanelGroup: function(panelId) {
     const rows = document.querySelectorAll(`tr[data-parent-id="${panelId}"]`);
     const btn = document.getElementById(`toggle-btn-${panelId}`);
     if (!rows || rows.length === 0) return;
@@ -2930,7 +2930,7 @@ const app = {
     if (btn) btn.textContent = isHidden ? '-' : '+';
   },
 
-  async openTestConfigModal(testId = null) {
+  openTestConfigModal: async function(testId = null) {
     // If editing, look up the test object from testCatalog (already loaded) or fetch it
     let test = null;
     if (testId !== null) {
@@ -3008,7 +3008,7 @@ const app = {
     };
   },
 
-  handleTestResultTypeChange() {
+  handleTestResultTypeChange: function() {
     const rType = document.getElementById('test-config-result-type').value;
     const unitGroup = document.getElementById('test-config-unit-group');
     const unitInput = document.getElementById('test-config-unit');
@@ -3048,7 +3048,7 @@ const app = {
     }
   },
 
-  async saveTestConfig() {
+  saveTestConfig: async function() {
     const id = document.getElementById('test-config-id').value;
     const name = document.getElementById('test-config-name').value.trim();
     const section_id = parseInt(document.getElementById('test-config-section').value, 10);
@@ -3100,7 +3100,7 @@ const app = {
     }
   },
 
-  async deleteTest(testId) {
+  deleteTest: async function(testId) {
     // Guard: block deletion of panel parent that still has children
     const hasChildren = (this.testCatalog || []).some(t => t.parent_rollup_id === testId);
     if (hasChildren) {
@@ -3127,7 +3127,7 @@ const app = {
    },
 
 
-  async renderAuditLog(container) {
+  renderAuditLog: async function(container) {
     container.innerHTML = `
       <div class="card">
         <div class="card-header">
@@ -3175,7 +3175,7 @@ const app = {
     }
   },
 
-  escape(str) {
+  escape: function(str) {
     if (!str) return '';
     return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   }
