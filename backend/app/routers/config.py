@@ -23,7 +23,7 @@ def get_tests(conn: sqlite3.Connection = Depends(get_db), current_user: dict = D
 @router.get("/tests/{test_id}/parameters")
 def get_test_parameters(test_id: int, conn: sqlite3.Connection = Depends(get_db), current_user: dict = Depends(get_current_user)):
     cur = conn.cursor()
-    cur.execute("SELECT id, test_id, parameter_name, unit, ref_range, sort_order FROM test_parameters WHERE test_id = ? ORDER BY sort_order, id", (test_id,))
+    cur.execute("SELECT id, test_id, parameter_name, unit, ref_range, sort_order, options FROM test_parameters WHERE test_id = ? ORDER BY sort_order, id", (test_id,))
     return [dict(r) for r in cur.fetchall()]
 
 @router.get("/tests/{test_id}/children")

@@ -2010,7 +2010,7 @@ const app = {
        // URINALYSIS FULL MODAL — 3-section panel via API sub-parameters
        singleContainer.style.display = 'none';
        paramsContainer.style.display = 'block';
-       var uaParamRes = yield fetch('/api/config/tests/' + testId + '/children');
+       var uaParamRes = yield fetch('/api/config/tests/' + testId + '/parameters');
        var uaParams = [];
        if (uaParamRes.ok) {
          uaParams = yield uaParamRes.json();
@@ -2034,6 +2034,7 @@ const app = {
          uaHtml += '<h5 style="margin: 0 0 10px 0; padding-bottom: 4px; border-bottom: 1px solid var(--border-color); color: var(--primary-color);">' + sec.label + '</h5>';
          uaHtml += '<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px 18px;">';
          secParams.forEach(function(p) {
+           var pName = p.parameter_name || p.name || '';
            var opts = [];
            try { if (p.options) opts = JSON.parse(p.options); } catch(e) {}
            var inputHtml = '';
@@ -2046,7 +2047,7 @@ const app = {
              inputHtml = '<input type="text" class="modal-param-val" placeholder="Value" style="width:100%; padding:6px 8px; border:1px solid var(--border-color); border-radius:4px; font-size:0.85rem;">';
            }
            uaHtml += '<div class="modal-param-row" data-param-id="' + p.id + '" style="display:flex; flex-direction:column; gap:3px;">';
-           uaHtml += '<label style="font-size:0.8rem; font-weight:600; color:var(--text-dark);">' + p.name + '</label>';
+           uaHtml += '<label style="font-size:0.8rem; font-weight:600; color:var(--text-dark);">' + pName + '</label>';
            uaHtml += inputHtml;
            uaHtml += '</div>';
          });
@@ -2231,13 +2232,13 @@ const app = {
             const editReason = document.getElementById('result-entry-reason') ? document.getElementById('result-entry-reason').value.trim() : '';
 
             if (isEditMode) {
-              const isAdmin = this.currentUser && (this.currentUser.role === 'admin' || this.currentUser.role === 'superadmin');
+              const isAdmin = app.currentUser && (app.currentUser.role === 'admin' || app.currentUser.role === 'superadmin');
               if (!isAdmin) {
-                this.showNotificationModal("Error", "Only administrators can edit saved results.", true);
+                app.showNotificationModal("Error", "Only administrators can edit saved results.", true);
                 return;
               }
               if (!editReason) {
-                this.showNotificationModal("Error", "Reason for edit is required.", true);
+                app.showNotificationModal("Error", "Reason for edit is required.", true);
                 return;
               }
             }
@@ -2255,24 +2256,25 @@ const app = {
             });
             if (!res.ok) {
               const err = yield res.json();
-              this.showNotificationModal("Error", err.detail || "Failed to save result.", true);
+              app.showNotificationModal("Error", err.detail || "Failed to save result.", true);
               return;
             }
          }
          
-         this.showNotificationModal("Success", "Result saved successfully!", false);
+         app.showNotificationModal("Success", "Result saved successfully!", false);
          document.getElementById('result-entry-modal').style.display = 'none';
-         if (this.currentClientId) {
-            yield this.loadPendingTests(this.currentClientId);
-            yield this.loadHistoricalVisits(this.currentClientId);
+         if (app.currentClientId) {
+            yield app.loadPendingTests(app.currentClientId);
+            yield app.loadHistoricalVisits(app.currentClientId);
          }
          // Also refresh the edit visit modal tests list if it's currently open
          const editVisitId = (document.getElementById('edit-visit-id') ? document.getElementById('edit-visit-id').value : null);
          if (editVisitId && (document.getElementById('edit-visit-modal') ? document.getElementById('edit-visit-modal').style.display : null) !== 'none') {
-           yield this.openEditVisitModal(parseInt(editVisitId, 10));
+           yield app.openEditVisitModal(parseInt(editVisitId, 10));
          }
        } catch(err) {
-         this.showNotificationModal("Error", "Connection error saving result.", true);
+         console.error('Error saving result:', err);
+         app.showNotificationModal("Error", "Connection error saving result.", true);
        }
     });
   }),

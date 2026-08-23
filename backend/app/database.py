@@ -59,7 +59,8 @@ SCHEMA_SQL = """
         parameter_name TEXT NOT NULL,
         unit TEXT,
         ref_range TEXT,
-        sort_order INTEGER DEFAULT 0
+        sort_order INTEGER DEFAULT 0,
+        options TEXT
     );
 
     CREATE TABLE IF NOT EXISTS daily_entries (
@@ -207,7 +208,8 @@ def init_db():
         ("test_results", "edited_by_user_id", "INTEGER"),
         ("test_results", "edited_at", "DATETIME"),
         ("visits", "order_category", "TEXT DEFAULT 'in-house'"),
-        ("visits", "is_deleted", "BOOLEAN NOT NULL DEFAULT 0")
+        ("visits", "is_deleted", "BOOLEAN NOT NULL DEFAULT 0"),
+        ("test_parameters", "options", "TEXT")
     ]
     for table, col, col_def in migrations:
         try:
@@ -251,6 +253,46 @@ def init_db():
                     INSERT INTO test_parameters (test_id, parameter_name, unit, ref_range, sort_order)
                     VALUES (?, ?, ?, ?, ?)
                 """, (cbc_id, pname, punit, pref, porder))
+
+    # Pre-seed URINALYSIS test parameters with options for tripartite entry
+    URINALYSIS_PARAMS = [
+        ("Color", None, None, 1, '["Straw", "Yellow", "Amber", "Red", "Brown"]'),
+        ("Turbidity", None, None, 2, '["Clear", "Slightly Turbid", "Turbid"]'),
+        ("Pus Cells (WBCs)", None, "<5 / lpf", 3, '["Not Seen", "1-2 / lpf", "3-4 / lpf", "5-10 / lpf", "10-15 / lpf", ">15 / lpf"]'),
+        ("Red Blood Cells (RBCs)", None, "<3 / lpf", 4, '["Not Seen", "1-2 / lpf", "3-5 / lpf", "5-10 / lpf", ">10 / lpf"]'),
+        ("Epithelial Cells", None, "Few", 5, '["Not Seen", "Few", "Moderate", "Plenty"]'),
+        ("Casts", None, "Not Seen", 6, '["Not Seen", "Hyaline Casts (0-1 / lpf)", "Granular Casts", "Waxy Casts", "RBC Casts", "WBC Casts"]'),
+        ("Crystals", None, "Not Seen", 7, '["Not Seen", "Calcium Oxalate (++)", "Triple Phosphate (++)", "Uric Acid Crystals"]'),
+        ("Specific Gravity (S.G)", "Ratio", "1.005 - 1.030", 8, '["1.000", "1.005", "1.010", "1.015", "1.020", "1.025", "1.030"]'),
+        ("PH", "pH", "5.0 - 8.5", 9, '["5.0", "6.0", "6.5", "7.0", "7.5", "8.0", "8.5"]'),
+        ("Proteins (Albuminuria Screening)", None, "Nil", 10, '["Nil", "Trace (15 mg/dL)", "1+ (30 mg/dL)", "2+ (100 mg/dL)", "3+ (300 mg/dL)", "4+ (\u22652000 mg/dL)"]'),
+        ("Glucose (Glucosuria Screening)", None, "Nil", 11, '["Nil", "Trace (100 mg/dL)", "1+ (250 mg/dL)", "2+ (500 mg/dL)", "3+ (1000 mg/dL)", "4+ (\u22652000 mg/dL)"]'),
+        ("Bilirubin (Bilirubinuria)", None, "Nil", 12, '["Nil", "Small (+)", "Moderate (++)", "Large (+++)"]'),
+        ("Urobilinogen", None, "Normal", 13, '["Normal (1.0 EU/dL)", "2.0 EU/dL", "4.0 EU/dL", "8.0 EU/dL"]'),
+        ("Ketones (Ketonuria)", None, "Nil", 14, '["Nil", "Trace (5 mg/dL)", "1+ (15 mg/dL)", "2+ (40 mg/dL)", "3+ (80 mg/dL)", "4+ (160 mg/dL)"]'),
+        ("Blood (Hematuria/Hemoglobinuria)", None, "Nil", 15, '["Nil", "Non-Hemolyzed Trace", "Hemolyzed Trace", "1+ (Small)", "2+ (Moderate)", "3+ (Large)"]'),
+        ("Nitrates (Nitrite Screening)", None, "Negative", 16, '["Negative", "Positive"]'),
+        ("Leukocytes (Leukocyte Esterase)", None, "Nil", 17, '["Nil", "Trace", "1+ (Small)", "2+ (Moderate)", "3+ (Large)"]')
+    ]
+    cursor.execute("SELECT id FROM tests WHERE LOWER(name) = 'urinalysis'")
+    for ua_row in cursor.fetchall():
+        ua_id = ua_row[0]
+        # Clean up any legacy parameters under urinalysis
+        cursor.execute("DELETE FROM test_parameters WHERE test_id = ? AND parameter_name IN ('Macroscopy (Physical Profile)', 'Microscopy (Sediment Cytology)')", (ua_id,))
+        for pname, punit, pref, porder, popts in URINALYSIS_PARAMS:
+            cursor.execute("SELECT id FROM test_parameters WHERE test_id = ? AND parameter_name = ?", (ua_id, pname))
+            existing_p = cursor.fetchone()
+            if not existing_p:
+                cursor.execute("""
+                    INSERT INTO test_parameters (test_id, parameter_name, unit, ref_range, sort_order, options)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                """, (ua_id, pname, punit, pref, porder, popts))
+            else:
+                cursor.execute("""
+                    UPDATE test_parameters
+                    SET unit = ?, ref_range = ?, sort_order = ?, options = ?
+                    WHERE id = ?
+                """, (punit, pref, porder, popts, existing_p[0]))
 
     conn.commit()
     conn.close()

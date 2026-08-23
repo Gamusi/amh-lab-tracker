@@ -246,6 +246,20 @@ def seed_database():
                 WHERE id=?
             """, (t["result_type"], t["default_unit"], t["secondary_unit"], t["ref_range"], opts, t["sort_order"], parent_id, r["id"]))
 
+        # Also sync into test_parameters for panel sub-parameter tracking and FK constraints
+        cur.execute("SELECT id FROM test_parameters WHERE test_id = ? AND parameter_name = ?", (parent_id, t["name"]))
+        tp_row = cur.fetchone()
+        if not tp_row:
+            cur.execute("""
+                INSERT INTO test_parameters (test_id, parameter_name, unit, ref_range, sort_order, options)
+                VALUES (?, ?, ?, ?, ?, ?)
+            """, (parent_id, t["name"], t["default_unit"], t["ref_range"], t["sort_order"], opts))
+        else:
+            cur.execute("""
+                UPDATE test_parameters SET unit = ?, ref_range = ?, sort_order = ?, options = ?
+                WHERE id = ?
+            """, (t["default_unit"], t["ref_range"], t["sort_order"], opts, tp_row["id"]))
+
     conn.commit()
     conn.close()
     print(f"Seeding done: {len(sec_map)} sections, {len(TESTS)} tests.")

@@ -611,3 +611,75 @@ def test_get_client_endpoint(mock_db):
     assert data["age_display"] == "25y"
     assert data["phone"] == "0722000000"
 
+
+def test_urinalysis_parameter_results_save_and_pdf(mock_db):
+    conn = mock_db["conn"]
+    cur = conn.cursor()
+
+    # Create urinalysis test and parameters in mock_db
+    cur.execute("INSERT INTO tests (name, section_id, is_tracked, result_type) VALUES ('URINALYSIS', 1, 1, 'panel')")
+    ua_id = cur.lastrowid
+
+    # Pre-seed test_parameters for Urinalysis
+    URINALYSIS_PARAMS = [
+        ("Color", None, None, 1, '["Straw", "Yellow", "Amber", "Red", "Brown"]'),
+        ("Turbidity", None, None, 2, '["Clear", "Slightly Turbid", "Turbid"]'),
+        ("Pus Cells (WBCs)", None, "<5 / lpf", 3, '["Not Seen", "1-2 / lpf", "3-4 / lpf", "5-10 / lpf", "10-15 / lpf", ">15 / lpf"]'),
+        ("Red Blood Cells (RBCs)", None, "<3 / lpf", 4, '["Not Seen", "1-2 / lpf", "3-5 / lpf", "5-10 / lpf", ">10 / lpf"]'),
+        ("Epithelial Cells", None, "Few", 5, '["Not Seen", "Few", "Moderate", "Plenty"]'),
+        ("Casts", None, "Not Seen", 6, '["Not Seen", "Hyaline Casts (0-1 / lpf)", "Granular Casts", "Waxy Casts", "RBC Casts", "WBC Casts"]'),
+        ("Crystals", None, "Not Seen", 7, '["Not Seen", "Calcium Oxalate (++)", "Triple Phosphate (++)", "Uric Acid Crystals"]'),
+        ("Specific Gravity (S.G)", "Ratio", "1.005 - 1.030", 8, '["1.000", "1.005", "1.010", "1.015", "1.020", "1.025", "1.030"]'),
+        ("PH", "pH", "5.0 - 8.5", 9, '["5.0", "6.0", "6.5", "7.0", "7.5", "8.0", "8.5"]'),
+        ("Proteins (Albuminuria Screening)", None, "Nil", 10, '["Nil", "Trace (15 mg/dL)", "1+ (30 mg/dL)", "2+ (100 mg/dL)", "3+ (300 mg/dL)", "4+ (≥2000 mg/dL)"]'),
+        ("Glucose (Glucosuria Screening)", None, "Nil", 11, '["Nil", "Trace (100 mg/dL)", "1+ (250 mg/dL)", "2+ (500 mg/dL)", "3+ (1000 mg/dL)", "4+ (≥2000 mg/dL)"]'),
+        ("Bilirubin (Bilirubinuria)", None, "Nil", 12, '["Nil", "Small (+)", "Moderate (++)", "Large (+++)"]'),
+        ("Urobilinogen", None, "Normal", 13, '["Normal (1.0 EU/dL)", "2.0 EU/dL", "4.0 EU/dL", "8.0 EU/dL"]'),
+        ("Ketones (Ketonuria)", None, "Nil", 14, '["Nil", "Trace (5 mg/dL)", "1+ (15 mg/dL)", "2+ (40 mg/dL)", "3+ (80 mg/dL)", "4+ (160 mg/dL)"]'),
+        ("Blood (Hematuria/Hemoglobinuria)", None, "Nil", 15, '["Nil", "Non-Hemolyzed Trace", "Hemolyzed Trace", "1+ (Small)", "2+ (Moderate)", "3+ (Large)"]'),
+        ("Nitrates (Nitrite Screening)", None, "Negative", 16, '["Negative", "Positive"]'),
+        ("Leukocytes (Leukocyte Esterase)", None, "Nil", 17, '["Nil", "Trace", "1+ (Small)", "2+ (Moderate)", "3+ (Large)"]')
+    ]
+    for pname, punit, pref, porder, popts in URINALYSIS_PARAMS:
+        cur.execute("""
+            INSERT INTO test_parameters (test_id, parameter_name, unit, ref_range, sort_order, options)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, (ua_id, pname, punit, pref, porder, popts))
+    conn.commit()
+
+    # Get parameters
+    param_res = client.get(f"/api/config/tests/{ua_id}/parameters")
+    assert param_res.status_code == 200
+    params = param_res.json()
+    assert len(params) == 17
+
+    # Create client, visit, order
+    cur.execute("INSERT INTO clients (client_number, full_name, sex, date_of_birth) VALUES ('AMH-UA-1', 'Amina Ali', 'Female', '1995-05-10')")
+    client_id = cur.lastrowid
+    cur.execute("INSERT INTO clinicians (name) VALUES ('Dr. Musa')")
+    clinician_id = cur.lastrowid
+    cur.execute("INSERT INTO visits (client_id, clinician_id, ward_of_origin) VALUES (?, ?, 'ANC')", (client_id, clinician_id))
+    visit_id = cur.lastrowid
+    cur.execute("INSERT INTO test_orders (visit_id, test_id, status) VALUES (?, ?, 'pending')", (visit_id, ua_id))
+    order_id = cur.lastrowid
+    conn.commit()
+
+    # Submit parameter results
+    param_payload = [{"parameter_id": p["id"], "result_value": "Straw" if p["parameter_name"] == "Color" else "Not Seen"} for p in params]
+    save_res = client.post("/api/clients/results", json={
+        "order_id": order_id,
+        "result_value": "Completed",
+        "parameter_results": param_payload
+    })
+    assert save_res.status_code == 200
+
+    # Verify results in DB
+    cur.execute("SELECT COUNT(*) FROM test_results WHERE order_id = ?", (order_id,))
+    assert cur.fetchone()[0] == 17
+
+    # Verify visit PDF generates cleanly
+    pdf_res = client.get(f"/api/reports/visit/{visit_id}/pdf")
+    assert pdf_res.status_code == 200
+    assert pdf_res.content.startswith(b'%PDF-')
+
+
