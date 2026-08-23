@@ -56,10 +56,23 @@ This document outlines the coding standards and design principles that all devel
 
 AMH Lab Tracker is designed to run even on airgapped workstations in a hospital setting. The following rules govern how the project is packaged and distributed.
 
-1. **Commit offline wheels and packages to git.** The `offline_packages/wheels/` directory (and any equivalent `usb_drive/wheels/`) contains pre-downloaded Python dependency wheels. These **must be committed to the repository** and must never be added to `.gitignore`. Pushing wheels to the remote makes it easy to clone the repo onto a USB drive or new workstation and run `setup.bat` without any internet access.
+1. **Commit offline wheels and packages to git.** The `offline_packages/wheels/` directory contains pre-downloaded Python dependency wheels (targeting Python 3.11 & 3.14 Windows). These **must be committed to the repository** and must never be added to `.gitignore`. Pushing wheels to the remote makes it easy to clone the repo onto a USB drive or new workstation and run `setup.bat` without any internet access.
 
 2. **Commit release ZIP archives when produced.** Packaged release ZIPs (output of `pack_release.py`) may also be committed because they are the primary distribution artifact for a given release. Do not blanket-ignore `*.zip`.
 
 3. **The owner controls `.gitignore`.** Do not modify `.gitignore` without explicit instruction from the repository owner.
 
 4. **`setup.bat` is the single entry point for new installations.** It installs dependencies from local wheels, seeds the database, and creates the desktop shortcut — all without touching the internet. Keep it working and well-tested.
+
+## G. Frontend & Browser Engine Compatibility (Strict ES6 Baseline)
+
+The system is deployed to low-spec clinical workstations in Uganda that frequently run **Legacy Microsoft Edge (EdgeHTML 12–18 / early Windows 10 & Windows 7 LTSB)**. All frontend code must strictly adhere to the following rules:
+
+1. **Zero Node.js / Zero Build Tools:** The frontend is strictly Vanilla JS and CSS. No Webpack, Vite, Babel, or npm build steps are permitted in development or production.
+2. **Prohibited JavaScript Syntax (ES2017+):**
+   - **`async` / `await`:** Prohibited. Legacy Edge (Edge 12–14) throws `SCRIPT1009: Expected '}'` at parse time. Use native ES6 generator-to-promise coroutines (`__async(function*() { ... yield ... })`) or standard Promises (`.then()`).
+   - **Optional Chaining (`?.`):** Prohibited (ES2020). Throws `SCRIPT1002: Syntax error` in Edge 12–18. Use explicit guard checks (`el ? el.value : null`).
+   - **Nullish Coalescing (`??`):** Prohibited (ES2020). Use standard boolean fallback (`||` with explicit null checks).
+   - **Regex Lookbehinds (`(?<=...)`) & Named Captures:** Prohibited (ES2018). Use standard capturing groups and submatch extraction.
+3. **Defensive Polyfills:** Core Array and Object helper methods (`Array.prototype.includes`, `Array.prototype.find`, `Object.values`, `Object.entries`) must be polyfilled at the top of `app.js` to ensure stability on Edge 12/13.
+4. **HTML Inline SVG Tags:** Inline SVGs in HTML templates must explicitly close all child elements (e.g. `<path ...></path>`, `<rect ...></rect>`, `<line ...></line>`) rather than using self-closing slashes (`<path .../>`) to prevent `HTML1500` parser warnings in Microsoft Edge/IE.

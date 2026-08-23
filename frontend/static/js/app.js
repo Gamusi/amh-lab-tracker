@@ -1,4 +1,8 @@
-// ES6 async/await polyfill runner for legacy browser engines (Edge 12-14, older WebViews)
+// ============================================================================
+// Legacy Browser Polyfills & Coroutine Runner (Edge 12-18, IE11+, WebViews)
+// ============================================================================
+
+// Native ES6 Generator-to-Promise Coroutine (replaces ES2017 async/await)
 function __async(generatorFunc) {
   return function() {
     var self = this;
@@ -24,6 +28,76 @@ function __async(generatorFunc) {
     });
   };
 }
+
+// Array.prototype.includes (ES2016 polyfill for Edge 12-13)
+if (!Array.prototype.includes) {
+  Array.prototype.includes = function(searchElement, fromIndex) {
+    var O = Object(this);
+    var len = parseInt(O.length, 10) || 0;
+    if (len === 0) return false;
+    var n = parseInt(fromIndex, 10) || 0;
+    var k = n >= 0 ? n : Math.max(0, len + n);
+    while (k < len) {
+      if (searchElement === O[k] || (searchElement !== searchElement && O[k] !== O[k])) {
+        return true;
+      }
+      k++;
+    }
+    return false;
+  };
+}
+
+// String.prototype.includes (ES6 polyfill)
+if (!String.prototype.includes) {
+  String.prototype.includes = function(search, start) {
+    if (typeof start !== 'number') start = 0;
+    if (start + search.length > this.length) return false;
+    return this.indexOf(search, start) !== -1;
+  };
+}
+
+// Object.values (ES2017 polyfill for Edge 12-13)
+if (!Object.values) {
+  Object.values = function(obj) {
+    var vals = [];
+    for (var key in obj) {
+      if (Object.prototype.hasOwnProperty.call(obj, key)) {
+        vals.push(obj[key]);
+      }
+    }
+    return vals;
+  };
+}
+
+// Object.entries (ES2017 polyfill for Edge 12-13)
+if (!Object.entries) {
+  Object.entries = function(obj) {
+    var entries = [];
+    for (var key in obj) {
+      if (Object.prototype.hasOwnProperty.call(obj, key)) {
+        entries.push([key, obj[key]]);
+      }
+    }
+    return entries;
+  };
+}
+
+// Array.prototype.find (ES6 polyfill)
+if (!Array.prototype.find) {
+  Array.prototype.find = function(predicate) {
+    if (this == null) throw new TypeError('Array.prototype.find called on null or undefined');
+    if (typeof predicate !== 'function') throw new TypeError('predicate must be a function');
+    var list = Object(this);
+    var length = list.length >>> 0;
+    var thisArg = arguments[1];
+    for (var i = 0; i < length; i++) {
+      var value = list[i];
+      if (predicate.call(thisArg, value, i, list)) return value;
+    }
+    return undefined;
+  };
+}
+
 
 const app = {
   currentUser: null,
