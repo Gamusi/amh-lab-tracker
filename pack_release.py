@@ -26,9 +26,13 @@ def pack():
 
     # 1. Ensure offline wheels are downloaded
     os.makedirs(WHEELS_DIR, exist_ok=True)
-    print("\n1. Checking / downloading offline dependency wheels...")
-    req_file = os.path.join(BASE_DIR, "requirements.txt")
-    run_cmd(f"{sys.executable} -m pip download -r requirements.txt --python-version 3.11 --platform win_amd64 --only-binary=:all: -d \"{WHEELS_DIR}\"")
+    existing_wheels = [f for f in os.listdir(WHEELS_DIR) if f.endswith(".whl")]
+    if len(existing_wheels) >= 15:
+        print(f"\n1. Using existing {len(existing_wheels)} offline wheels in {WHEELS_DIR} (skipping download).")
+    else:
+        print("\n1. Downloading offline dependency wheels for Python 3.11 Windows...")
+        req_file = os.path.join(BASE_DIR, "requirements.txt")
+        run_cmd(f"{sys.executable} -m pip download -r requirements.txt --python-version 3.11 --platform win_amd64 --only-binary=:all: -d \"{WHEELS_DIR}\"")
 
     # 2. Clean and create stage directory
     print("\n2. Staging files for release...")
