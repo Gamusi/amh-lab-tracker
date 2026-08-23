@@ -1,0 +1,53 @@
+﻿{
+  "WBC": {
+    "unit": "10^3/uL",
+    "rules": [
+      {
+        "age_min": 0,
+        "age_max": 11,
+        "normal_min": 6.0,
+        "normal_max": 14.0
+      },
+      {
+        "age_min": 12,
+        "normal_min": 4.0,
+        "normal_max": 11.0
+      }
+    ]
+  },
+  "Hemoglobin (Hb)": {
+    "unit": "g/dL",
+    "rules": [
+      {
+        "age_min": 0,
+        "age_max": 11,
+        "normal_min": 11.5,
+        "normal_max": 15.5,
+        "critical_min": 8.0
+      },
+      {
+        "age_min": 12,
+        "sex": "Male",
+        "normal_min": 13.5,
+        "normal_max": 17.5,
+        "critical_min": 8.0
+      },
+      {
+        "age_min": 12,
+        "sex": "Female",
+        "normal_min": 12.0,
+        "normal_max": 15.5,
+        "critical_min": 8.0
+      }
+    ]
+  },
+  "Fasting Blood Sugar (FBS)": {
+    "unit": "mmol/L",
+    "rules": [
+      {
+        "normal_min": 3.9,
+        "normal_max": 5.5
+      }
+    ]
+  }
+}

@@ -1,0 +1,261 @@
+import os, sqlite3, logging
+
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+DATA_DIR = os.path.join(BASE_DIR, "data")
+
+DEFAULT_DB = os.path.join(DATA_DIR, "amh_lab.db")
+DB_PATH = os.environ.get("AMH_DB_PATH", DEFAULT_DB)
+
+logger = logging.getLogger("amh_db")
+
+SCHEMA_SQL = """
+    CREATE TABLE IF NOT EXISTS users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        full_name TEXT NOT NULL,
+        username TEXT UNIQUE NOT NULL,
+        password_hash TEXT NOT NULL,
+        role TEXT NOT NULL DEFAULT 'staff',
+        cadre TEXT,
+        is_active BOOLEAN NOT NULL DEFAULT 1,
+        password_reset_required BOOLEAN NOT NULL DEFAULT 0,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS user_sessions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL REFERENCES users(id),
+        token TEXT UNIQUE NOT NULL,
+        expires_at DATETIME NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS sections (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT UNIQUE NOT NULL,
+        sort_order INTEGER DEFAULT 0
+    );
+
+    CREATE TABLE IF NOT EXISTS tests (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        section_id INTEGER NOT NULL REFERENCES sections(id),
+        is_tracked BOOLEAN NOT NULL DEFAULT 0,
+        parent_rollup_id INTEGER REFERENCES tests(id),
+        is_active BOOLEAN NOT NULL DEFAULT 1,
+        sort_order INTEGER DEFAULT 0,
+        result_type TEXT DEFAULT 'qualitative',
+        default_unit TEXT,
+        secondary_unit TEXT,
+        ref_range TEXT,
+        panic_value_low FLOAT,
+        panic_value_high FLOAT,
+        options TEXT,
+        UNIQUE(name, section_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS test_parameters (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        test_id INTEGER NOT NULL REFERENCES tests(id),
+        parameter_name TEXT NOT NULL,
+        unit TEXT,
+        ref_range TEXT,
+        sort_order INTEGER DEFAULT 0
+    );
+
+    CREATE TABLE IF NOT EXISTS daily_entries (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        entry_date DATE NOT NULL,
+        test_id INTEGER NOT NULL REFERENCES tests(id),
+        done INTEGER NOT NULL DEFAULT 0,
+        positive INTEGER,
+        entered_by_user_id INTEGER REFERENCES users(id),
+        entered_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_by_user_id INTEGER REFERENCES users(id),
+        updated_at DATETIME,
+        UNIQUE(entry_date, test_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS audit_log (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER REFERENCES users(id),
+        action TEXT NOT NULL,
+        detail TEXT,
+        timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS clients (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        client_number TEXT UNIQUE NOT NULL,
+        full_name TEXT NOT NULL,
+        date_of_birth DATE,
+        age_years FLOAT,
+        age_category TEXT,
+        sex TEXT,
+        phone TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS clinicians (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT UNIQUE NOT NULL,
+        is_active BOOLEAN NOT NULL DEFAULT 1,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS wards (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL UNIQUE,
+        is_active INTEGER DEFAULT 1
+    );
+
+    CREATE TABLE IF NOT EXISTS sequence_tracker (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        seq_name TEXT UNIQUE NOT NULL,
+        last_value INTEGER NOT NULL DEFAULT 0
+    );
+
+    CREATE TABLE IF NOT EXISTS visits (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        client_id INTEGER NOT NULL REFERENCES clients(id),
+        clinician_id INTEGER REFERENCES clinicians(id),
+        ward_of_origin TEXT,
+        lab_number TEXT UNIQUE,
+        order_category TEXT DEFAULT 'in-house',
+        is_deleted BOOLEAN NOT NULL DEFAULT 0,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS test_orders (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        visit_id INTEGER NOT NULL REFERENCES visits(id),
+        test_id INTEGER NOT NULL REFERENCES tests(id),
+        sample_id TEXT,
+        ordered_by_user_id INTEGER REFERENCES users(id),
+        ordered_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        status TEXT DEFAULT 'pending',
+        order_category TEXT DEFAULT 'in-house'
+    );
+
+    CREATE TABLE IF NOT EXISTS test_results (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        order_id INTEGER NOT NULL REFERENCES test_orders(id),
+        parameter_id INTEGER REFERENCES test_parameters(id),
+        result_value TEXT,
+        result_unit TEXT,
+        is_positive BOOLEAN,
+        entered_by_user_id INTEGER REFERENCES users(id),
+        entered_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        verified_by_user_id INTEGER REFERENCES users(id),
+        verified_at DATETIME,
+        edit_reason TEXT,
+        edited_by_user_id INTEGER REFERENCES users(id),
+        edited_at DATETIME
+    );
+"""
+
+def get_connection():
+    db_dir = os.path.dirname(os.path.abspath(DB_PATH))
+    if db_dir:
+        os.makedirs(db_dir, exist_ok=True)
+    conn = sqlite3.connect(DB_PATH, check_same_thread=False)
+    conn.execute("PRAGMA foreign_keys = ON;")
+    conn.execute("PRAGMA journal_mode = WAL;")
+    logger.debug(f"Connected to database at {DB_PATH}")
+    return conn
+
+def get_db():
+    conn = get_connection()
+    conn.row_factory = sqlite3.Row
+    try:
+        yield conn
+    finally:
+        conn.close()
+        logger.debug("Closed database connection")
+
+def init_db():
+    logger.info("Initializing database schema...")
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.executescript(SCHEMA_SQL)
+    
+    # Pre-seed clinicians with 'SELF REQUEST' if it doesn't exist
+    cursor.execute("SELECT id FROM clinicians WHERE name = 'SELF REQUEST'")
+    if not cursor.fetchone():
+        cursor.execute("INSERT INTO clinicians (name) VALUES ('SELF REQUEST')")
+        logger.info("Pre-seeded clinician 'SELF REQUEST'")
+
+    # Safe Migrations for existing database columns
+    migrations = [
+        ("tests", "parent_rollup_id", "INTEGER REFERENCES tests(id)"),
+        ("test_orders", "sample_id", "TEXT"),
+        ("test_orders", "visit_id", "INTEGER REFERENCES visits(id)"),
+        ("test_results", "parameter_id", "INTEGER REFERENCES test_parameters(id)"),
+        ("users", "password_reset_required", "BOOLEAN NOT NULL DEFAULT 0"),
+        ("users", "cadre", "TEXT"),
+        ("test_orders", "order_category", "TEXT DEFAULT 'in-house'"),
+        ("tests", "result_type", "TEXT DEFAULT 'qualitative'"),
+        ("tests", "default_unit", "TEXT"),
+        ("tests", "options", "TEXT"),
+        ("clients", "age_years", "FLOAT"),
+        ("clients", "age_category", "TEXT"),
+        ("tests", "ref_range", "TEXT"),
+        ("tests", "panic_value_low", "FLOAT"),
+        ("tests", "panic_value_high", "FLOAT"),
+        ("tests", "secondary_unit", "TEXT"),
+        ("test_results", "result_unit", "TEXT"),
+        ("test_results", "edit_reason", "TEXT"),
+        ("test_results", "edited_by_user_id", "INTEGER"),
+        ("test_results", "edited_at", "DATETIME"),
+        ("visits", "order_category", "TEXT DEFAULT 'in-house'"),
+        ("visits", "is_deleted", "BOOLEAN NOT NULL DEFAULT 0")
+    ]
+    for table, col, col_def in migrations:
+        try:
+            cursor.execute(f"ALTER TABLE {table} ADD COLUMN {col} {col_def}")
+            logger.info(f"Migration: Added column {col} to table {table}")
+        except sqlite3.OperationalError:
+            pass # Column already exists
+
+    # Pre-seed CBC test parameters if CBC exists in tests
+    CBC_PARAMS = [
+        ("Total WBC Count (White Blood Cells)", "10³/µL", "4.0 - 9.0", 1),
+        ("Neutrophils (%) [Relative Count]", "%", "28.0 - 78.0", 2),
+        ("Lymphocytes (%) [Relative Count]", "%", "17.0 - 57.0", 3),
+        ("Monocytes (%) [Relative Count]", "%", "0.0 - 10.0", 4),
+        ("Eosinophils (%) [Relative Count]", "%", "0.0 - 10.0", 5),
+        ("Basophils (%) [Relative Count]", "%", "0.0 - 2.0", 6),
+        ("Neutrophils (Absolute Count)", "10⁹/µL", "1.1 - 7.0", 7),
+        ("Lymphocytes (Absolute Count)", "10⁹/µL", "0.7 - 5.1", 8),
+        ("Monocytes (Absolute Count)", "10⁹/µL", "0.0 - 0.9", 9),
+        ("Eosinophils (Absolute Count)", "10⁹/µL", "0.0 - 0.9", 10),
+        ("Basophils (Absolute Count)", "10⁹/µL", "0.0 - 0.2", 11),
+        ("Red Blood Cells (RBC)", "10⁶/µL", "3.76 - 5.70", 12),
+        ("Hemoglobin (Hb)", "g/dL", "12.0 - 18.0", 13),
+        ("Hematocrit (HCT)", "%", "33.5 - 52.0", 14),
+        ("Mean Cell Volume (MCV)", "fL", "80.0 - 100", 15),
+        ("Mean Cell Hb (MCH)", "pg", "28.0 - 32.0", 16),
+        ("Mean Cell Hb Conc (MCHC)", "g/dL", "31.0 - 35.0", 17),
+        ("RBC Distribution Width (RDW)", "%", "11.6 - 14.0", 18),
+        ("Platelets Count (PLT)", "10³/µL", "150 - 350", 19),
+        ("Thrombocrit (PCT)", "%", "0.16 - 0.33", 20),
+        ("Mean Platelet Volume (MPV)", "fL", "7.0 - 11.0", 21),
+        ("PLT Distribution Width (PDW)", "%", "15.0 - 17.0", 22),
+    ]
+    cursor.execute("SELECT id FROM tests WHERE LOWER(name) LIKE '%cbc%' OR LOWER(name) LIKE '%blood count%'")
+    for cbc_row in cursor.fetchall():
+        cbc_id = cbc_row[0]
+        for pname, punit, pref, porder in CBC_PARAMS:
+            cursor.execute("SELECT id FROM test_parameters WHERE test_id = ? AND parameter_name = ?", (cbc_id, pname))
+            if not cursor.fetchone():
+                cursor.execute("""
+                    INSERT INTO test_parameters (test_id, parameter_name, unit, ref_range, sort_order)
+                    VALUES (?, ?, ?, ?, ?)
+                """, (cbc_id, pname, punit, pref, porder))
+
+    conn.commit()
+    conn.close()
+    logger.info("Database schema initialized and migrated successfully")
+
+if __name__ == "__main__":
+    init_db()
+    print(f"Database schema created successfully at {DB_PATH}!")
