@@ -98,7 +98,6 @@ if (!Array.prototype.find) {
   };
 }
 
-
 const app = {
   currentUser: null,
   currentView: 'clients',
@@ -149,7 +148,7 @@ const app = {
         }
       }
     });
-  },
+  }),
 
   loadTheme: __async(function*() {
     try {
@@ -166,7 +165,7 @@ const app = {
     } catch (e) {
       console.warn('Theme loading warning:', e);
     }
-  },
+  }),
 
   checkAuth: __async(function*() {
     try {
@@ -189,7 +188,7 @@ const app = {
     } catch (e) {
       this.showLogin();
     }
-  },
+  }),
 
   showLogin: function() {
     this.currentUser = null;
@@ -237,13 +236,13 @@ const app = {
       errDiv.textContent = 'Connection error. Please try again.';
       errDiv.style.display = 'block';
     }
-  },
+  }),
 
   handleLogout: __async(function*() {
     this.stopInactivityTimer();
     yield fetch('/api/auth/logout', { method: 'POST' });
     this.showLogin();
-  },
+  }),
 
   showResetPasswordModal: function() {
     const modal = document.getElementById('reset-password-modal');
@@ -309,7 +308,7 @@ const app = {
       errDiv.textContent = 'Connection error. Please try again.';
       errDiv.style.display = 'block';
     }
-  },
+  }),
 
   showRegisterForm: function(event) {
     if (event) event.preventDefault();
@@ -366,7 +365,7 @@ const app = {
       errDiv.textContent = 'Connection error. Please try again.';
       errDiv.style.display = 'block';
     }
-  },
+  }),
 
   setupInactivityListeners: function() {
     const reset = () => this.resetInactivityTimer();
@@ -595,7 +594,7 @@ const app = {
       </div>
     `;
     yield this.loadDailyLogData(today);
-  },
+  }),
 
   loadDailyLogData: __async(function*(dateStr) {
     try {
@@ -692,7 +691,7 @@ const app = {
     } catch (e) {
       console.error('Error loading daily log:', e);
     }
-  },
+  }),
 
   saveDailyLogData: __async(function*() {
     const dateStr = document.getElementById('log-date').value;
@@ -726,7 +725,7 @@ const app = {
     } catch (e) {
       this.showNotificationModal("Error", 'Error connecting to server.', true);
     }
-  },
+  }),
 
   // Reports View
   renderReports: __async(function*(container) {
@@ -762,7 +761,7 @@ const app = {
       </div>
     `;
     yield this.loadReportData();
-  },
+  }),
 
   exportReportCSV: function() {
     const pType = document.getElementById('report-period-type').value;
@@ -856,7 +855,7 @@ const app = {
     } catch (e) {
       console.error('Report error:', e);
     }
-  },
+  }),
 
   // Trends View
   renderTrends: __async(function*(container) {
@@ -889,7 +888,7 @@ const app = {
       </div>
     `;
     yield this.loadTrendsData();
-  },
+  }),
 
   exportTrendsCSV: function() {
     const fy = document.getElementById('trend-from-year').value;
@@ -954,7 +953,7 @@ const app = {
     } catch (e) {
       console.error('Trends error:', e);
     }
-  },
+  }),
 
   // Test Reports View
   renderClients: __async(function*(container) {
@@ -989,7 +988,7 @@ const app = {
       </div>
     `;
     yield this.searchClients('');
-  },
+  }),
 
   searchClients: __async(function*(q) {
     try {
@@ -1018,7 +1017,7 @@ const app = {
     } catch (e) {
       console.error('Client search error:', e);
     }
-  },
+  }),
 
   selectClient: __async(function*(pid, pnum, pname, psex) {
     this.currentClientId = pid;
@@ -1097,7 +1096,7 @@ const app = {
     yield this.loadTestOptionsMulti();
     yield this.loadPendingTests(pid);
     yield this.loadHistoricalVisits(pid);
-  },
+  }),
 
   loadTestOptions: __async(function*() {
     try {
@@ -1119,7 +1118,7 @@ const app = {
     } catch (e) {
       console.error('Error loading test catalog options:', e);
     }
-  },
+  }),
 
   onTestSelectChange: __async(function*(testId) {
     if (!testId) return;
@@ -1155,7 +1154,7 @@ const app = {
     } catch (e) {
       console.error('Error loading test parameters:', e);
     }
-  },
+  }),
 
   submitShiftAudit: __async(function*() {
     const dateStr = document.getElementById('log-date') ? document.getElementById('log-date').value : new Date().toISOString().split('T')[0];
@@ -1187,7 +1186,7 @@ const app = {
     } catch (e) {
       this.showNotificationModal("Error", 'Error recording shift audit.', true);
     }
-  },
+  }),
 
   loadWards: __async(function*() {
     try {
@@ -1207,7 +1206,7 @@ const app = {
     } catch (e) {
       console.error('Error loading wards', e);
     }
-  },
+  }),
 
   loadClinicians: __async(function*() {
     try {
@@ -1223,7 +1222,7 @@ const app = {
     } catch (e) {
       console.error('Error loading clinicians', e);
     }
-  },
+  }),
 
 
   loadTestOptionsMulti: __async(function*() {
@@ -1270,7 +1269,7 @@ const app = {
     } catch (e) {
       console.error('Error loading tests', e);
     }
-  },
+  }),
 
   filterVisitTests: function() {
     const query = document.getElementById('visit-test-search').value.toLowerCase();
@@ -1324,7 +1323,7 @@ const app = {
     } catch(e) {
       this.showNotificationModal("Error", 'Error creating visit.', true);
     }
-  },
+  }),
   loadPendingTests: __async(function*(pid) {
     const container = document.getElementById('pending-tests-container');
     if (!container) return;
@@ -1382,7 +1381,7 @@ const app = {
       console.error(e);
       container.innerHTML = 'Error loading pending tests.';
     }
-  },
+  }),
 
   toggleSelectAllPendingOrders: function(checked) {
     const checkboxes = document.querySelectorAll('.pending-order-checkbox');
@@ -1433,9 +1432,9 @@ const app = {
           console.error(e);
           this.showNotificationModal("Error", "Server error.", true);
         }
-      }
+      })
     );
-  },
+  }),
 
   loadHistoricalVisits: __async(function*(pid) {
     const container = document.getElementById('historical-visits-container');
@@ -1488,7 +1487,7 @@ const app = {
       console.error(e);
       container.innerHTML = 'Error loading visits.';
     }
-  },
+  }),
 
   toggleSelectAllVisits: function(checked) {
     const checkboxes = document.querySelectorAll('.visit-checkbox');
@@ -1540,9 +1539,9 @@ const app = {
           console.error(e);
           this.showNotificationModal("Error", "Server error.", true);
         }
-      }
+      })
     );
-  },
+  }),
 
   deleteVisit: function(visitId) {
     this.confirmAction(
@@ -1565,7 +1564,7 @@ const app = {
           console.error(e);
           this.showNotificationModal("Error", "Server error.", true);
         }
-      }
+      })
     );
   },
   viewReport: function(visitId) {
@@ -1609,7 +1608,7 @@ const app = {
       console.error(e);
       this.showNotificationModal("Error", "Could not open edit form.", true);
     }
-  },
+  }),
 
   submitEditClient: __async(function*(event) {
     event.preventDefault();
@@ -1652,7 +1651,7 @@ const app = {
     } catch(e) {
       this.showNotificationModal("Error", "Connection error.", true);
     }
-  },
+  }),
 
   openEditVisitModal: __async(function*(visitId) {
     try {
@@ -1736,7 +1735,7 @@ const app = {
       console.error(e);
       this.showNotificationModal("Error", "Could not load visit details.", true);
     }
-  },
+  }),
 
   submitEditVisit: __async(function*(e) {
     e.preventDefault();
@@ -1768,7 +1767,7 @@ const app = {
     } catch(err) {
       this.showNotificationModal("Error", "Connection error.", true);
     }
-  },
+  }),
 
   showAddTestModal: __async(function*(visitId) {
     document.getElementById('add-test-visit-id').value = visitId;
@@ -1815,7 +1814,7 @@ const app = {
       });
       container.innerHTML = html;
     }
-  },
+  }),
 
   filterAddTests: function() {
     const query = document.getElementById('add-test-search').value.toLowerCase();
@@ -1862,7 +1861,7 @@ const app = {
     } catch(e) {
       this.showNotificationModal("Error", "Connection error.", true);
     }
-  },
+  }),
 
 
   removeOrder: __async(function*(orderId) {
@@ -1881,8 +1880,8 @@ const app = {
       } catch(e) {
         app.showNotificationModal("Error", "Connection error.", true);
       }
-    });
-  },
+    }));
+  }),
 
 
   toggleAnalyzerPaste: function(show = null) {
@@ -1955,7 +1954,7 @@ const app = {
       console.error(err);
       this.showNotificationModal("Error", "Failed to connect to parser service.", true);
     }
-  },
+  }),
 
   showEnterResultModal: __async(function*(orderId, testId, testName, existingVal = null, existingUnit = null, visitId = null) {
     document.getElementById('result-entry-order-id').value = orderId;
@@ -2011,17 +2010,13 @@ const app = {
        // URINALYSIS FULL MODAL — 3-section panel via API sub-parameters
        singleContainer.style.display = 'none';
        paramsContainer.style.display = 'block';
-       // Fetch sub-parameters from the API (same endpoint as CBC uses via children/tests)
        var uaParamRes = yield fetch('/api/config/tests/' + testId + '/children');
        var uaParams = [];
        if (uaParamRes.ok) {
          uaParams = yield uaParamRes.json();
        }
-       // Sort by sort_order
        uaParams.sort(function(a, b) { return (a.sort_order || 0) - (b.sort_order || 0); });
 
-       // Section groupings by sort_order
-       // Macroscopy: 1-2, Microscopy: 3-7, Dipstick: 8-17
        var UA_SECTIONS = [
          { label: 'Macroscopy', min: 1, max: 2 },
          { label: 'Microscopy', min: 3, max: 7 },
@@ -2044,7 +2039,7 @@ const app = {
            var inputHtml = '';
            if (opts && opts.length > 0) {
              var optsHtml = opts.map(function(o) {
-               return '<option value="' + o.replace(/"/g, '&quot;') + '">' + o + '</option>';
+               return '<option value="' + o.split('"').join('&quot;') + '">' + o + '</option>';
              }).join('');
              inputHtml = '<select class="modal-param-val" style="width:100%; padding:6px 8px; border:1px solid var(--border-color); border-radius:4px; font-size:0.85rem;">' + optsHtml + '</select>';
            } else {
@@ -2192,7 +2187,8 @@ const app = {
               paramResults.push({ parameter_id: pid, result_value: pval });
             }
          });
-        } else if (nameLower.includes('widal')) {
+
+       } else if (nameLower.includes('widal')) {
          const res = document.getElementById('widal-res').value;
          const tit = document.getElementById('widal-tit-val').value;
          finalVal = res === 'Positive' && tit ? `${res} (${tit})` : res;
@@ -2278,8 +2274,8 @@ const app = {
        } catch(err) {
          this.showNotificationModal("Error", "Connection error saving result.", true);
        }
-    };
-  },
+    });
+  }),
 
 
 
@@ -2348,14 +2344,14 @@ const app = {
     } catch (e) {
       this.showNotificationModal("Error", 'Error submitting result.', true);
     }
-  },
+  }),
 
   loadClientOrders: __async(function*(pid) {
     const frame = document.getElementById('report-frame');
     if (frame) {
       frame.src = `/api/reports/client/${pid}/pdf`;
     }
-  },
+  }),
 
   showNewClientModal: function() {
     document.getElementById('new-client-form').reset();
@@ -2446,7 +2442,7 @@ const app = {
     } catch (error) {
       this.showNotificationModal("Error", 'Connection error.', true);
     }
-  },
+  }),
 
   // Configuration View
 
@@ -2513,7 +2509,7 @@ const app = {
     yield this.loadConfigData();
     yield this.loadWardsConfig();
     yield this.loadCliniciansConfig();
-  },
+  }),
 
 
   
@@ -2545,7 +2541,7 @@ const app = {
         </table>
       `;
     } catch(e) { console.error(e); }
-  },
+  }),
 
   showAddWardModal: __async(function*() {
     document.getElementById('ward-modal-title').textContent = 'Add Ward';
@@ -2554,7 +2550,7 @@ const app = {
     document.getElementById('ward-modal-name').value = '';
     document.getElementById('ward-modal').style.display = 'flex';
     document.getElementById('ward-modal-name').focus();
-  },
+  }),
 
   editWard: __async(function*(id, oldName, isActive) {
     document.getElementById('ward-modal-title').textContent = 'Edit Ward';
@@ -2563,7 +2559,7 @@ const app = {
     document.getElementById('ward-modal-name').value = oldName;
     document.getElementById('ward-modal').style.display = 'flex';
     document.getElementById('ward-modal-name').focus();
-  },
+  }),
 
   submitWardModal: __async(function*(e) {
     e.preventDefault();
@@ -2594,7 +2590,7 @@ const app = {
         this.showNotificationModal("Error", err.detail || "Failed to save ward.", true);
       }
     } catch(e) { console.error(e); }
-  },
+  }),
 
   deleteWard: __async(function*(id) {
     app.confirmAction("Confirm Deactivation", "Are you sure you want to deactivate this ward?", __async(function*() {
@@ -2602,8 +2598,8 @@ const app = {
         yield fetch(`/api/config/wards/${id}`, { method: 'DELETE' });
         app.loadWardsConfig();
       } catch(e) { console.error(e); }
-    });
-  },
+    }));
+  }),
 
   reactivateWard: __async(function*(id) {
     try {
@@ -2619,7 +2615,7 @@ const app = {
         this.showNotificationModal("Error", err.detail || "Failed to reactivate ward.", true);
       }
     } catch(e) { console.error(e); }
-  },
+  }),
 
   loadCliniciansConfig: __async(function*() {
     try {
@@ -2642,7 +2638,7 @@ const app = {
         </table>
       `;
     } catch(e) { console.error(e); }
-  },
+  }),
   
   showAddClinicianModal: function() {
     document.getElementById('clinician-modal-name').value = '';
@@ -2666,7 +2662,7 @@ const app = {
         app.showNotificationModal("Error", err.detail || "Failed to add clinician.", true);
       }
     } catch(e) { console.error(e); }
-  },
+  }),
 
   loadConfigData: __async(function*() {
     try {
@@ -2937,12 +2933,12 @@ const app = {
     } catch (e) {
       console.error('Config loading error:', e);
     }
-  },
+  }),
 
   approveUser: __async(function*(userId, role, cadre) {
     yield this.saveUserUpdate(userId, { role: role || 'staff', cadre: cadre || null, is_active: true });
     this.showNotificationModal("Success", 'User registration approved successfully!', false);
-  },
+  }),
 
   rejectUser: __async(function*(userId, username) {
     app.confirmAction("Reject User", `Are you sure you want to reject and delete the registration for '${username}'?`, __async(function*() {
@@ -2958,15 +2954,15 @@ const app = {
       } catch (e) {
         app.showNotificationModal("Error", 'Connection error rejecting registration.', true);
       }
-    });
-  },
+    }));
+  }),
 
   deactivateUser: __async(function*(userId, role, cadre) {
     app.confirmAction("Deactivate User", "Are you sure you want to deactivate this account?", __async(function*() {
       yield app.saveUserUpdate(userId, { role: role, cadre: cadre || null, is_active: false });
       app.showNotificationModal("Success", 'User account deactivated.', false);
-    });
-  },
+    }));
+  }),
 
   changeUserFields: __async(function*(userId, isActive) {
     const roleEl = document.getElementById(`role-select-${userId}`);
@@ -2975,7 +2971,7 @@ const app = {
     
     yield this.saveUserUpdate(userId, { role: roleEl.value, cadre: cadreEl.value || null, is_active: isActive });
     this.showNotificationModal("Success", 'User details updated successfully.', false);
-  },
+  }),
 
   promptAction: function(title, message, callback) {
     const modal = document.getElementById('prompt-modal');
@@ -3018,8 +3014,8 @@ const app = {
       }
       yield app.saveUserUpdate(userId, { role: role, cadre: cadre || null, is_active: true, password: tempPw.trim() });
       app.showNotificationModal("Success", `Password reset for '${username}'. User will be required to change it on next login.`, false);
-    });
-  },
+    }));
+  }),
 
   saveUserUpdate: __async(function*(userId, updateBody) {
     try {
@@ -3041,7 +3037,7 @@ const app = {
     } catch (e) {
       this.showNotificationModal("Error", 'Connection error updating account.', true);
     }
-  },
+  }),
 
   togglePanelGroup: function(panelId) {
     const rows = document.querySelectorAll(`tr[data-parent-id="${panelId}"]`);
@@ -3127,8 +3123,8 @@ const app = {
     form.onsubmit = __async(function*(e) {
       e.preventDefault();
       yield this.saveTestConfig();
-    };
-  },
+    });
+  }),
 
   handleTestResultTypeChange: function() {
     const rType = document.getElementById('test-config-result-type').value;
@@ -3220,7 +3216,7 @@ const app = {
     } catch (e) {
       this.showNotificationModal("Error", 'Connection error.', true);
     }
-  },
+  }),
 
   deleteTest: __async(function*(testId) {
     // Guard: block deletion of panel parent that still has children
@@ -3245,8 +3241,8 @@ const app = {
       } catch (e) {
         app.showNotificationModal("Error", 'Connection error.', true);
       }
-    });
-   },
+    }));
+   }),
 
 
   renderAuditLog: __async(function*(container) {
@@ -3295,7 +3291,7 @@ const app = {
     } catch (e) {
       console.error('Audit log error:', e);
     }
-  },
+  }),
 
   escape: function(str) {
     if (!str) return '';
