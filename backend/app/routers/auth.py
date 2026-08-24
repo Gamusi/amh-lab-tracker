@@ -1,4 +1,5 @@
 import datetime, sqlite3, logging
+from pydantic import BaseModel
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from ..database import get_db
 from typing import Optional
@@ -95,6 +96,45 @@ def change_password(req: ChangePasswordRequest, current_user: User = Depends(get
     conn.commit()
     logger.info(f"Password changed successfully for user '{user['username']}'")
     return {"status": "success", "message": "Password changed successfully"}
+
+class AdminResetPasswordRequest(BaseModel):
+    temporary_password: Optional[str] = None
+
+@router.post("/users/{user_id}/reset-password")
+def admin_reset_password(
+    user_id: int,
+    req: Optional[AdminResetPasswordRequest] = None,
+    admin_user: User = Depends(require_admin),
+    conn: sqlite3.Connection = Depends(get_db)
+):
+    cur = conn.cursor()
+    cur.execute("SELECT id, username, role FROM users WHERE id = ?", (user_id,))
+    target_user = cur.fetchone()
+    if not target_user:
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    if admin_user["role"] == "admin" and target_user["role"] in ["admin", "superadmin"] and target_user["id"] != admin_user["id"]:
+        raise HTTPException(status_code=403, detail="Admins can only reset passwords for staff accounts.")
+
+    temp_pass = (req.temporary_password if req and req.temporary_password else "").strip() or "AMH@1234"
+    new_hash = hash_password(temp_pass)
+
+    cur.execute(
+        "UPDATE users SET password_hash = ?, password_reset_required = 1 WHERE id = ?",
+        (new_hash, user_id)
+    )
+    now_str = datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%d %H:%M:%S")
+    cur.execute(
+        "INSERT INTO audit_log (user_id, action, detail, timestamp) VALUES (?, 'ADMIN_RESET_PASSWORD', ?, ?)",
+        (admin_user["id"], f"Reset password for user {target_user['username']} (ID {user_id})", now_str)
+    )
+    conn.commit()
+
+    return {
+        "status": "success",
+        "message": f"Password for {target_user['username']} has been reset.",
+        "temporary_password": temp_pass
+    }
 
 @router.get("/users")
 def list_users(admin_user: User = Depends(require_admin), conn: sqlite3.Connection = Depends(get_db)):

@@ -38,7 +38,7 @@ def mock_db():
         yield conn
         
     app.dependency_overrides[get_db] = override_get_db
-    app.dependency_overrides[get_current_user] = lambda: {"id": 1, "username": "labtech1", "full_name": "Lab Technician"}
+    app.dependency_overrides[get_current_user] = lambda: {"id": 1, "username": "labtech1", "full_name": "Lab Technician", "role": "admin"}
     
     yield {
         "conn": conn,
@@ -730,5 +730,121 @@ def test_pdf_report_content_disposition_header(mock_db):
     res = client.get(f"/api/reports/visit/{vid}/pdf")
     assert res.status_code == 200
     assert 'filename="AMH-26-8-777.pdf"' in res.headers.get("content-disposition", "")
+
+def test_staff_entry_leaves_order_unverified_and_blocks_staff_pdf(mock_db):
+    conn = mock_db["conn"]
+    cur = conn.cursor()
+    cur.execute("INSERT INTO clients (client_number, full_name, sex) VALUES ('AMH-V1', 'David O', 'Male')")
+    cid = cur.lastrowid
+    cur.execute("INSERT INTO visits (client_id, ward_of_origin, lab_number) VALUES (?, 'GOPD', 'AMH-26-8-050')", (cid,))
+    vid = cur.lastrowid
+    cur.execute("INSERT INTO test_orders (visit_id, test_id, status) VALUES (?, ?, 'pending')", (vid, mock_db["mps_id"]))
+    oid = cur.lastrowid
+    conn.commit()
+
+    # Enter result as staff user (role: staff)
+    app.dependency_overrides[get_current_user] = lambda: {"id": 2, "username": "staff1", "full_name": "Staff Tech", "role": "staff"}
+    res = client.post("/api/clients/results", json={"order_id": oid, "result_value": "Negative"})
+    assert res.status_code == 200
+
+    # Verify order is in 'entered' status, not verified
+    cur.execute("SELECT status FROM test_orders WHERE id = ?", (oid,))
+    assert cur.fetchone()["status"] == "entered"
+    cur.execute("SELECT verified_by_user_id FROM test_results WHERE order_id = ?", (oid,))
+    assert cur.fetchone()["verified_by_user_id"] is None
+
+    # Staff attempts to fetch PDF -> 403 Forbidden
+    pdf_res = client.get(f"/api/reports/visit/{vid}/pdf")
+    assert pdf_res.status_code == 403
+    assert "verified" in pdf_res.json()["detail"].lower()
+
+    # Admin verifies the order
+    app.dependency_overrides[get_current_user] = lambda: {"id": 1, "username": "admin1", "full_name": "Admin Lab", "role": "admin"}
+    verify_res = client.post(f"/api/clients/orders/{oid}/verify")
+    assert verify_res.status_code == 200
+
+    # Check order is now completed and verified
+    cur.execute("SELECT status FROM test_orders WHERE id = ?", (oid,))
+    assert cur.fetchone()["status"] == "completed"
+
+    # Now staff can fetch PDF
+    app.dependency_overrides[get_current_user] = lambda: {"id": 2, "username": "staff1", "full_name": "Staff Tech", "role": "staff"}
+    pdf_res_after = client.get(f"/api/reports/visit/{vid}/pdf")
+    assert pdf_res_after.status_code == 200
+
+def test_admin_can_reset_staff_password(mock_db):
+    conn = mock_db["conn"]
+    cur = conn.cursor()
+    from backend.app.auth import hash_password
+    cur.execute("INSERT INTO users (username, full_name, password_hash, role, is_active) VALUES ('tech2', 'Tech Two', ?, 'staff', 1)", (hash_password("oldpass123"),))
+    user_id = cur.lastrowid
+    conn.commit()
+
+    # Admin resets password
+    app.dependency_overrides[get_current_user] = lambda: {"id": 1, "username": "admin1", "full_name": "Admin", "role": "admin"}
+    res = client.post(f"/api/auth/users/{user_id}/reset-password", json={"temporary_password": "TempPass2026"})
+    assert res.status_code == 200
+
+    # Verify user record updated with password_reset_required = 1
+    cur.execute("SELECT password_reset_required, password_hash FROM users WHERE id = ?", (user_id,))
+    row = cur.fetchone()
+    assert row["password_reset_required"] == 1
+    from backend.app.auth import verify_password
+    assert verify_password("TempPass2026", row["password_hash"])
+
+def test_staff_can_delete_empty_visit_but_not_visit_with_results(mock_db):
+    conn = mock_db["conn"]
+    cur = conn.cursor()
+    cur.execute("INSERT INTO clients (client_number, full_name, sex) VALUES ('AMH-DEL-1', 'Grace N', 'Female')")
+    cid = cur.lastrowid
+    cur.execute("INSERT INTO visits (client_id, ward_of_origin) VALUES (?, 'GOPD')", (cid,))
+    vid1 = cur.lastrowid
+    cur.execute("INSERT INTO test_orders (visit_id, test_id, status) VALUES (?, ?, 'pending')", (vid1, mock_db["mps_id"]))
+    
+    # Visit 2 has entered result
+    cur.execute("INSERT INTO visits (client_id, ward_of_origin) VALUES (?, 'GOPD')", (cid,))
+    vid2 = cur.lastrowid
+    cur.execute("INSERT INTO test_orders (visit_id, test_id, status) VALUES (?, ?, 'entered')", (vid2, mock_db["mps_id"]))
+    oid2 = cur.lastrowid
+    cur.execute("INSERT INTO test_results (order_id, result_value) VALUES (?, 'Positive')", (oid2,))
+    conn.commit()
+
+    # Staff user tries to delete visit 1 (only pending tests) -> SUCCESS
+    app.dependency_overrides[get_current_user] = lambda: {"id": 2, "username": "staff1", "full_name": "Staff Tech", "role": "staff"}
+    res1 = client.delete(f"/api/visits/{vid1}")
+    assert res1.status_code == 200
+    assert res1.json()["status"] == "deleted"
+
+    # Staff user tries to delete visit 2 (has saved results) -> 403 Forbidden
+    res2 = client.delete(f"/api/visits/{vid2}")
+    assert res2.status_code == 403
+    assert "administrator" in res2.json()["detail"].lower()
+
+    # Admin user deletes visit 2 -> SUCCESS
+    app.dependency_overrides[get_current_user] = lambda: {"id": 1, "username": "admin1", "full_name": "Admin Lab", "role": "admin"}
+    res2_admin = client.delete(f"/api/visits/{vid2}")
+    assert res2_admin.status_code == 200
+    assert res2_admin.json()["status"] == "deleted"
+
+def test_admin_can_preview_unverified_pdf(mock_db):
+    conn = mock_db["conn"]
+    cur = conn.cursor()
+    cur.execute("INSERT INTO clients (client_number, full_name, sex) VALUES ('AMH-PRV-1', 'Peter O', 'Male')")
+    cid = cur.lastrowid
+    cur.execute("INSERT INTO visits (client_id, ward_of_origin, lab_number) VALUES (?, 'OPD', 'AMH-26-8-999')", (cid,))
+    vid = cur.lastrowid
+    cur.execute("INSERT INTO test_orders (visit_id, test_id, status) VALUES (?, ?, 'entered')", (vid, mock_db["mps_id"]))
+    oid = cur.lastrowid
+    cur.execute("INSERT INTO test_results (order_id, result_value) VALUES (?, 'Negative')", (oid,))
+    conn.commit()
+
+    # Admin can generate/preview PDF even when unverified
+    app.dependency_overrides[get_current_user] = lambda: {"id": 1, "username": "admin1", "full_name": "Admin Lab", "role": "admin"}
+    res = client.get(f"/api/reports/visit/{vid}/pdf")
+    assert res.status_code == 200
+    assert res.content.startswith(b'%PDF-')
+
+
+
 
 

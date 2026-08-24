@@ -1449,7 +1449,15 @@ const app = {
       }
       
       const isAdmin = this.currentUser && (this.currentUser.role === 'admin' || this.currentUser.role === 'superadmin');
+      const totalUnverifiedVisits = visits.filter(v => v.unverified_count && v.unverified_count > 0).length;
       let html = '';
+      if (totalUnverifiedVisits > 0) {
+        html += `
+          <div style="background: #fffbeb; border: 1px solid #fde68a; color: #92400e; padding: 10px 14px; border-radius: 6px; margin-bottom: 12px; font-size: 0.875rem; max-width: 800px;">
+            <strong>Notice:</strong> ${totalUnverifiedVisits} visit(s) contain entered results awaiting Administrator verification.
+          </div>
+        `;
+      }
       if (isAdmin) {
         html += `
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; width: 100%; max-width: 800px;">
@@ -1464,21 +1472,44 @@ const app = {
       }
       visits.forEach(v => {
         const labNumStr = v.lab_number ? `(${this.escape(v.lab_number)})` : '(Pending Lab No)';
+        const hasUnverified = v.unverified_count && v.unverified_count > 0;
+        const hasSavedResults = (v.completed_count && v.completed_count > 0) || hasUnverified;
+        const statusBadge = hasUnverified 
+          ? ` [Unverified]`
+          : (hasSavedResults ? ` [Verified]` : '');
+
         if (isAdmin) {
-          html += `<div style="display: grid; grid-template-columns: 36px 4fr 1fr 1fr 1fr; gap: 8px; align-items: center; margin-bottom: 8px; width: 100%; max-width: 800px;">
+          const verifyBtn = hasUnverified 
+            ? `<button class="btn btn-primary btn-sm" style="background:#0284c7; border-color:#0284c7; font-weight:600; width:100%;" onclick="app.openEditVisitModal(${v.visit_id})" title="Inspect and verify test results">Verify Results</button>`
+            : `<button class="btn btn-secondary btn-sm" style="width:100%;" onclick="app.openEditVisitModal(${v.visit_id})">Edit / Review</button>`;
+          
+          const visitClick = hasSavedResults 
+            ? `app.viewReport(${v.visit_id})` 
+            : `app.openEditVisitModal(${v.visit_id})`;
+
+          html += `<div style="display: grid; grid-template-columns: 36px 3.5fr 1.3fr 1.1fr 1fr; gap: 8px; align-items: center; margin-bottom: 8px; width: 100%; max-width: 800px;">
                     <div style="text-align: center;">
                       <input type="checkbox" class="visit-checkbox" value="${v.visit_id}" onchange="app.onVisitSelectionChange()">
                     </div>
-                    <button class="btn btn-secondary btn-sm" style="text-align: left;" onclick="app.viewReport(${v.visit_id})">Visit ${v.visit_id} ${labNumStr} - ${v.created_at.split(' ')[0]}</button>
-                    <button class="btn btn-secondary btn-sm" onclick="app.openEditVisitModal(${v.visit_id})">Edit</button>
+                    <button class="btn btn-secondary btn-sm" style="text-align: left; display: flex; align-items: center; justify-content: space-between;" onclick="${visitClick}">
+                      <span>Visit ${v.visit_id} ${labNumStr} - ${v.created_at.split(' ')[0]}</span>
+                      ${statusBadge}
+                    </button>
+                    ${verifyBtn}
                     <button class="btn btn-primary btn-sm" onclick="app.showAddTestModal(${v.visit_id})">Add Tests</button>
                     <button class="btn btn-danger btn-sm" onclick="app.deleteVisit(${v.visit_id})">Delete</button>
                    </div>`;
         } else {
-          html += `<div style="display: grid; grid-template-columns: 4fr 1fr 1fr; gap: 8px; margin-bottom: 8px; width: 100%; max-width: 800px;">
-                    <button class="btn btn-secondary btn-sm" style="text-align: left;" onclick="app.viewReport(${v.visit_id})">Visit ${v.visit_id} ${labNumStr} - ${v.created_at.split(' ')[0]}</button>
-                    <button class="btn btn-secondary btn-sm" onclick="app.openEditVisitModal(${v.visit_id})">Edit</button>
+          const reportBtn = hasSavedResults && !hasUnverified
+            ? `<button class="btn btn-secondary btn-sm" style="text-align: left; display: flex; align-items: center; justify-content: space-between;" onclick="app.viewReport(${v.visit_id})"><span>Visit ${v.visit_id} ${labNumStr} - ${v.created_at.split(' ')[0]}</span> ${statusBadge}</button>`
+            : `<button class="btn btn-secondary btn-sm" style="text-align: left; color: #b45309; font-weight: 500; display: flex; align-items: center; justify-content: space-between;" onclick="app.openEditVisitModal(${v.visit_id})" title="Click to view and inspect results"><span>Visit ${v.visit_id} ${labNumStr} - ${v.created_at.split(' ')[0]}</span> ${statusBadge}</button>`;
+          const staffCols = !hasSavedResults ? '3.5fr 1.3fr 1.1fr 1fr' : '3.5fr 1.3fr 1.1fr';
+          const deleteBtn = !hasSavedResults ? `<button class="btn btn-danger btn-sm" onclick="app.deleteVisit(${v.visit_id})">Delete</button>` : '';
+          html += `<div style="display: grid; grid-template-columns: ${staffCols}; gap: 8px; margin-bottom: 8px; width: 100%; max-width: 800px;">
+                    ${reportBtn}
+                    <button class="btn btn-secondary btn-sm" onclick="app.openEditVisitModal(${v.visit_id})">View Details</button>
                     <button class="btn btn-primary btn-sm" onclick="app.showAddTestModal(${v.visit_id})">Add Tests</button>
+                    ${deleteBtn}
                    </div>`;
         }
       });
@@ -1497,26 +1528,27 @@ const app = {
 
   onVisitSelectionChange: function() {
     const selected = document.querySelectorAll('.visit-checkbox:checked');
-    const all = document.querySelectorAll('.visit-checkbox');
-    const selectAllCb = document.getElementById('select-all-visits');
-    if (selectAllCb) {
-      selectAllCb.checked = all.length > 0 && selected.length === all.length;
-    }
     const btn = document.getElementById('btn-bulk-delete-visits');
     const countSpan = document.getElementById('selected-visits-count');
+    const selectAllCb = document.getElementById('select-all-visits');
+    const allCheckboxes = document.querySelectorAll('.visit-checkbox');
+
     if (btn && countSpan) {
       countSpan.textContent = selected.length;
       btn.style.display = selected.length > 0 ? 'inline-block' : 'none';
     }
+    if (selectAllCb && allCheckboxes.length > 0) {
+      selectAllCb.checked = selected.length === allCheckboxes.length;
+    }
   },
 
-  bulkDeleteVisits: __async(function*() {
-    const selected = Array.from(document.querySelectorAll('.visit-checkbox:checked')).map(cb => parseInt(cb.value, 10));
+  bulkDeleteVisits: function() {
+    const selected = Array.from(document.querySelectorAll('.visit-checkbox:checked')).map(cb => parseInt(cb.value));
     if (selected.length === 0) return;
 
     this.confirmAction(
       "Delete Selected Visits",
-      `Are you sure you want to delete ${selected.length} selected visit(s)? All associated test orders and results will be removed. This action cannot be undone.`,
+      `Are you sure you want to delete ${selected.length} visit(s)? Associated test orders and results will be removed.`,
       __async(function*() {
         try {
           const res = yield fetch('/api/visits/bulk', {
@@ -1526,14 +1558,15 @@ const app = {
           });
           if (res.ok) {
             const data = yield res.json();
-            this.showNotificationModal("Success", `Deleted ${data.deleted_visit_ids.length} visit(s).`, false);
+            const deleted = data.deleted_visit_ids || [];
+            this.showNotificationModal("Success", `Successfully deleted ${deleted.length} visit(s).`, false);
             if (this.currentClientId) {
               yield this.loadHistoricalVisits(this.currentClientId);
               yield this.loadPendingTests(this.currentClientId);
             }
           } else {
             const err = yield res.json();
-            this.showNotificationModal("Error", err.detail || "Failed to delete visits.", true);
+            this.showNotificationModal("Error", err.detail || "Failed to delete selected visits.", true);
           }
         } catch(e) {
           console.error(e);
@@ -1541,7 +1574,7 @@ const app = {
         }
       })
     );
-  }),
+  },
 
   deleteVisit: function(visitId) {
     this.confirmAction(
@@ -1567,6 +1600,7 @@ const app = {
       })
     );
   },
+
   viewReport: function(visitId) {
     const frame = document.getElementById('report-frame');
     if (frame) {
@@ -1574,6 +1608,53 @@ const app = {
       frame.src = `/api/reports/visit/${visitId}/pdf`;
     }
   },
+
+  verifySingleOrder: __async(function*(orderId, visitId) {
+    try {
+      const res = yield fetch('/api/clients/orders/' + orderId + '/verify', { method: 'POST' });
+      if (!res.ok) {
+        const err = yield res.json();
+        app.showNotificationModal("Error", err.detail || "Failed to verify test result.", true);
+        return;
+      }
+      if (visitId) {
+        yield app.openEditVisitModal(visitId);
+      }
+      if (app.currentClientId) {
+        yield app.loadHistoricalVisits(app.currentClientId);
+      }
+    } catch(e) {
+      console.error(e);
+      app.showNotificationModal("Error", "Connection error verifying test result.", true);
+    }
+  }),
+
+  verifyVisitResults: __async(function*(visitId) {
+    this.confirmAction(
+      "Verify Visit Results",
+      "Are you sure you want to verify and release all entered results for this visit?",
+      __async(function*() {
+        try {
+          const res = yield fetch('/api/clients/visits/' + visitId + '/verify', { method: 'POST' });
+          if (!res.ok) {
+            const err = yield res.json();
+            app.showNotificationModal("Error", err.detail || "Failed to verify results.", true);
+            return;
+          }
+          app.showNotificationModal("Success", "All results successfully verified and released for printing.", false);
+          if (app.currentClientId) {
+            yield app.loadHistoricalVisits(app.currentClientId);
+          }
+          const editModal = document.getElementById('edit-visit-modal');
+          if (editModal && editModal.style.display === 'flex') {
+            yield app.openEditVisitModal(visitId);
+          }
+        } catch(e) {
+          app.showNotificationModal("Error", "Connection error verifying results.", true);
+        }
+      })
+    );
+  }),
 
   updateEditAgePlaceholder: function() {
     const cat = document.getElementById('edit-client-category').value;
@@ -1591,81 +1672,80 @@ const app = {
       const res = yield fetch(`/api/clients/${clientId}`);
       if (!res.ok) throw new Error("Failed to fetch client");
       const data = yield res.json();
-
-      document.getElementById('edit-client-id').value = clientId;
-      document.getElementById('edit-client-name').value = data.full_name || '';
-      document.getElementById('edit-client-sex').value = data.sex || 'Male';
-      document.getElementById('edit-client-age').value = data.age_display || '';
-      document.getElementById('edit-client-phone').value = data.phone || '';
-
-      const cat = data.age_category || 'Adult';
-      const catSel = document.getElementById('edit-client-category');
-      catSel.value = cat;
-      this.updateEditAgePlaceholder();
-
+      
+      document.getElementById('edit-client-id').value = data.id;
+      document.getElementById('edit-client-number').value = data.client_number;
+      document.getElementById('edit-client-name').value = data.full_name;
+      document.getElementById('edit-client-sex').value = data.sex;
+      
+      const phoneInput = document.getElementById('edit-client-phone');
+      if (phoneInput) phoneInput.value = data.phone || '';
+      
+      const catSelect = document.getElementById('edit-client-category');
+      const ageInput = document.getElementById('edit-client-age');
+      
+      if (catSelect && ageInput) {
+        catSelect.value = data.age_category || 'Adult';
+        this.updateEditAgePlaceholder();
+        ageInput.value = data.age_raw || '';
+      }
+      
       document.getElementById('edit-client-modal').style.display = 'flex';
     } catch(e) {
       console.error(e);
-      this.showNotificationModal("Error", "Could not open edit form.", true);
+      this.showNotificationModal("Error", "Could not load client details.", true);
     }
   }),
 
-  submitEditClient: __async(function*(event) {
-    event.preventDefault();
-    const clientId = document.getElementById('edit-client-id').value;
-    const full_name = document.getElementById('edit-client-name').value.trim();
-    const age_string = document.getElementById('edit-client-age').value.trim();
-    const age_category = document.getElementById('edit-client-category').value;
+  submitEditClient: __async(function*(e) {
+    e.preventDefault();
+    const id = document.getElementById('edit-client-id').value;
+    const name = document.getElementById('edit-client-name').value.trim();
     const sex = document.getElementById('edit-client-sex').value;
-    const phone = document.getElementById('edit-client-phone').value.trim();
-
-    const payload = { full_name, sex, phone, age_category };
-    if (age_string) payload.age_string = age_string;
+    const phone = document.getElementById('edit-client-phone') ? document.getElementById('edit-client-phone').value.trim() : null;
+    const ageCategory = document.getElementById('edit-client-category') ? document.getElementById('edit-client-category').value : 'Adult';
+    const ageRaw = document.getElementById('edit-client-age') ? document.getElementById('edit-client-age').value.trim() : null;
 
     try {
-      const res = yield fetch(`/api/clients/${clientId}`, {
+      const res = yield fetch(`/api/clients/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+        body: JSON.stringify({
+          full_name: name,
+          sex: sex,
+          phone: phone,
+          age_category: ageCategory,
+          age_raw: ageRaw
+        })
       });
+
       if (res.ok) {
-        const updated = yield res.json();
         document.getElementById('edit-client-modal').style.display = 'none';
-        // Update header name live
-        const nameSpan = document.getElementById('client-header-name');
-        if (nameSpan) nameSpan.textContent = updated.full_name || full_name;
-        // Update cached data
-        if (this.currentClientData) {
-          this.currentClientData.full_name = updated.full_name || full_name;
-          this.currentClientData.sex = updated.sex || sex;
-          this.currentClientData.phone = updated.phone || phone;
-          this.currentClientData.age_category = updated.age_category || age_category;
-        }
-        // Refresh client list so search shows updated name
-        yield this.searchClients('');
         this.showNotificationModal("Success", "Client details updated successfully.", false);
+        yield this.loadClientDetails(id);
       } else {
         const err = yield res.json();
         this.showNotificationModal("Error", err.detail || "Failed to update client.", true);
       }
     } catch(e) {
-      this.showNotificationModal("Error", "Connection error.", true);
+      console.error(e);
+      this.showNotificationModal("Error", "Server connection error.", true);
     }
   }),
 
   openEditVisitModal: __async(function*(visitId) {
     try {
       const res = yield fetch(`/api/visits/${visitId}`);
-      if (!res.ok) throw new Error('Failed to load visit details');
+      if (!res.ok) throw new Error("Failed to fetch visit");
       const data = yield res.json();
+
+      document.getElementById('edit-visit-id').value = data.visit_id;
       
-      document.getElementById('edit-visit-id').value = visitId;
-      
-      // Populate ward dropdown
+      // Populate wards dropdown
       const wardSelect = document.getElementById('edit-visit-ward');
       wardSelect.innerHTML = '';
       try {
-        const wRes = yield fetch('/api/config/wards?active_only=true');
+        const wRes = yield fetch('/api/config/wards');
         const wards = yield wRes.json();
         wards.forEach(w => {
           const opt = document.createElement('option');
@@ -1674,9 +1754,9 @@ const app = {
           wardSelect.appendChild(opt);
         });
       } catch(e) {}
-      wardSelect.value = data.ward_of_origin || '';
-      
-      // Populate clinician dropdown
+      wardSelect.value = data.ward_of_origin;
+
+      // Populate clinicians dropdown
       const clinSelect = document.getElementById('edit-visit-clinician');
       clinSelect.innerHTML = '<option value="">-- None --</option>';
       try {
@@ -1703,25 +1783,75 @@ const app = {
       const ordersList = document.getElementById('edit-visit-orders-list');
       if (ordersList) {
         if (!data.orders || data.orders.length === 0) {
-          ordersList.innerHTML = '<div style="color:var(--text-muted); font-size:0.85rem;">No tests attached to this visit.</div>';
+          ordersList.innerHTML = '<div style="color:var(--text-muted); font-size:0.85rem; padding:12px;">No tests attached to this visit.</div>';
         } else {
           const isAdmin = this.currentUser && (this.currentUser.role === 'admin' || this.currentUser.role === 'superadmin');
-          let oHtml = '<table style="width:100%; border-collapse:collapse; font-size:0.875rem;">';
-          oHtml += '<thead><tr style="border-bottom:2px solid #e2e8f0; color:var(--text-muted); text-align:left; background:#f8fafc;"><th style="padding:8px 12px;">Test Name</th><th style="padding:8px 12px;">Section</th><th style="padding:8px 12px;">Category</th><th style="padding:8px 12px;">Current Result</th><th style="padding:8px 12px; text-align:right;">Action</th></tr></thead><tbody>';
+          const hasUnverified = data.orders.some(o => o.status === 'entered');
+          let oHtml = '';
+          if (isAdmin && hasUnverified) {
+            oHtml += `
+              <div style="display: flex; justify-content: space-between; align-items: center; background: #fffbeb; border: 1px solid #fde68a; color: #92400e; padding: 10px 14px; border-radius: 6px; margin-bottom: 12px; font-size: 0.875rem;">
+                <div><strong>Quality Review:</strong> Inspect test results below. Click <em>Verify</em> per test or <em>Verify All</em>.</div>
+                <button type="button" class="btn btn-primary btn-sm" style="background:#0284c7; border-color:#0284c7; white-space:nowrap; padding:5px 12px;" onclick="app.verifyVisitResults(${visitId})">Verify All Results</button>
+              </div>
+            `;
+          }
+          oHtml += '<table style="width:100%; border-collapse:collapse; font-size:0.85rem;">';
+          oHtml += '<thead><tr style="border-bottom:2px solid #e2e8f0; color:var(--text-muted); text-align:left; background:#f8fafc;"><th style="padding:8px 10px;">Test Name</th><th style="padding:8px 10px;">Section</th><th style="padding:8px 10px;">Ref. Range</th><th style="padding:8px 10px;">Result Value</th><th style="padding:8px 10px;">Technician / Time</th><th style="padding:8px 10px;">Status</th><th style="padding:8px 10px; text-align:right;">Actions</th></tr></thead><tbody>';
           data.orders.forEach(o => {
             const hasResult = o.results && o.results.length > 0;
-            const resVal = hasResult ? (o.results[0].result_value || 'Completed') : '<span style="color:var(--text-muted); font-style:italic;">Pending Entry</span>';
-            const resUnit = hasResult && o.results[0].result_unit ? ` ${this.escape(o.results[0].result_unit)}` : '';
-            const catText = this.escape(o.order_category || 'in-house');
+            let resVal = '<span style="color:var(--text-muted); font-style:italic;">Pending Entry</span>';
+            if (hasResult) {
+              if (o.results.length > 1) {
+                resVal = '<div style="display:flex; flex-direction:column; gap:2px; font-size:0.82rem;">' + o.results.map(r => `<div><strong>${this.escape(r.parameter_name || 'Param')}:</strong> ${this.escape(r.result_value || '—')} ${r.result_unit ? this.escape(r.result_unit) : ''}</div>`).join('') + '</div>';
+              } else {
+                const r = o.results[0];
+                const unitStr = r.result_unit ? ` ${this.escape(r.result_unit)}` : '';
+                resVal = `<strong>${this.escape(r.result_value || 'Completed')}</strong>${unitStr}`;
+              }
+            }
+            const refRangeText = this.escape(o.ref_range || (o.results && o.results[0] && o.results[0].ref_range) || '—');
+            const techName = hasResult && o.results[0].entered_by_name ? this.escape(o.results[0].entered_by_name) : '—';
+            const techTime = hasResult && o.results[0].entered_at ? o.results[0].entered_at.substring(0, 16) : '';
+            const techInfo = hasResult ? `${techName}<small style="display:block; color:var(--text-muted); font-size:0.75rem;">${techTime}</small>` : '—';
+
+            let statusText = '<span style="color:var(--text-muted);">Pending Entry</span>';
+            if (o.status === 'entered') {
+              statusText = '<span style="color:#d97706; font-weight:600; font-size:0.8rem;">Entered (Unverified)</span>';
+            } else if (o.status === 'completed') {
+              const verifier = hasResult && o.results[0].verified_by_name ? `<small style="display:block; color:var(--text-muted); font-size:0.75rem;">by ${this.escape(o.results[0].verified_by_name)}</small>` : '';
+              statusText = `<span style="color:#16a34a; font-weight:600; font-size:0.8rem;">Verified</span>${verifier}`;
+            }
+
+            let actionBtns = '';
+            if (isAdmin) {
+              if (o.status === 'entered') {
+                actionBtns = `
+                  <div style="display:flex; gap:6px; justify-content:flex-end;">
+                    <button type="button" class="btn btn-success btn-sm" style="padding:4px 8px; font-weight:600; font-size:0.78rem;" onclick="app.verifySingleOrder(${o.order_id}, ${visitId})">Verify</button>
+                    <button type="button" class="btn btn-secondary btn-sm" style="padding:4px 8px; font-size:0.78rem;" onclick="app.showEnterResultModal(${o.order_id}, ${o.test_id}, '${this.escape(o.test_name)}', '${hasResult ? this.escape(o.results[0].result_value || '') : ''}', '${hasResult && o.results[0].result_unit ? this.escape(o.results[0].result_unit) : ''}', ${visitId})">Edit</button>
+                  </div>
+                `;
+              } else if (o.status === 'completed') {
+                actionBtns = `<button type="button" class="btn btn-secondary btn-sm" style="padding:4px 8px; font-size:0.78rem;" onclick="app.showEnterResultModal(${o.order_id}, ${o.test_id}, '${this.escape(o.test_name)}', '${hasResult ? this.escape(o.results[0].result_value || '') : ''}', '${hasResult && o.results[0].result_unit ? this.escape(o.results[0].result_unit) : ''}', ${visitId})">Edit</button>`;
+              } else {
+                actionBtns = `<button type="button" class="btn btn-primary btn-sm" style="padding:4px 8px; font-size:0.78rem;" onclick="app.showEnterResultModal(${o.order_id}, ${o.test_id}, '${this.escape(o.test_name)}', '', '', ${visitId})">Enter</button>`;
+              }
+            } else {
+              if (o.status === 'pending') {
+                actionBtns = `<button type="button" class="btn btn-primary btn-sm" style="padding:4px 8px; font-size:0.78rem;" onclick="app.showEnterResultModal(${o.order_id}, ${o.test_id}, '${this.escape(o.test_name)}', '', '', ${visitId})">Enter</button>`;
+              }
+            }
+
             oHtml += `
               <tr style="border-bottom:1px solid #f1f5f9;">
-                <td style="padding:10px 12px;"><strong>${this.escape(o.test_name)}</strong></td>
-                <td style="padding:10px 12px; color:var(--text-muted); font-size:0.85rem;">${this.escape(o.section_name || '—')}</td>
-                <td style="padding:10px 12px; text-transform:capitalize; font-size:0.85rem;">${catText}</td>
-                <td style="padding:10px 12px;"><strong>${resVal}</strong>${resUnit}</td>
-                <td style="padding:10px 12px; text-align:right;">
-                  ${isAdmin ? `<button type="button" class="btn btn-secondary btn-sm" style="padding:4px 12px;" onclick="app.showEnterResultModal(${o.order_id}, ${o.test_id}, '${this.escape(o.test_name)}', '${hasResult ? this.escape(o.results[0].result_value || '') : ''}', '${hasResult && o.results[0].result_unit ? this.escape(o.results[0].result_unit) : ''}', ${visitId})">${hasResult ? 'Edit Result' : 'Enter Result'}</button>` : ''}
-                </td>
+                <td style="padding:8px 10px;"><strong>${this.escape(o.test_name)}</strong></td>
+                <td style="padding:8px 10px; color:var(--text-muted); font-size:0.82rem;">${this.escape(o.section_name || '—')}</td>
+                <td style="padding:8px 10px; color:var(--text-muted); font-size:0.82rem;">${refRangeText}</td>
+                <td style="padding:8px 10px;">${resVal}</td>
+                <td style="padding:8px 10px; font-size:0.82rem;">${techInfo}</td>
+                <td style="padding:8px 10px;">${statusText}</td>
+                <td style="padding:8px 10px; text-align:right;">${actionBtns}</td>
               </tr>
             `;
           });
@@ -2072,19 +2202,23 @@ const app = {
             if (test.options) options = JSON.parse(test.options);
         } catch (e) {}
 
-        if (test.result_type === 'qualitative' || test.result_type === 'semi_quantitative') {
+        if (test.result_type === 'qualitative' || test.result_type === 'semi_quantitative' || test.result_type === 'options' || (options && options.length > 0)) {
             if (options && options.length > 0) {
-                let optsHtml = options.map(o => `<option value="${this.escape(o)}">${this.escape(o)}</option>`).join('');
+                let optsHtml = options.map(o => `<option value="${this.escape(o)}"${isEdit && existingVal === o ? ' selected' : ''}>${this.escape(o)}</option>`).join('');
                 singleContainer.innerHTML = `
                   <label>Result:</label>
                   <select id="qual-res" style="width:100%; padding:8px;">
                     ${optsHtml}
                   </select>
                 `;
+                if (isEdit && existingVal) {
+                  const sel = document.getElementById('qual-res');
+                  if (sel) sel.value = existingVal;
+                }
             } else {
                 singleContainer.innerHTML = `
                   <label>Result:</label>
-                  <input type="text" id="result-entry-value" placeholder="Enter text result" style="width:100%; padding:8px;">
+                  <input type="text" id="result-entry-value" value="${isEdit ? this.escape(existingVal) : ''}" placeholder="Enter text result" style="width:100%; padding:8px;">
                 `;
             }
         } else {
@@ -2894,6 +3028,11 @@ const app = {
                   ? `<button class="btn btn-secondary" style="padding: 4px 8px; font-size: 0.8rem; color: var(--danger-color); border-color: var(--danger-color);" onclick="app.deactivateUser(${u.id}, '${this.escape(u.role)}', '${this.escape(u.cadre || '')}')">Deactivate</button>`
                   : '';
 
+                const canReset = !isSelf && u.role !== 'superadmin' && !(this.currentUser.role === 'admin' && (u.role === 'admin' || u.role === 'superadmin'));
+                const resetBtn = canReset
+                  ? `<button class="btn btn-secondary" style="padding: 4px 10px; font-size: 0.8rem;" onclick="app.promptResetPassword(${u.id}, '${this.escape(u.username)}', '${this.escape(u.role)}', '${this.escape(u.cadre || '')}')">Reset Password</button>`
+                  : '';
+
                 activeRows += `
                   <tr>
                     <td><strong>${this.escape(u.full_name)}</strong> ${isSelf ? '<small style="color: var(--primary-color); font-weight: 600;">(You)</small>' : ''}</td>
@@ -2903,8 +3042,9 @@ const app = {
                     <td>${statusBadge}</td>
                     <td>
                       <div style="display: flex; gap: 6px; align-items: center;">
-                        <button class="btn btn-secondary" style="padding: 4px 10px; font-size: 0.8rem;" onclick="app.promptResetPassword(${u.id}, '${this.escape(u.username)}', '${this.escape(u.role)}', '${this.escape(u.cadre || '')}')" ${!canEdit ? 'disabled' : ''}>Reset Password</button>
+                        ${resetBtn}
                         ${deactivateBtn}
+                        ${!resetBtn && !deactivateBtn ? '<span style="color:var(--text-muted); font-size:0.85rem;">—</span>' : ''}
                       </div>
                     </td>
                   </tr>
@@ -3009,13 +3149,25 @@ const app = {
   },
 
   promptResetPassword: __async(function*(userId, username, role, cadre) {
-    app.promptAction("Reset Password", `Enter a new temporary password for user '${username}' (minimum 4 characters):`, __async(function*(tempPw) {
-      if (tempPw.trim().length < 4) {
-        app.showNotificationModal("Error", 'Password must be at least 4 characters long.', true);
-        return;
+    app.promptAction("Reset Password", `Enter a new temporary password for user '${username}' (leave empty for default 'AMH@1234'):`, __async(function*(tempPw) {
+      try {
+        const payload = tempPw && tempPw.trim().length > 0 ? { temporary_password: tempPw.trim() } : {};
+        const res = yield fetch(`/api/auth/users/${userId}/reset-password`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        if (res.ok) {
+          const data = yield res.json();
+          app.showNotificationModal("Success", `Password reset for '${username}'. Temporary password: ${data.temporary_password}`, false);
+          yield app.loadConfigData();
+        } else {
+          const err = yield res.json();
+          app.showNotificationModal("Error", err.detail || 'Failed to reset password.', true);
+        }
+      } catch(e) {
+        app.showNotificationModal("Error", 'Connection error resetting password.', true);
       }
-      yield app.saveUserUpdate(userId, { role: role, cadre: cadre || null, is_active: true, password: tempPw.trim() });
-      app.showNotificationModal("Success", `Password reset for '${username}'. User will be required to change it on next login.`, false);
     }));
   }),
 

@@ -50,7 +50,7 @@ def test_get_visit_report_pdf():
     cur.execute("INSERT INTO test_orders (visit_id, test_id, status) VALUES (?, ?, 'completed')", (visit_id, test_id))
     order_id = cur.lastrowid
     
-    cur.execute("INSERT INTO test_results (order_id, result_value) VALUES (?, '12.5')", (order_id,))
+    cur.execute("INSERT INTO test_results (order_id, result_value, verified_by_user_id) VALUES (?, '12.5', 1)", (order_id,))
     conn.commit()
     
     def override_get_db():
@@ -58,7 +58,7 @@ def test_get_visit_report_pdf():
         
     app.dependency_overrides[get_db] = override_get_db
     from backend.app.auth import get_current_user
-    app.dependency_overrides[get_current_user] = lambda: {"id": 1, "username": "testuser"}
+    app.dependency_overrides[get_current_user] = lambda: {"id": 1, "username": "testuser", "role": "admin"}
     
     try:
         response = client.get(f"/api/reports/visit/{visit_id}/pdf")

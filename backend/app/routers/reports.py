@@ -246,6 +246,17 @@ def get_visit_report_pdf(visit_id: int, db: sqlite3.Connection = Depends(get_db)
     sex = visit_row["sex"] or "U"
     
     cur.execute("""
+        SELECT COUNT(*) as unverified_count
+        FROM test_orders to_ord
+        LEFT JOIN test_results tr ON tr.order_id = to_ord.id
+        WHERE to_ord.visit_id = ? AND (to_ord.status = 'entered' OR (to_ord.status = 'completed' AND tr.result_value IS NOT NULL AND tr.verified_by_user_id IS NULL))
+    """, (visit_id,))
+    unv_row = cur.fetchone()
+    if unv_row and unv_row["unverified_count"] > 0:
+        if current_user.get("role") not in ["admin", "superadmin"]:
+            raise HTTPException(status_code=403, detail="Results must be verified by an Administrator before printing.")
+
+    cur.execute("""
         SELECT 
             to_ord.id AS order_id,
             t.id AS test_id,
@@ -268,7 +279,7 @@ def get_visit_report_pdf(visit_id: int, db: sqlite3.Connection = Depends(get_db)
         LEFT JOIN users u_enter ON tr.entered_by_user_id = u_enter.id
         LEFT JOIN users u_ord ON to_ord.ordered_by_user_id = u_ord.id
         LEFT JOIN users u_ver ON tr.verified_by_user_id = u_ver.id
-        WHERE to_ord.visit_id = ? AND to_ord.status = 'completed' AND tr.result_value IS NOT NULL
+        WHERE to_ord.visit_id = ? AND to_ord.status IN ('completed', 'entered') AND tr.result_value IS NOT NULL
         ORDER BY s.sort_order, t.sort_order, tr.id
     """, (visit_id,))
     

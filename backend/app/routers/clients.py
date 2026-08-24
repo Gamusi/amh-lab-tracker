@@ -3,7 +3,7 @@ from pydantic import BaseModel
 from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from ..database import get_db
-from ..auth import get_current_user
+from ..auth import get_current_user, require_admin
 from ..schemas import VisitCreate, TestResultCreate, ParameterResultItem, AddOrdersRequest, ClientUpdate, BulkOrderDeleteRequest, BulkVisitDeleteRequest
 from ..evaluator import evaluate_result
 
@@ -460,12 +460,18 @@ def enter_result(req: TestResultCreate, conn: sqlite3.Connection = Depends(get_d
     overall_positive = False
 
     # Insert main result or parameter results with verified_at and verified_by_user_id
+    is_admin = current_user.get("role") in ["admin", "superadmin"]
+    verified_by = current_user["id"] if is_admin else None
+    verified_time = now_str if is_admin else None
+    order_status = "completed" if is_admin else "entered"
+
     if req.parameter_results:
         for pr in req.parameter_results:
             cur.execute("SELECT parameter_name FROM test_parameters WHERE id = ?", (pr.parameter_id,))
-            param_row = cur.fetchone()
-            if param_row:
-                param_name = param_row["parameter_name"]
+            p_row = cur.fetchone()
+            param_name = ""
+            if p_row:
+                param_name = p_row["parameter_name"]
             else:
                 # Fallback: parameter_id may refer to a child test in the tests table (e.g. urinalysis sub-parameters)
                 cur.execute("SELECT name FROM tests WHERE id = ?", (pr.parameter_id,))
@@ -487,7 +493,7 @@ def enter_result(req: TestResultCreate, conn: sqlite3.Connection = Depends(get_d
             res_row = cur.fetchone()
             if res_row:
                 if res_row["result_value"] is not None:
-                    if current_user["role"] not in ["admin", "superadmin"]:
+                    if current_user.get("role") not in ["admin", "superadmin"]:
                         raise HTTPException(status_code=403, detail="Only admins can edit existing test results")
                     if not req.edit_reason or not req.edit_reason.strip():
                         raise HTTPException(status_code=400, detail="Reason for editing result is required")
@@ -500,12 +506,12 @@ def enter_result(req: TestResultCreate, conn: sqlite3.Connection = Depends(get_d
                     UPDATE test_results
                     SET result_value = ?, is_positive = ?, result_unit = ?, edit_reason = ?, edited_by_user_id = ?, edited_at = ?, verified_by_user_id = ?, verified_at = ?
                     WHERE id = ?
-                """, (pr.result_value, pr_is_positive, req.result_unit, req.edit_reason, current_user["id"], now_str, current_user["id"], now_str, res_row["id"]))
+                """, (pr.result_value, pr_is_positive, req.result_unit, req.edit_reason, current_user["id"], now_str, verified_by, verified_time, res_row["id"]))
             else:
                 cur.execute("""
                     INSERT INTO test_results (order_id, parameter_id, result_value, result_unit, is_positive, entered_by_user_id, entered_at, verified_by_user_id, verified_at)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """, (req.order_id, pr.parameter_id, pr.result_value, req.result_unit, pr_is_positive, current_user["id"], now_str, current_user["id"], now_str))
+                """, (req.order_id, pr.parameter_id, pr.result_value, req.result_unit, pr_is_positive, current_user["id"], now_str, verified_by, verified_time))
     else:
         eval_dict = evaluate_result(test_name, req.result_value, dob, sex, today)
         is_positive = eval_dict.get("is_abnormal", False)
@@ -521,7 +527,7 @@ def enter_result(req: TestResultCreate, conn: sqlite3.Connection = Depends(get_d
         res_row = cur.fetchone()
         if res_row:
             if res_row["result_value"] is not None:
-                if current_user["role"] not in ["admin", "superadmin"]:
+                if current_user.get("role") not in ["admin", "superadmin"]:
                     raise HTTPException(status_code=403, detail="Only admins can edit existing test results")
                 if not req.edit_reason or not req.edit_reason.strip():
                     raise HTTPException(status_code=400, detail="Reason for editing result is required")
@@ -534,14 +540,14 @@ def enter_result(req: TestResultCreate, conn: sqlite3.Connection = Depends(get_d
                 UPDATE test_results
                 SET result_value = ?, is_positive = ?, result_unit = ?, edit_reason = ?, edited_by_user_id = ?, edited_at = ?, verified_by_user_id = ?, verified_at = ?
                 WHERE id = ?
-            """, (req.result_value, is_positive, req.result_unit, req.edit_reason, current_user["id"], now_str, current_user["id"], now_str, res_row["id"]))
+            """, (req.result_value, is_positive, req.result_unit, req.edit_reason, current_user["id"], now_str, verified_by, verified_time, res_row["id"]))
         else:
             cur.execute("""
                 INSERT INTO test_results (order_id, parameter_id, result_value, result_unit, is_positive, entered_by_user_id, entered_at, verified_by_user_id, verified_at)
                 VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?)
-            """, (req.order_id, req.result_value, req.result_unit, is_positive, current_user["id"], now_str, current_user["id"], now_str))
+            """, (req.order_id, req.result_value, req.result_unit, is_positive, current_user["id"], now_str, verified_by, verified_time))
 
-    cur.execute("UPDATE test_orders SET status = 'completed' WHERE id = ?", (req.order_id,))
+    cur.execute("UPDATE test_orders SET status = ? WHERE id = ?", (order_status, req.order_id))
 
     # Auto-increment DailyEntry counts (with HIV algorithm rollup support)
     increment_daily_entry(cur, today_str, order["test_id"], overall_positive, current_user["id"])
@@ -695,7 +701,9 @@ def get_client_visits(client_id: int, conn: sqlite3.Connection = Depends(get_db)
     cur.execute("""
         SELECT 
             v.id as visit_id, v.ward_of_origin, v.lab_number, v.created_at,
-            cl.name as clinician_name
+            cl.name as clinician_name,
+            (SELECT COUNT(*) FROM test_orders o WHERE o.visit_id = v.id AND o.status = 'entered') as unverified_count,
+            (SELECT COUNT(*) FROM test_orders o WHERE o.visit_id = v.id AND o.status = 'completed') as completed_count
         FROM visits v
         LEFT JOIN clinicians cl ON v.clinician_id = cl.id
         WHERE v.client_id = ? AND v.is_deleted = 0
@@ -724,7 +732,7 @@ def get_visit_details(visit_id: int, conn: sqlite3.Connection = Depends(get_db),
     cur.execute("""
         SELECT 
             o.id as order_id, o.sample_id, o.ordered_at, o.status, o.order_category,
-            t.id as test_id, t.name as test_name, t.is_tracked, s.name as section_name,
+            t.id as test_id, t.name as test_name, t.is_tracked, t.ref_range, t.default_unit, t.secondary_unit, t.result_type, s.name as section_name,
             u.full_name as ordered_by_name
         FROM test_orders o
         JOIN tests t ON o.test_id = t.id
@@ -754,10 +762,10 @@ def get_visit_details(visit_id: int, conn: sqlite3.Connection = Depends(get_db),
 
 @router.delete("/api/visits/bulk")
 def bulk_delete_visits(req: BulkVisitDeleteRequest, conn: sqlite3.Connection = Depends(get_db), current_user: dict = Depends(get_current_user)):
-    if current_user["role"] not in ["admin", "superadmin"]:
-        raise HTTPException(status_code=403, detail="Only admins can delete visits")
-        
-    logger.info(f"Admin '{current_user['username']}' is bulk deleting visits: {req.visit_ids}")
+    if current_user.get("role") not in ["admin", "superadmin"]:
+        raise HTTPException(status_code=403, detail="Only admins can delete visits in bulk")
+
+    logger.info(f"User '{current_user['username']}' is bulk deleting visits: {req.visit_ids}")
     cur = conn.cursor()
     deleted_ids = []
     skipped_ids = []
@@ -789,16 +797,18 @@ def bulk_delete_visits(req: BulkVisitDeleteRequest, conn: sqlite3.Connection = D
 
 @router.delete("/api/visits/{visit_id}")
 def delete_visit(visit_id: int, conn: sqlite3.Connection = Depends(get_db), current_user: dict = Depends(get_current_user)):
-    if current_user["role"] not in ["admin", "superadmin"]:
-        raise HTTPException(status_code=403, detail="Only admins can delete visits")
-        
-    logger.info(f"Admin '{current_user['username']}' is deleting visit ID {visit_id}")
+    logger.info(f"User '{current_user['username']}' is deleting visit ID {visit_id}")
     cur = conn.cursor()
     
     cur.execute("SELECT id, is_deleted FROM visits WHERE id = ?", (visit_id,))
     visit_row = cur.fetchone()
     if not visit_row or visit_row["is_deleted"] == 1:
         raise HTTPException(status_code=404, detail="Visit not found")
+
+    cur.execute("SELECT COUNT(*) as result_count FROM test_orders WHERE visit_id = ? AND status IN ('entered', 'completed')", (visit_id,))
+    res_count = cur.fetchone()["result_count"]
+    if res_count > 0 and current_user.get("role") not in ["admin", "superadmin"]:
+        raise HTTPException(status_code=403, detail="Visits with saved test results can only be deleted by an Administrator.")
         
     # Find all test orders for this visit
     cur.execute("SELECT id FROM test_orders WHERE visit_id = ?", (visit_id,))
@@ -820,3 +830,59 @@ def delete_visit(visit_id: int, conn: sqlite3.Connection = Depends(get_db), curr
     
     conn.commit()
     return {"status": "deleted", "visit_id": visit_id}
+
+@router.post("/api/clients/orders/{order_id}/verify")
+@router.post("/api/orders/{order_id}/verify")
+def verify_order(
+    order_id: int,
+    conn: sqlite3.Connection = Depends(get_db),
+    admin_user: dict = Depends(require_admin)
+):
+    cur = conn.cursor()
+    cur.execute("SELECT id, visit_id, test_id FROM test_orders WHERE id = ?", (order_id,))
+    order = cur.fetchone()
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+        
+    now_str = datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%d %H:%M:%S")
+    cur.execute("UPDATE test_orders SET status = 'completed' WHERE id = ?", (order_id,))
+    cur.execute("UPDATE test_results SET verified_by_user_id = ?, verified_at = ? WHERE order_id = ?", (admin_user["id"], now_str, order_id))
+    cur.execute(
+        "INSERT INTO audit_log (user_id, action, detail, timestamp) VALUES (?, 'VERIFY_ORDER', ?, ?)",
+        (admin_user["id"], f"Verified order ID {order_id}", now_str)
+    )
+    conn.commit()
+    return {"status": "verified", "order_id": order_id, "verified_by": admin_user["username"]}
+
+@router.post("/api/clients/visits/{visit_id}/verify")
+@router.post("/api/visits/{visit_id}/verify")
+def verify_visit(
+    visit_id: int,
+    conn: sqlite3.Connection = Depends(get_db),
+    admin_user: dict = Depends(require_admin)
+):
+    cur = conn.cursor()
+    cur.execute("SELECT id FROM visits WHERE id = ? AND is_deleted = 0", (visit_id,))
+    visit = cur.fetchone()
+    if not visit:
+        raise HTTPException(status_code=404, detail="Visit not found")
+
+    cur.execute("SELECT id FROM test_orders WHERE visit_id = ?", (visit_id,))
+    orders = cur.fetchall()
+    if not orders:
+        raise HTTPException(status_code=404, detail="No test orders found for this visit")
+
+    now_str = datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%d %H:%M:%S")
+    order_ids = [o["id"] for o in orders]
+    placeholders = ",".join("?" for _ in order_ids)
+    
+    cur.execute(f"UPDATE test_orders SET status = 'completed' WHERE id IN ({placeholders})", order_ids)
+    cur.execute(f"UPDATE test_results SET verified_by_user_id = ?, verified_at = ? WHERE order_id IN ({placeholders})", [admin_user["id"], now_str] + order_ids)
+    
+    cur.execute(
+        "INSERT INTO audit_log (user_id, action, detail, timestamp) VALUES (?, 'VERIFY_VISIT', ?, ?)",
+        (admin_user["id"], f"Verified all test results for visit ID {visit_id}", now_str)
+    )
+    conn.commit()
+    return {"status": "verified", "visit_id": visit_id, "verified_count": len(order_ids)}
+
