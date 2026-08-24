@@ -118,55 +118,79 @@ def _build_signatures_table(order_data: dict, compact: bool = False) -> KeepToge
 
 
 def _build_urinalysis_table(urinalysis_test: dict) -> KeepTogether:
-    data = [["Urinalysis Parameters", "Result"]]
-    
-    result_str = str(urinalysis_test.get("result") or "")
-    
-    # Try parsing result_str as a multiline or comma separated if it's plain text
-    import json
-    params = []
-    try:
-        parsed = json.loads(result_str)
-        if isinstance(parsed, dict):
-            for k, v in parsed.items():
-                params.append([k, v])
-        else:
-            params.append(["Result", result_str])
-    except Exception:
-        # Fallback if not JSON
-        if "\n" in result_str:
-            lines = result_str.split("\n")
-            for line in lines:
-                if ":" in line:
-                    k, v = line.split(":", 1)
-                    params.append([k.strip(), v.strip()])
-                else:
-                    params.append(["", line.strip()])
-        elif "," in result_str and ":" in result_str:
-            parts = result_str.split(",")
-            for p in parts:
-                if ":" in p:
-                    k, v = p.split(":", 1)
-                    params.append([k.strip(), v.strip()])
-        else:
-            params.append(["Result", result_str])
-            
-    if not params:
-        params.append(["Result", result_str])
-        
-    data.extend(params)
-    
-    t = Table(data, colWidths=[240, 240]) # Full width = 480
+    items = []
+    if urinalysis_test.get("parameters"):
+        for p in urinalysis_test["parameters"]:
+            pname = p.get("name") or p.get("parameter_name") or ""
+            pres = p.get("result") if p.get("result") is not None else p.get("result_value", "")
+            items.append((str(pname), str(pres)))
+    else:
+        result_str = str(urinalysis_test.get("result") or "")
+        import json
+        try:
+            parsed = json.loads(result_str)
+            if isinstance(parsed, dict):
+                for k, v in parsed.items():
+                    items.append((str(k), str(v)))
+            elif isinstance(parsed, list):
+                for item in parsed:
+                    if isinstance(item, dict):
+                        items.append((str(item.get("name", "")), str(item.get("result", ""))))
+            else:
+                items.append(("Result", result_str))
+        except Exception:
+            if "\n" in result_str:
+                lines = result_str.split("\n")
+                for line in lines:
+                    if ":" in line:
+                        k, v = line.split(":", 1)
+                        items.append((k.strip(), v.strip()))
+                    else:
+                        items.append(("", line.strip()))
+            elif "," in result_str and ":" in result_str:
+                parts = result_str.split(",")
+                for p in parts:
+                    if ":" in p:
+                        k, v = p.split(":", 1)
+                        items.append((k.strip(), v.strip()))
+            else:
+                items.append(("Result", result_str))
+
+    if not items:
+        items = [("Result", str(urinalysis_test.get("result") or ""))]
+
+    n = len(items)
+    half = (n + 1) // 2
+    col1 = items[:half]
+    col2 = items[half:]
+
+    data = [
+        ["Urinalysis", "", "", ""],
+        ["Parameter", "Result", "Parameter", "Result"]
+    ]
+
+    for i in range(half):
+        p1, r1 = col1[i]
+        p2, r2 = col2[i] if i < len(col2) else ("", "")
+        data.append([p1, r1, p2, r2])
+
+    t = Table(data, colWidths=[145, 95, 145, 95])
     t.setStyle(TableStyle([
+        ('SPAN', (0,0), (3,0)),
         ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
         ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#f0f0f0')),
-        ('FONTNAME', (0,1), (-1,-1), 'Helvetica'),
+        ('FONTSIZE', (0,0), (-1,0), 8.5),
+        ('FONTNAME', (0,1), (-1,1), 'Helvetica-Bold'),
+        ('FONTSIZE', (0,1), (-1,1), 8),
+        ('LINEBELOW', (0,1), (-1,1), 0.8, colors.black),
+        ('FONTNAME', (0,2), (-1,-1), 'Helvetica'),
+        ('FONTSIZE', (0,2), (-1,-1), 7.5),
         ('ALIGN', (0,0), (-1,-1), 'LEFT'),
-        ('BOTTOMPADDING', (0,0), (-1,-1), 4),
-        ('TOPPADDING', (0,0), (-1,-1), 4),
-        ('GRID', (0,0), (-1,-1), 0.5, colors.lightgrey),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 2),
+        ('TOPPADDING', (0,0), (-1,-1), 2),
+        ('GRID', (0,1), (-1,-1), 0.3, colors.HexColor('#d0d0d0')),
     ]))
-    return KeepTogether([t, Spacer(1, 15)])
+    return KeepTogether([t, Spacer(1, 10)])
 
 def _build_cbc_patient_header(order_data: dict) -> Table:
     client_no = str(order_data.get("client_number") or order_data.get("client_id") or "")
@@ -401,13 +425,19 @@ from reportlab.platypus import PageBreak
 
 def generate_pdf(order_data: dict, results_data: list) -> bytes:
     buffer = io.BytesIO()
+    lab_no = order_data.get("lab_number") or order_data.get("client_number") or ""
+    client_name = order_data.get("full_name") or ""
     doc = SimpleDocTemplate(
         buffer, 
         pagesize=A4, 
         leftMargin=SAFE_MARGIN_X, 
         rightMargin=SAFE_MARGIN_X, 
         topMargin=145,
-        bottomMargin=65
+        bottomMargin=65,
+        title=f"Lab Report - {lab_no}",
+        author="Ahmadiyya Muslim Hospital, Mbale",
+        creator="AMH Lab Tracker",
+        subject=f"Clinical Diagnostic Report: {client_name} ({lab_no})"
     )
     
     title_style = ParagraphStyle(

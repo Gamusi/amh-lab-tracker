@@ -682,4 +682,53 @@ def test_urinalysis_parameter_results_save_and_pdf(mock_db):
     assert pdf_res.status_code == 200
     assert pdf_res.content.startswith(b'%PDF-')
 
+def test_pdf_report_includes_client_age(mock_db):
+    conn = mock_db["conn"]
+    cur = conn.cursor()
+    cur.execute("INSERT INTO clients (client_number, full_name, sex, date_of_birth, age_years) VALUES ('AMH-AGE-1', 'Grace Akello', 'Female', '2000-01-01', 26.0)")
+    cid = cur.lastrowid
+    cur.execute("INSERT INTO clinicians (name) VALUES ('Dr. Kato')")
+    clid = cur.lastrowid
+    cur.execute("INSERT INTO visits (client_id, clinician_id, ward_of_origin, lab_number) VALUES (?, ?, 'GOPD', 'AMH-26-8-099')", (cid, clid))
+    vid = cur.lastrowid
+    cur.execute("INSERT INTO test_orders (visit_id, test_id, status) VALUES (?, ?, 'completed')", (vid, mock_db["cbc_id"]))
+    oid = cur.lastrowid
+    cur.execute("INSERT INTO test_results (order_id, parameter_id, result_value) VALUES (?, ?, '13.5')", (oid, mock_db["hb_param_id"]))
+    conn.commit()
+
+    res = client.get(f"/api/reports/visit/{vid}/pdf")
+    assert res.status_code == 200
+    assert res.headers["content-type"] == "application/pdf"
+    assert res.content.startswith(b'%PDF-')
+
+    # Also test age_years fallback without date_of_birth
+    cur.execute("INSERT INTO clients (client_number, full_name, sex, age_years) VALUES ('AMH-AGE-2', 'Baby John', 'Male', 0.5)")
+    cid2 = cur.lastrowid
+    cur.execute("INSERT INTO visits (client_id, clinician_id, ward_of_origin, lab_number) VALUES (?, ?, 'Pediatric', 'AMH-26-8-100')", (cid2, clid))
+    vid2 = cur.lastrowid
+    cur.execute("INSERT INTO test_orders (visit_id, test_id, status) VALUES (?, ?, 'completed')", (vid2, mock_db["mps_id"]))
+    oid2 = cur.lastrowid
+    cur.execute("INSERT INTO test_results (order_id, result_value) VALUES (?, 'Negative')", (oid2,))
+    conn.commit()
+
+    res2 = client.get(f"/api/reports/visit/{vid2}/pdf")
+    assert res2.status_code == 200
+    assert res2.content.startswith(b'%PDF-')
+
+def test_pdf_report_content_disposition_header(mock_db):
+    conn = mock_db["conn"]
+    cur = conn.cursor()
+    cur.execute("INSERT INTO clients (client_number, full_name, sex) VALUES ('AMH-FIL-1', 'Mary Namaganda', 'Female')")
+    cid = cur.lastrowid
+    cur.execute("INSERT INTO visits (client_id, ward_of_origin, lab_number) VALUES (?, 'ANC', 'AMH-26-8-777')", (cid,))
+    vid = cur.lastrowid
+    cur.execute("INSERT INTO test_orders (visit_id, test_id, status) VALUES (?, ?, 'completed')", (vid, mock_db["mps_id"]))
+    oid = cur.lastrowid
+    cur.execute("INSERT INTO test_results (order_id, result_value) VALUES (?, 'Negative')", (oid,))
+    conn.commit()
+
+    res = client.get(f"/api/reports/visit/{vid}/pdf")
+    assert res.status_code == 200
+    assert 'filename="AMH-26-8-777.pdf"' in res.headers.get("content-disposition", "")
+
 

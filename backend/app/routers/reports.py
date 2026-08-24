@@ -227,6 +227,8 @@ def get_visit_report_pdf(visit_id: int, db: sqlite3.Connection = Depends(get_db)
             c.client_number,
             c.full_name,
             c.date_of_birth,
+            c.age_years,
+            c.age_category,
             c.sex,
             c.phone,
             cl.name AS clinician_name
@@ -356,7 +358,18 @@ def get_visit_report_pdf(visit_id: int, db: sqlite3.Connection = Depends(get_db)
     age_str = ""
     if dob:
         age_val = evaluator.calculate_age(dob, datetime.date.today())
-        age_str = str(age_val)
+        age_str = f"{age_val}y" if age_val > 0 else "<1y"
+    elif visit_row["age_years"] is not None:
+        ay = visit_row["age_years"]
+        if ay < 1.0:
+            months = int(round(ay * 12))
+            if months > 0:
+                age_str = f"{months}m"
+            else:
+                days = int(round(ay * 365))
+                age_str = f"{days}d" if days > 0 else "<1y"
+        else:
+            age_str = f"{int(ay)}y" if ay == int(ay) else f"{ay}y"
         
     clinician_name = visit_row["clinician_name"] or "SELF REQUEST"
 
@@ -378,7 +391,13 @@ def get_visit_report_pdf(visit_id: int, db: sqlite3.Connection = Depends(get_db)
 
     
     pdf_bytes = generate_pdf(order_data, results_data)
-    return Response(content=pdf_bytes, media_type="application/pdf")
+    lab_num = visit_row["lab_number"] or f"AMH_Visit_{visit_id}"
+    safe_filename = "".join(c for c in lab_num if c.isalnum() or c in ("-", "_", ".")) + ".pdf"
+
+    headers = {
+        "Content-Disposition": f'inline; filename="{safe_filename}"'
+    }
+    return Response(content=pdf_bytes, media_type="application/pdf", headers=headers)
 
 @router.get("/client/{client_id}/pdf")
 def get_client_report_pdf(client_id: int, db: sqlite3.Connection = Depends(get_db), current_user: dict = Depends(get_current_user)):

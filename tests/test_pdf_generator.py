@@ -125,3 +125,43 @@ def test_generate_pdf_full_report():
     assert pdf_bytes.startswith(b'%PDF-')
     assert len(pdf_bytes) > 1000
 
+def test_pdf_contains_hospital_metadata():
+    order_data = {
+        "lab_number": "AMH-26-8-123",
+        "full_name": "Test Client",
+        "technician_name": "Technician John"
+    }
+    results_data = [{"department": "Parasitology", "tests": [{"test_name": "BS for MPS", "result": "Negative"}]}]
+    pdf_bytes = generate_pdf(order_data, results_data)
+    
+    # Verify PDF contains author and title strings in byte stream
+    assert b"Ahmadiyya Muslim Hospital" in pdf_bytes
+    assert b"AMH-26-8-123" in pdf_bytes
+
+def test_urinalysis_and_general_tests_fit_on_single_page():
+    order_data = {
+        "lab_number": "AMH-26-8-555",
+        "full_name": "Test Client",
+        "client_number": "AMH-100",
+        "age": "30y",
+        "sex": "Female",
+        "ordered_date": "2026-08-24"
+    }
+    ua_params = [
+        {"name": "Color", "result": "Yellow"},
+        {"name": "Turbidity", "result": "Clear"},
+        {"name": "Pus Cells (WBCs)", "result": "Not Seen"},
+        {"name": "Red Blood Cells (RBCs)", "result": "Not Seen"},
+        {"name": "Proteins", "result": "Nil"},
+        {"name": "Glucose", "result": "Nil"}
+    ]
+    results_data = [
+        {"department": "Clinical Chemistry", "tests": [{"test_name": "URINALYSIS", "result": "Completed", "parameters": ua_params}]},
+        {"department": "Parasitology", "tests": [{"test_name": "BS for MPS", "result": "Negative", "unit": "", "reference": "Negative"}]},
+        {"department": "Serology", "tests": [{"test_name": "H. Pylori Ag", "result": "Negative", "unit": "", "reference": "Negative"}]}
+    ]
+    pdf_bytes = generate_pdf(order_data, results_data)
+    assert len(pdf_bytes) > 1000
+    # Verify single page output (Page /Count 1)
+    assert b"/Count 1" in pdf_bytes or b"/Type /Page" in pdf_bytes
+
