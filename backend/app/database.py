@@ -143,6 +143,7 @@ SCHEMA_SQL = """
         parameter_id INTEGER REFERENCES test_parameters(id),
         result_value TEXT,
         result_unit TEXT,
+        clinical_flag TEXT,
         is_positive BOOLEAN,
         entered_by_user_id INTEGER REFERENCES users(id),
         entered_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -151,6 +152,20 @@ SCHEMA_SQL = """
         edit_reason TEXT,
         edited_by_user_id INTEGER REFERENCES users(id),
         edited_at DATETIME
+    );
+
+    CREATE TABLE IF NOT EXISTS reference_ranges (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        test_id INTEGER REFERENCES tests(id),
+        parameter_name TEXT NOT NULL,
+        age_min INTEGER DEFAULT 0,
+        age_max INTEGER DEFAULT 999,
+        sex TEXT,
+        normal_min REAL,
+        normal_max REAL,
+        critical_min REAL,
+        critical_max REAL,
+        unit TEXT
     );
 """
 
@@ -191,6 +206,7 @@ def init_db():
         ("test_orders", "sample_id", "TEXT"),
         ("test_orders", "visit_id", "INTEGER REFERENCES visits(id)"),
         ("test_results", "parameter_id", "INTEGER REFERENCES test_parameters(id)"),
+        ("test_results", "clinical_flag", "TEXT"),
         ("users", "password_reset_required", "BOOLEAN NOT NULL DEFAULT 0"),
         ("users", "cadre", "TEXT"),
         ("test_orders", "order_category", "TEXT DEFAULT 'in-house'"),
@@ -265,20 +281,36 @@ def init_db():
         ("Crystals", None, "Not Seen", 7, '["Not Seen", "Calcium Oxalate (++)", "Triple Phosphate (++)", "Uric Acid Crystals"]'),
         ("Specific Gravity (S.G)", "Ratio", "1.005 - 1.030", 8, '["1.000", "1.005", "1.010", "1.015", "1.020", "1.025", "1.030"]'),
         ("PH", "pH", "5.0 - 8.5", 9, '["5.0", "6.0", "6.5", "7.0", "7.5", "8.0", "8.5"]'),
-        ("Proteins (Albuminuria Screening)", None, "Nil", 10, '["Nil", "Trace (15 mg/dL)", "1+ (30 mg/dL)", "2+ (100 mg/dL)", "3+ (300 mg/dL)", "4+ (\u22652000 mg/dL)"]'),
-        ("Glucose (Glucosuria Screening)", None, "Nil", 11, '["Nil", "Trace (100 mg/dL)", "1+ (250 mg/dL)", "2+ (500 mg/dL)", "3+ (1000 mg/dL)", "4+ (\u22652000 mg/dL)"]'),
-        ("Bilirubin (Bilirubinuria)", None, "Nil", 12, '["Nil", "Small (+)", "Moderate (++)", "Large (+++)"]'),
+        ("Proteins", None, "Nil", 10, '["Nil", "Trace (15 mg/dL)", "1+ (30 mg/dL)", "2+ (100 mg/dL)", "3+ (300 mg/dL)", "4+ (\u22652000 mg/dL)"]'),
+        ("Glucose", None, "Nil", 11, '["Nil", "Trace (100 mg/dL)", "1+ (250 mg/dL)", "2+ (500 mg/dL)", "3+ (1000 mg/dL)", "4+ (\u22652000 mg/dL)"]'),
+        ("Bilirubin", None, "Nil", 12, '["Nil", "Small (+)", "Moderate (++)", "Large (+++)"]'),
         ("Urobilinogen", None, "Normal", 13, '["Normal (1.0 EU/dL)", "2.0 EU/dL", "4.0 EU/dL", "8.0 EU/dL"]'),
-        ("Ketones (Ketonuria)", None, "Nil", 14, '["Nil", "Trace (5 mg/dL)", "1+ (15 mg/dL)", "2+ (40 mg/dL)", "3+ (80 mg/dL)", "4+ (160 mg/dL)"]'),
-        ("Blood (Hematuria/Hemoglobinuria)", None, "Nil", 15, '["Nil", "Non-Hemolyzed Trace", "Hemolyzed Trace", "1+ (Small)", "2+ (Moderate)", "3+ (Large)"]'),
-        ("Nitrates (Nitrite Screening)", None, "Negative", 16, '["Negative", "Positive"]'),
-        ("Leukocytes (Leukocyte Esterase)", None, "Nil", 17, '["Nil", "Trace", "1+ (Small)", "2+ (Moderate)", "3+ (Large)"]')
+        ("Ketones", None, "Nil", 14, '["Nil", "Trace (5 mg/dL)", "1+ (15 mg/dL)", "2+ (40 mg/dL)", "3+ (80 mg/dL)", "4+ (160 mg/dL)"]'),
+        ("Blood", None, "Nil", 15, '["Nil", "Non-Hemolyzed Trace", "Hemolyzed Trace", "1+ (Small)", "2+ (Moderate)", "3+ (Large)"]'),
+        ("Nitrate", None, "Negative", 16, '["Negative", "Positive"]'),
+        ("Leukocyte Esterase", None, "Nil", 17, '["Nil", "Trace", "1+ (Small)", "2+ (Moderate)", "3+ (Large)"]')
     ]
     cursor.execute("SELECT id FROM tests WHERE LOWER(name) = 'urinalysis'")
     for ua_row in cursor.fetchall():
         ua_id = ua_row[0]
         # Clean up any legacy parameters under urinalysis
         cursor.execute("DELETE FROM test_parameters WHERE test_id = ? AND parameter_name IN ('Macroscopy (Physical Profile)', 'Microscopy (Sediment Cytology)')", (ua_id,))
+        
+        # Rename old parameter names if present
+        RENAMES = [
+            ("Proteins (Albuminuria Screening)", "Proteins"),
+            ("Glucose (Glucosuria Screening)", "Glucose"),
+            ("Bilirubin (Bilirubinuria)", "Bilirubin"),
+            ("Ketones (Ketonuria)", "Ketones"),
+            ("Blood (Hematuria/Hemoglobinuria)", "Blood"),
+            ("Nitrates (Nitrite Screening)", "Nitrate"),
+            ("Nitrates", "Nitrate"),
+            ("Leukocytes (Leukocyte Esterase)", "Leukocyte Esterase"),
+            ("Leukocytes", "Leukocyte Esterase"),
+        ]
+        for old_n, new_n in RENAMES:
+            cursor.execute("UPDATE test_parameters SET parameter_name = ? WHERE test_id = ? AND parameter_name = ?", (new_n, ua_id, old_n))
+
         for pname, punit, pref, porder, popts in URINALYSIS_PARAMS:
             cursor.execute("SELECT id FROM test_parameters WHERE test_id = ? AND parameter_name = ?", (ua_id, pname))
             existing_p = cursor.fetchone()

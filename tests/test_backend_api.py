@@ -845,6 +845,75 @@ def test_admin_can_preview_unverified_pdf(mock_db):
     assert res.content.startswith(b'%PDF-')
 
 
+def test_evaluator_clinical_flags_and_critical_alerts():
+    from backend.app.evaluator import evaluate_result
+    import datetime
+
+    today = datetime.date(2026, 8, 24)
+    dob_adult_female = datetime.date(1995, 1, 1) # 31y Female
+
+    # Normal Hb (12.0 - 15.5)
+    r1 = evaluate_result("Hemoglobin (Hb)", "13.0", dob_adult_female, "Female", today)
+    assert r1["flag"] is None
+    assert not r1["is_abnormal"]
+
+    # Low Hb (e.g. 10.5 g/dL -> 'L')
+    r2 = evaluate_result("Hemoglobin (Hb)", "10.5", dob_adult_female, "Female", today)
+    assert r2["flag"] == "L"
+    assert r2["is_abnormal"]
+
+    # Critical Low / Severe Anemia Watch (< 8.0 g/dL -> 'L*')
+    r3 = evaluate_result("Hemoglobin (Hb)", "6.8", dob_adult_female, "Female", today)
+    assert r3["flag"] == "L*"
+    assert r3["is_abnormal"]
+
+    # High FBS (> 5.5 mmol/L -> 'H')
+    r4 = evaluate_result("Fasting Blood Sugar (FBS)", "7.8", dob_adult_female, "Female", today)
+    assert r4["flag"] == "H"
+
+    # Qualitative positive/reactive -> '\u26A0'
+    r5 = evaluate_result("Malaria RDT", "Positive", dob_adult_female, "Female", today)
+    assert r5["flag"] == "\u26A0"
+    assert r5["is_abnormal"]
+
+
+def test_admin_reference_range_crud(mock_db):
+    conn = mock_db["conn"]
+    app.dependency_overrides[get_current_user] = lambda: {"id": 1, "username": "admin1", "role": "admin"}
+
+    # Create new rule
+    payload = {
+        "parameter_name": "Serum Creatinine",
+        "age_min": 18,
+        "age_max": 999,
+        "sex": "Male",
+        "normal_min": 60.0,
+        "normal_max": 110.0,
+        "critical_min": 40.0,
+        "critical_max": 350.0,
+        "unit": "umol/L"
+    }
+    create_res = client.post("/api/config/reference-ranges", json=payload)
+    assert create_res.status_code == 200
+    rule_id = create_res.json()["id"]
+    assert create_res.json()["parameter_name"] == "Serum Creatinine"
+
+    # List rules
+    list_res = client.get("/api/config/reference-ranges")
+    assert list_res.status_code == 200
+    assert any(r["parameter_name"] == "Serum Creatinine" for r in list_res.json())
+
+    # Update rule
+    update_res = client.put(f"/api/config/reference-ranges/{rule_id}", json={"normal_max": 115.0})
+    assert update_res.status_code == 200
+    assert update_res.json()["normal_max"] == 115.0
+
+    # Delete rule
+    del_res = client.delete(f"/api/config/reference-ranges/{rule_id}")
+    assert del_res.status_code == 200
+    assert del_res.json()["status"] == "deleted"
+
+
 
 
 

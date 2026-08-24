@@ -515,7 +515,9 @@ const app = {
   confirmAction: function(title, message, callback) {
     const modal = document.getElementById('confirm-modal');
     if (!modal) {
-      if (confirm(message)) callback();
+      if (confirm(message)) {
+        if (typeof callback === 'function') callback.call(app);
+      }
       return;
     }
     document.getElementById('confirm-title').textContent = title;
@@ -536,7 +538,7 @@ const app = {
     
     newOk.addEventListener('click', () => {
       modal.style.display = 'none';
-      callback();
+      if (typeof callback === 'function') callback.call(app);
     });
     
     modal.style.display = 'flex';
@@ -1420,17 +1422,17 @@ const app = {
           });
           if (res.ok) {
             const data = yield res.json();
-            this.showNotificationModal("Success", `Removed ${data.deleted_order_ids.length} test order(s).`, false);
-            if (this.currentClientId) {
-              yield this.loadPendingTests(this.currentClientId);
+            app.showNotificationModal("Success", `Removed ${data.deleted_order_ids.length} test order(s).`, false);
+            if (app.currentClientId) {
+              yield app.loadPendingTests(app.currentClientId);
             }
           } else {
             const err = yield res.json();
-            this.showNotificationModal("Error", err.detail || "Failed to remove test orders.", true);
+            app.showNotificationModal("Error", err.detail || "Failed to remove test orders.", true);
           }
         } catch(e) {
           console.error(e);
-          this.showNotificationModal("Error", "Server error.", true);
+          app.showNotificationModal("Error", "Server error.", true);
         }
       })
     );
@@ -1559,18 +1561,18 @@ const app = {
           if (res.ok) {
             const data = yield res.json();
             const deleted = data.deleted_visit_ids || [];
-            this.showNotificationModal("Success", `Successfully deleted ${deleted.length} visit(s).`, false);
-            if (this.currentClientId) {
-              yield this.loadHistoricalVisits(this.currentClientId);
-              yield this.loadPendingTests(this.currentClientId);
+            app.showNotificationModal("Success", `Successfully deleted ${deleted.length} visit(s).`, false);
+            if (app.currentClientId) {
+              yield app.loadHistoricalVisits(app.currentClientId);
+              yield app.loadPendingTests(app.currentClientId);
             }
           } else {
             const err = yield res.json();
-            this.showNotificationModal("Error", err.detail || "Failed to delete selected visits.", true);
+            app.showNotificationModal("Error", err.detail || "Failed to delete selected visits.", true);
           }
         } catch(e) {
           console.error(e);
-          this.showNotificationModal("Error", "Server error.", true);
+          app.showNotificationModal("Error", "Server error.", true);
         }
       })
     );
@@ -1584,18 +1586,18 @@ const app = {
         try {
           const res = yield fetch(`/api/visits/${visitId}`, { method: 'DELETE' });
           if (res.ok) {
-            this.showNotificationModal("Success", "Visit deleted successfully.", false);
-            if (this.currentClientId) {
-              yield this.loadHistoricalVisits(this.currentClientId);
-              yield this.loadPendingTests(this.currentClientId);
+            app.showNotificationModal("Success", "Visit deleted successfully.", false);
+            if (app.currentClientId) {
+              yield app.loadHistoricalVisits(app.currentClientId);
+              yield app.loadPendingTests(app.currentClientId);
             }
           } else {
             const err = yield res.json();
-            this.showNotificationModal("Error", err.detail || "Failed to delete visit.", true);
+            app.showNotificationModal("Error", err.detail || "Failed to delete visit.", true);
           }
         } catch(e) {
           console.error(e);
-          this.showNotificationModal("Error", "Server error.", true);
+          app.showNotificationModal("Error", "Server error.", true);
         }
       })
     );
@@ -1800,14 +1802,33 @@ const app = {
           oHtml += '<thead><tr style="border-bottom:2px solid #e2e8f0; color:var(--text-muted); text-align:left; background:#f8fafc;"><th style="padding:8px 10px;">Test Name</th><th style="padding:8px 10px;">Section</th><th style="padding:8px 10px;">Ref. Range</th><th style="padding:8px 10px;">Result Value</th><th style="padding:8px 10px;">Technician / Time</th><th style="padding:8px 10px;">Status</th><th style="padding:8px 10px; text-align:right;">Actions</th></tr></thead><tbody>';
           data.orders.forEach(o => {
             const hasResult = o.results && o.results.length > 0;
-            let resVal = '<span style="color:var(--text-muted); font-style:italic;">Pending Entry</span>';
             if (hasResult) {
               if (o.results.length > 1) {
-                resVal = '<div style="display:flex; flex-direction:column; gap:2px; font-size:0.82rem;">' + o.results.map(r => `<div><strong>${this.escape(r.parameter_name || 'Param')}:</strong> ${this.escape(r.result_value || '—')} ${r.result_unit ? this.escape(r.result_unit) : ''}</div>`).join('') + '</div>';
+                resVal = '<div style="display:flex; flex-direction:column; gap:2px; font-size:0.82rem;">' + o.results.map(r => {
+                  let flagBadge = '';
+                  if (r.clinical_flag) {
+                    const isCrit = r.clinical_flag.indexOf('*') !== -1;
+                    const flagColor = isCrit ? '#dc2626' : (r.clinical_flag === 'L' || r.clinical_flag === 'H' ? '#ea580c' : '#dc2626');
+                    const flagText = r.clinical_flag === '\u26A0' ? '\u26A0' : `[${r.clinical_flag}]`;
+                    flagBadge = ` <span style="font-weight:700; color:${flagColor};">${this.escape(flagText)}</span>`;
+                  } else if (r.is_positive) {
+                    flagBadge = ' <span style="font-weight:700; color:#dc2626;">\u26A0</span>';
+                  }
+                  return `<div><strong>${this.escape(r.parameter_name || 'Param')}:</strong> ${this.escape(r.result_value || '—')} ${r.result_unit ? this.escape(r.result_unit) : ''}${flagBadge}</div>`;
+                }).join('') + '</div>';
               } else {
                 const r = o.results[0];
                 const unitStr = r.result_unit ? ` ${this.escape(r.result_unit)}` : '';
-                resVal = `<strong>${this.escape(r.result_value || 'Completed')}</strong>${unitStr}`;
+                let flagBadge = '';
+                if (r.clinical_flag) {
+                  const isCrit = r.clinical_flag.indexOf('*') !== -1;
+                  const flagColor = isCrit ? '#dc2626' : (r.clinical_flag === 'L' || r.clinical_flag === 'H' ? '#ea580c' : '#dc2626');
+                  const flagText = r.clinical_flag === '\u26A0' ? '\u26A0' : `[${r.clinical_flag}]`;
+                  flagBadge = ` <span style="font-weight:700; color:${flagColor};">${this.escape(flagText)}</span>`;
+                } else if (r.is_positive) {
+                  flagBadge = ' <span style="font-weight:700; color:#dc2626;">\u26A0</span>';
+                }
+                resVal = `<strong>${this.escape(r.result_value || 'Completed')}</strong>${unitStr}${flagBadge}`;
               }
             }
             const refRangeText = this.escape(o.ref_range || (o.results && o.results[0] && o.results[0].ref_range) || '—');
@@ -2600,6 +2621,18 @@ const app = {
 
       <details class="card" style="margin-bottom: 16px;">
         <summary class="card-header" style="cursor: pointer; list-style: none;">
+          <span class="card-title">${this.icon('sliders')} Reference Intervals & Clinical Flags Configuration</span>
+        </summary>
+        <div style="padding: 16px;">
+          <button class="btn btn-primary" onclick="app.showAddReferenceRangeModal()" style="margin-bottom: 12px;">${this.icon('plus')} Add Reference Range Rule</button>
+          <div id="reference-ranges-table-container">
+            <p style="color: var(--text-muted);">Loading reference intervals...</p>
+          </div>
+        </div>
+      </details>
+
+      <details class="card" style="margin-bottom: 16px;">
+        <summary class="card-header" style="cursor: pointer; list-style: none;">
           <span class="card-title">${this.icon('building')} Wards Configuration</span>
         </summary>
         <div style="padding: 16px;">
@@ -2643,6 +2676,7 @@ const app = {
       ` : ''}
     `;
     yield this.loadConfigData();
+    yield this.loadReferenceRangesConfig();
     yield this.loadWardsConfig();
     yield this.loadCliniciansConfig();
   }),
@@ -2799,6 +2833,171 @@ const app = {
       }
     } catch(e) { console.error(e); }
   }),
+
+  loadReferenceRangesConfig: __async(function*() {
+    try {
+      const res = yield fetch('/api/config/reference-ranges');
+      if (!res.ok) throw new Error('API returned ' + res.status);
+      const ranges = yield res.json();
+      this.referenceRangesList = ranges;
+      let rows = '';
+      ranges.forEach(r => {
+        const normStr = (r.normal_min !== null && r.normal_max !== null) ? `${r.normal_min} - ${r.normal_max}` : (r.normal_min !== null ? `>= ${r.normal_min}` : (r.normal_max !== null ? `<= ${r.normal_max}` : '—'));
+        const critMinStr = r.critical_min !== null ? `< ${r.critical_min}` : '';
+        const critMaxStr = r.critical_max !== null ? `> ${r.critical_max}` : '';
+        const critCombined = (critMinStr || critMaxStr) ? `${critMinStr} ${critMaxStr}`.trim() : '—';
+        const critStr = (critCombined !== '—') ? `<span style="color:#dc2626; font-weight:600;">${this.escape(critCombined)}</span>` : '—';
+        const ageStr = (r.age_min === 0 && r.age_max >= 900) ? 'All Ages' : `${r.age_min} - ${r.age_max}y`;
+        const sexStr = r.sex ? r.sex : 'Any';
+        rows += `
+          <tr>
+            <td><strong>${this.escape(r.parameter_name)}</strong></td>
+            <td>${this.escape(ageStr)}</td>
+            <td>${this.escape(sexStr)}</td>
+            <td>${normStr}</td>
+            <td>${critStr}</td>
+            <td>${this.escape(r.unit || '—')}</td>
+            <td style="text-align: right; white-space: nowrap;">
+              <button class="btn btn-secondary btn-sm" onclick="app.showEditReferenceRangeModal(${r.id})" style="padding: 3px 8px; font-size: 0.78rem;">Edit</button>
+              <button class="btn btn-danger btn-sm" onclick="app.deleteReferenceRange(${r.id}, '${this.escape(r.parameter_name)}')" style="padding: 3px 8px; font-size: 0.78rem;">Delete</button>
+            </td>
+          </tr>
+        `;
+      });
+      const container = document.getElementById('reference-ranges-table-container');
+      if (container) {
+        container.innerHTML = `
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Parameter / Test</th>
+                <th>Age</th>
+                <th>Sex</th>
+                <th>Normal Interval</th>
+                <th>Critical Alert</th>
+                <th>Unit</th>
+                <th style="text-align: right;">Actions</th>
+              </tr>
+            </thead>
+            <tbody>${rows || '<tr><td colspan="7" style="text-align:center; color:var(--text-muted);">No reference intervals configured.</td></tr>'}</tbody>
+          </table>
+        `;
+      }
+    } catch(e) {
+      console.error(e);
+      const container = document.getElementById('reference-ranges-table-container');
+      if (container) container.innerHTML = '<p style="color:var(--danger-color);">Failed to load reference intervals.</p>';
+    }
+  }),
+
+  showAddReferenceRangeModal: function() {
+    document.getElementById('reference-range-modal-title').textContent = 'Add Reference Range Rule';
+    document.getElementById('ref-range-modal-id').value = '';
+    document.getElementById('ref-range-modal-param').value = '';
+    document.getElementById('ref-range-modal-age-min').value = '0';
+    document.getElementById('ref-range-modal-age-max').value = '999';
+    document.getElementById('ref-range-modal-sex').value = '';
+    document.getElementById('ref-range-modal-norm-min').value = '';
+    document.getElementById('ref-range-modal-norm-max').value = '';
+    document.getElementById('ref-range-modal-crit-min').value = '';
+    document.getElementById('ref-range-modal-crit-max').value = '';
+    document.getElementById('ref-range-modal-unit').value = '';
+    document.getElementById('reference-range-modal').style.display = 'flex';
+  },
+
+  showEditReferenceRangeModal: function(id) {
+    const r = (this.referenceRangesList || []).find(item => item.id === id);
+    if (!r) return;
+    document.getElementById('reference-range-modal-title').textContent = 'Edit Reference Range Rule';
+    document.getElementById('ref-range-modal-id').value = r.id;
+    document.getElementById('ref-range-modal-param').value = r.parameter_name || '';
+    document.getElementById('ref-range-modal-age-min').value = r.age_min !== null ? r.age_min : 0;
+    document.getElementById('ref-range-modal-age-max').value = r.age_max !== null ? r.age_max : 999;
+    document.getElementById('ref-range-modal-sex').value = r.sex || '';
+    document.getElementById('ref-range-modal-norm-min').value = r.normal_min !== null ? r.normal_min : '';
+    document.getElementById('ref-range-modal-norm-max').value = r.normal_max !== null ? r.normal_max : '';
+    document.getElementById('ref-range-modal-crit-min').value = r.critical_min !== null ? r.critical_min : '';
+    document.getElementById('ref-range-modal-crit-max').value = r.critical_max !== null ? r.critical_max : '';
+    document.getElementById('ref-range-modal-unit').value = r.unit || '';
+    document.getElementById('reference-range-modal').style.display = 'flex';
+  },
+
+  submitReferenceRangeModal: __async(function*(event) {
+    event.preventDefault();
+    const id = document.getElementById('ref-range-modal-id').value;
+    const param = document.getElementById('ref-range-modal-param').value.trim();
+    const ageMin = document.getElementById('ref-range-modal-age-min').value;
+    const ageMax = document.getElementById('ref-range-modal-age-max').value;
+    const sex = document.getElementById('ref-range-modal-sex').value || null;
+    const normMin = document.getElementById('ref-range-modal-norm-min').value;
+    const normMax = document.getElementById('ref-range-modal-norm-max').value;
+    const critMin = document.getElementById('ref-range-modal-crit-min').value;
+    const critMax = document.getElementById('ref-range-modal-crit-max').value;
+    const unit = document.getElementById('ref-range-modal-unit').value.trim() || null;
+
+    const payload = {
+      parameter_name: param,
+      age_min: ageMin !== '' ? parseInt(ageMin, 10) : 0,
+      age_max: ageMax !== '' ? parseInt(ageMax, 10) : 999,
+      sex: sex,
+      normal_min: normMin !== '' ? parseFloat(normMin) : null,
+      normal_max: normMax !== '' ? parseFloat(normMax) : null,
+      critical_min: critMin !== '' ? parseFloat(critMin) : null,
+      critical_max: critMax !== '' ? parseFloat(critMax) : null,
+      unit: unit
+    };
+
+    try {
+      let res;
+      if (id) {
+        res = yield fetch(`/api/config/reference-ranges/${id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+      } else {
+        res = yield fetch('/api/config/reference-ranges', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+      }
+
+      if (res.ok) {
+        document.getElementById('reference-range-modal').style.display = 'none';
+        app.loadReferenceRangesConfig();
+      } else {
+        const err = yield res.json();
+        app.showNotificationModal("Error", err.detail || "Failed to save reference range rule.", true);
+      }
+    } catch(e) {
+      console.error(e);
+      app.showNotificationModal("Error", "Network error saving reference range rule.", true);
+    }
+  }),
+
+  deleteReferenceRange: function(id, paramName) {
+    this.confirmAction(
+      "Delete Reference Range Rule",
+      `Are you sure you want to delete the reference interval rule for "${paramName}"?`,
+      () => {
+        __async(function*() {
+          try {
+            const res = yield fetch(`/api/config/reference-ranges/${id}`, { method: 'DELETE' });
+            if (res.ok) {
+              app.loadReferenceRangesConfig();
+            } else {
+              const err = yield res.json();
+              app.showNotificationModal("Error", err.detail || "Failed to delete reference range rule.", true);
+            }
+          } catch(e) {
+            console.error(e);
+            app.showNotificationModal("Error", "Network error deleting rule.", true);
+          }
+        })();
+      }
+    );
+  },
 
   loadConfigData: __async(function*() {
     try {

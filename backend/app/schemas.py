@@ -200,6 +200,39 @@ class BulkOrderDeleteRequest(BaseModel):
 class BulkVisitDeleteRequest(BaseModel):
     visit_ids: List[int]
 
+class ReferenceRangeBase(BaseModel):
+    test_id: Optional[int] = None
+    parameter_name: str
+    age_min: Optional[int] = 0
+    age_max: Optional[int] = 999
+    sex: Optional[str] = None
+    normal_min: Optional[float] = None
+    normal_max: Optional[float] = None
+    critical_min: Optional[float] = None
+    critical_max: Optional[float] = None
+    unit: Optional[str] = None
+
+class ReferenceRangeCreate(ReferenceRangeBase):
+    pass
+
+class ReferenceRangeUpdate(BaseModel):
+    test_id: Optional[int] = None
+    parameter_name: Optional[str] = None
+    age_min: Optional[int] = None
+    age_max: Optional[int] = None
+    sex: Optional[str] = None
+    normal_min: Optional[float] = None
+    normal_max: Optional[float] = None
+    critical_min: Optional[float] = None
+    critical_max: Optional[float] = None
+    unit: Optional[str] = None
+
+class ReferenceRangeResponse(ReferenceRangeBase):
+    id: int
+
+    class Config:
+        from_attributes = True
+
 
 
 

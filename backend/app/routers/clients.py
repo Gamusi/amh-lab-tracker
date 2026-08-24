@@ -478,13 +478,16 @@ def enter_result(req: TestResultCreate, conn: sqlite3.Connection = Depends(get_d
                 t_row = cur.fetchone()
                 param_name = t_row["name"] if t_row else ""
 
-            eval_dict = evaluate_result(param_name, pr.result_value, dob, sex, today)
+            eval_dict = evaluate_result(param_name, pr.result_value, dob, sex, today, db=cur)
+            clinical_flag = eval_dict.get("flag")
             pr_is_positive = eval_dict.get("is_abnormal", False)
 
             if pr.result_value:
                 pr_val_lower = pr.result_value.strip().lower()
                 if pr_val_lower in ["positive", "abnormal", "reactive"] or pr_val_lower.startswith("positive") or pr_val_lower.startswith("reactive"):
                     pr_is_positive = True
+                    if not clinical_flag:
+                        clinical_flag = "\u26A0"
 
             if pr_is_positive:
                 overall_positive = True
@@ -504,22 +507,25 @@ def enter_result(req: TestResultCreate, conn: sqlite3.Connection = Depends(get_d
 
                 cur.execute("""
                     UPDATE test_results
-                    SET result_value = ?, is_positive = ?, result_unit = ?, edit_reason = ?, edited_by_user_id = ?, edited_at = ?, verified_by_user_id = ?, verified_at = ?
+                    SET result_value = ?, is_positive = ?, result_unit = ?, clinical_flag = ?, edit_reason = ?, edited_by_user_id = ?, edited_at = ?, verified_by_user_id = ?, verified_at = ?
                     WHERE id = ?
-                """, (pr.result_value, pr_is_positive, req.result_unit, req.edit_reason, current_user["id"], now_str, verified_by, verified_time, res_row["id"]))
+                """, (pr.result_value, pr_is_positive, req.result_unit, clinical_flag, req.edit_reason, current_user["id"], now_str, verified_by, verified_time, res_row["id"]))
             else:
                 cur.execute("""
-                    INSERT INTO test_results (order_id, parameter_id, result_value, result_unit, is_positive, entered_by_user_id, entered_at, verified_by_user_id, verified_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """, (req.order_id, pr.parameter_id, pr.result_value, req.result_unit, pr_is_positive, current_user["id"], now_str, verified_by, verified_time))
+                    INSERT INTO test_results (order_id, parameter_id, result_value, result_unit, clinical_flag, is_positive, entered_by_user_id, entered_at, verified_by_user_id, verified_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (req.order_id, pr.parameter_id, pr.result_value, req.result_unit, clinical_flag, pr_is_positive, current_user["id"], now_str, verified_by, verified_time))
     else:
-        eval_dict = evaluate_result(test_name, req.result_value, dob, sex, today)
+        eval_dict = evaluate_result(test_name, req.result_value, dob, sex, today, db=cur)
+        clinical_flag = eval_dict.get("flag")
         is_positive = eval_dict.get("is_abnormal", False)
 
         if req.result_value:
             val_lower = req.result_value.strip().lower()
             if val_lower in ["positive", "abnormal", "reactive"] or val_lower.startswith("positive") or val_lower.startswith("reactive"):
                 is_positive = True
+                if not clinical_flag:
+                    clinical_flag = "\u26A0"
 
         overall_positive = is_positive
 
@@ -538,14 +544,14 @@ def enter_result(req: TestResultCreate, conn: sqlite3.Connection = Depends(get_d
 
             cur.execute("""
                 UPDATE test_results
-                SET result_value = ?, is_positive = ?, result_unit = ?, edit_reason = ?, edited_by_user_id = ?, edited_at = ?, verified_by_user_id = ?, verified_at = ?
+                SET result_value = ?, is_positive = ?, result_unit = ?, clinical_flag = ?, edit_reason = ?, edited_by_user_id = ?, edited_at = ?, verified_by_user_id = ?, verified_at = ?
                 WHERE id = ?
-            """, (req.result_value, is_positive, req.result_unit, req.edit_reason, current_user["id"], now_str, verified_by, verified_time, res_row["id"]))
+            """, (req.result_value, is_positive, req.result_unit, clinical_flag, req.edit_reason, current_user["id"], now_str, verified_by, verified_time, res_row["id"]))
         else:
             cur.execute("""
-                INSERT INTO test_results (order_id, parameter_id, result_value, result_unit, is_positive, entered_by_user_id, entered_at, verified_by_user_id, verified_at)
-                VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?)
-            """, (req.order_id, req.result_value, req.result_unit, is_positive, current_user["id"], now_str, verified_by, verified_time))
+                INSERT INTO test_results (order_id, parameter_id, result_value, result_unit, clinical_flag, is_positive, entered_by_user_id, entered_at, verified_by_user_id, verified_at)
+                VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (req.order_id, req.result_value, req.result_unit, clinical_flag, is_positive, current_user["id"], now_str, verified_by, verified_time))
 
     cur.execute("UPDATE test_orders SET status = ? WHERE id = ?", (order_status, req.order_id))
 
@@ -650,7 +656,7 @@ def get_printable_client_report(order_id: int, conn: sqlite3.Connection = Depend
         raise HTTPException(status_code=404, detail="Client report order not found")
 
     cur.execute("""
-        SELECT r.id, r.parameter_id, tp.parameter_name, tp.unit, tp.ref_range, r.result_value, r.is_positive
+        SELECT r.id, r.parameter_id, tp.parameter_name, tp.unit, tp.ref_range, r.result_value, r.result_unit, r.clinical_flag, r.is_positive
         FROM test_results r
         LEFT JOIN test_parameters tp ON r.parameter_id = tp.id
         WHERE r.order_id = ?
@@ -685,7 +691,7 @@ def get_client_orders(client_id: int, conn: sqlite3.Connection = Depends(get_db)
     
     for o in orders:
         cur.execute("""
-            SELECT r.id, r.parameter_id, tp.parameter_name, tp.unit, tp.ref_range, r.result_value, r.is_positive
+            SELECT r.id, r.parameter_id, tp.parameter_name, tp.unit, tp.ref_range, r.result_value, r.result_unit, r.clinical_flag, r.is_positive
             FROM test_results r
             LEFT JOIN test_parameters tp ON r.parameter_id = tp.id
             WHERE r.order_id = ?
@@ -745,7 +751,7 @@ def get_visit_details(visit_id: int, conn: sqlite3.Connection = Depends(get_db),
 
     for o in orders:
         cur.execute("""
-            SELECT r.id, r.parameter_id, tp.parameter_name, tp.unit, tp.ref_range, r.result_value, r.result_unit, r.is_positive,
+            SELECT r.id, r.parameter_id, tp.parameter_name, tp.unit, tp.ref_range, r.result_value, r.result_unit, r.clinical_flag, r.is_positive,
                    r.entered_at, r.verified_at, r.edit_reason, r.edited_at, u1.full_name as entered_by_name, u2.full_name as verified_by_name
             FROM test_results r
             LEFT JOIN test_parameters tp ON r.parameter_id = tp.id

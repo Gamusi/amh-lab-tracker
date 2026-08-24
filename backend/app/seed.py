@@ -107,14 +107,14 @@ TESTS = [
     # --- URINALYSIS: Dry Chemistry Dipstick — Siemens Multistix (sort_order 8-17) ---
     {'name': 'Specific Gravity (S.G)', 'section': 'Urinalysis Profile', 'is_tracked': 0, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['1.000', '1.005', '1.010', '1.015', '1.020', '1.025', '1.030'], 'parent_name': 'URINALYSIS', 'sort_order': 8},
     {'name': 'PH', 'section': 'Urinalysis Profile', 'is_tracked': 0, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['5.0', '6.0', '6.5', '7.0', '7.5', '8.0', '8.5'], 'parent_name': 'URINALYSIS', 'sort_order': 9},
-    {'name': 'Proteins (Albuminuria Screening)', 'section': 'Urinalysis Profile', 'is_tracked': 0, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['Nil', 'Trace (15 mg/dL)', '1+ (30 mg/dL)', '2+ (100 mg/dL)', '3+ (300 mg/dL)', '4+ (\u22652000 mg/dL)'], 'parent_name': 'URINALYSIS', 'sort_order': 10},
-    {'name': 'Glucose (Glucosuria Screening)', 'section': 'Urinalysis Profile', 'is_tracked': 0, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['Nil', 'Trace (100 mg/dL)', '1+ (250 mg/dL)', '2+ (500 mg/dL)', '3+ (1000 mg/dL)', '4+ (\u22652000 mg/dL)'], 'parent_name': 'URINALYSIS', 'sort_order': 11},
-    {'name': 'Bilirubin (Bilirubinuria)', 'section': 'Urinalysis Profile', 'is_tracked': 0, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['Nil', 'Small (+)', 'Moderate (++)', 'Large (+++)'], 'parent_name': 'URINALYSIS', 'sort_order': 12},
+    {'name': 'Proteins', 'section': 'Urinalysis Profile', 'is_tracked': 0, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['Nil', 'Trace (15 mg/dL)', '1+ (30 mg/dL)', '2+ (100 mg/dL)', '3+ (300 mg/dL)', '4+ (\u22652000 mg/dL)'], 'parent_name': 'URINALYSIS', 'sort_order': 10},
+    {'name': 'Glucose', 'section': 'Urinalysis Profile', 'is_tracked': 0, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['Nil', 'Trace (100 mg/dL)', '1+ (250 mg/dL)', '2+ (500 mg/dL)', '3+ (1000 mg/dL)', '4+ (\u22652000 mg/dL)'], 'parent_name': 'URINALYSIS', 'sort_order': 11},
+    {'name': 'Bilirubin', 'section': 'Urinalysis Profile', 'is_tracked': 0, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['Nil', 'Small (+)', 'Moderate (++)', 'Large (+++)'], 'parent_name': 'URINALYSIS', 'sort_order': 12},
     {'name': 'Urobilinogen', 'section': 'Urinalysis Profile', 'is_tracked': 0, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['Normal (1.0 EU/dL)', '2.0 EU/dL', '4.0 EU/dL', '8.0 EU/dL'], 'parent_name': 'URINALYSIS', 'sort_order': 13},
-    {'name': 'Ketones (Ketonuria)', 'section': 'Urinalysis Profile', 'is_tracked': 0, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['Nil', 'Trace (5 mg/dL)', '1+ (15 mg/dL)', '2+ (40 mg/dL)', '3+ (80 mg/dL)', '4+ (160 mg/dL)'], 'parent_name': 'URINALYSIS', 'sort_order': 14},
-    {'name': 'Blood (Hematuria/Hemoglobinuria)', 'section': 'Urinalysis Profile', 'is_tracked': 0, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['Nil', 'Non-Hemolyzed Trace', 'Hemolyzed Trace', '1+ (Small)', '2+ (Moderate)', '3+ (Large)'], 'parent_name': 'URINALYSIS', 'sort_order': 15},
-    {'name': 'Nitrates (Nitrite Screening)', 'section': 'Urinalysis Profile', 'is_tracked': 0, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['Negative', 'Positive'], 'parent_name': 'URINALYSIS', 'sort_order': 16},
-    {'name': 'Leukocytes (Leukocyte Esterase)', 'section': 'Urinalysis Profile', 'is_tracked': 0, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['Nil', 'Trace', '1+ (Small)', '2+ (Moderate)', '3+ (Large)'], 'parent_name': 'URINALYSIS', 'sort_order': 17},
+    {'name': 'Ketones', 'section': 'Urinalysis Profile', 'is_tracked': 0, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['Nil', 'Trace (5 mg/dL)', '1+ (15 mg/dL)', '2+ (40 mg/dL)', '3+ (80 mg/dL)', '4+ (160 mg/dL)'], 'parent_name': 'URINALYSIS', 'sort_order': 14},
+    {'name': 'Blood', 'section': 'Urinalysis Profile', 'is_tracked': 0, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['Nil', 'Non-Hemolyzed Trace', 'Hemolyzed Trace', '1+ (Small)', '2+ (Moderate)', '3+ (Large)'], 'parent_name': 'URINALYSIS', 'sort_order': 15},
+    {'name': 'Nitrate', 'section': 'Urinalysis Profile', 'is_tracked': 0, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['Negative', 'Positive'], 'parent_name': 'URINALYSIS', 'sort_order': 16},
+    {'name': 'Leukocyte Esterase', 'section': 'Urinalysis Profile', 'is_tracked': 0, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['Nil', 'Trace', '1+ (Small)', '2+ (Moderate)', '3+ (Large)'], 'parent_name': 'URINALYSIS', 'sort_order': 17},
     {'name': 'Stool Analysis (Macroscopy)', 'section': 'Parasitology & Stool Diagnostics', 'is_tracked': 0, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['Formed, No blood/mucus', 'Semi-formed, No blood/mucus', 'Loose', 'Watery', 'Blood present', 'Mucus present', 'Blood and mucus present'], 'parent_name': 'STOOL ANALYSIS', 'sort_order': 1},
     {'name': 'Stool Analysis (Microscopy)', 'section': 'Parasitology & Stool Diagnostics', 'is_tracked': 0, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['No ova, cysts, or trophozoites seen', 'E. histolytica cysts seen', 'E. histolytica trophozoites seen', 'G. lamblia cysts seen', 'G. lamblia trophozoites seen', 'Hookworm ova seen', 'Ascaris lumbricoides ova seen', 'Schistosoma mansoni ova seen', 'Trichuris trichiura ova seen'], 'parent_name': 'STOOL ANALYSIS', 'sort_order': 2},
     {'name': 'Stool Occult Blood', 'section': 'Parasitology & Stool Diagnostics', 'is_tracked': 0, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['Negative', 'Positive'], 'parent_name': 'STOOL ANALYSIS', 'sort_order': 3},
@@ -122,6 +122,93 @@ TESTS = [
     {'name': 'Stat-Pak', 'section': 'Serology & Clinical Immunology', 'is_tracked': 0, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['Non-Reactive', 'Reactive'], 'parent_name': 'HIV Testing Service', 'sort_order': 2},
     {'name': 'SD Bioline', 'section': 'Serology & Clinical Immunology', 'is_tracked': 0, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['Non-Reactive', 'Reactive'], 'parent_name': 'HIV Testing Service', 'sort_order': 3}
 ]
+
+
+DEFAULT_REFERENCE_RANGES = [
+    # CBC / Hematology
+    ("Total WBC Count (White Blood Cells)", 0, 11, None, 6.0, 14.0, 2.0, 30.0, "10³/µL"),
+    ("Total WBC Count (White Blood Cells)", 12, 999, None, 4.0, 10.0, 2.0, 30.0, "10³/µL"),
+    ("WBC", 0, 11, None, 6.0, 14.0, 2.0, 30.0, "10³/µL"),
+    ("WBC", 12, 999, None, 4.0, 11.0, 2.0, 30.0, "10³/µL"),
+    ("Hemoglobin (Hb)", 0, 11, None, 11.5, 15.5, 8.0, 20.0, "g/dL"),
+    ("Hemoglobin (Hb)", 12, 999, "Male", 13.5, 17.5, 8.0, 20.0, "g/dL"),
+    ("Hemoglobin (Hb)", 12, 999, "Female", 12.0, 15.5, 8.0, 20.0, "g/dL"),
+    ("Hemoglobin", 0, 11, None, 11.5, 15.5, 8.0, 20.0, "g/dL"),
+    ("Hemoglobin", 12, 999, "Male", 13.5, 17.5, 8.0, 20.0, "g/dL"),
+    ("Hemoglobin", 12, 999, "Female", 12.0, 15.5, 8.0, 20.0, "g/dL"),
+    ("Red Blood Cells (RBC)", 0, 11, None, 3.8, 5.5, None, None, "10⁶/µL"),
+    ("Red Blood Cells (RBC)", 12, 999, "Male", 4.5, 5.9, None, None, "10⁶/µL"),
+    ("Red Blood Cells (RBC)", 12, 999, "Female", 4.0, 5.2, None, None, "10⁶/µL"),
+    ("Hematocrit (HCT)", 0, 11, None, 34.0, 44.0, None, None, "%"),
+    ("Hematocrit (HCT)", 12, 999, "Male", 40.0, 52.0, None, None, "%"),
+    ("Hematocrit (HCT)", 12, 999, "Female", 36.0, 46.0, None, None, "%"),
+    ("Mean Cell Volume (MCV)", 0, 999, None, 80.0, 100.0, None, None, "fL"),
+    ("Mean Cell Hb (MCH)", 0, 999, None, 27.0, 33.0, None, None, "pg"),
+    ("Mean Cell Hb Conc (MCHC)", 0, 999, None, 32.0, 36.0, None, None, "g/dL"),
+    ("Platelets Count (PLT)", 0, 999, None, 150.0, 450.0, 50.0, 1000.0, "10³/µL"),
+    ("Neutrophils (%) [Relative Count]", 0, 999, None, 40.0, 75.0, None, None, "%"),
+    ("Lymphocytes (%) [Relative Count]", 0, 999, None, 20.0, 45.0, None, None, "%"),
+    ("Monocytes (%) [Relative Count]", 0, 999, None, 2.0, 10.0, None, None, "%"),
+    ("Eosinophils (%) [Relative Count]", 0, 999, None, 1.0, 6.0, None, None, "%"),
+    ("Basophils (%) [Relative Count]", 0, 999, None, 0.0, 2.0, None, None, "%"),
+    ("RBC Distribution Width (RDW)", 0, 999, None, 11.5, 14.5, None, None, "%"),
+
+    # Blood Sugars
+    ("Fasting Blood Sugar (FBS)", 0, 999, None, 3.9, 5.5, 2.8, 25.0, "mmol/L"),
+    ("FBS (Fasting Blood Sugar)", 0, 999, None, 3.9, 5.5, 2.8, 25.0, "mmol/L"),
+    ("RBS (Random Blood Sugar)", 0, 999, None, 3.9, 7.8, 2.8, 25.0, "mmol/L"),
+
+    # LFTs
+    ("ALT / SGPT (Alanine Aminotransferase)", 0, 999, "Male", 0.0, 45.0, None, None, "U/L"),
+    ("ALT / SGPT (Alanine Aminotransferase)", 0, 999, "Female", 0.0, 34.0, None, None, "U/L"),
+    ("AST / SGOT (Aspartate Aminotransferase)", 0, 999, "Male", 0.0, 40.0, None, None, "U/L"),
+    ("AST / SGOT (Aspartate Aminotransferase)", 0, 999, "Female", 0.0, 35.0, None, None, "U/L"),
+    ("Alkaline Phosphatase (ALP)", 0, 999, None, 44.0, 147.0, None, None, "U/L"),
+    ("Total Bilirubin", 0, 999, None, 3.4, 20.5, None, None, "µmol/L"),
+    ("Direct Bilirubin", 0, 999, None, 0.0, 8.6, None, None, "µmol/L"),
+    ("Total Protein", 0, 999, None, 6.4, 8.3, None, None, "g/dL"),
+    ("Serum Albumin", 0, 999, None, 3.5, 5.0, None, None, "g/dL"),
+    ("Gamma-Glutamyl Transferase (GGT)", 0, 999, "Male", 0.0, 55.0, None, None, "U/L"),
+    ("Gamma-Glutamyl Transferase (GGT)", 0, 999, "Female", 0.0, 38.0, None, None, "U/L"),
+    ("Total Cholesterol", 0, 999, None, 0.0, 5.2, None, None, "mmol/L"),
+
+    # RFTs
+    ("Serum Urea", 0, 999, None, 2.5, 7.8, None, None, "mmol/L"),
+    ("Serum Creatinine", 0, 999, "Male", 62.0, 106.0, 40.0, 350.0, "µmol/L"),
+    ("Serum Creatinine", 0, 999, "Female", 44.0, 80.0, 30.0, 300.0, "µmol/L"),
+    ("Serum Uric Acid", 0, 999, "Male", 200.0, 420.0, None, None, "µmol/L"),
+    ("Serum Uric Acid", 0, 999, "Female", 140.0, 340.0, None, None, "µmol/L"),
+
+    # Electrolytes
+    ("Serum Potassium (K+)", 0, 999, None, 3.5, 5.1, 2.8, 6.2, "mmol/L"),
+    ("Serum Sodium (Na+)", 0, 999, None, 135.0, 145.0, 120.0, 160.0, "mmol/L"),
+    ("Serum Chloride (Cl-)", 0, 999, None, 98.0, 107.0, None, None, "mmol/L"),
+    ("Bicarbonate (HCO3-)", 0, 999, None, 22.0, 29.0, None, None, "mmol/L")
+]
+
+def seed_reference_ranges(cur):
+    for pname, age_min, age_max, sex, n_min, n_max, c_min, c_max, unit in DEFAULT_REFERENCE_RANGES:
+        cur.execute("SELECT id FROM tests WHERE name = ?", (pname,))
+        t_row = cur.fetchone()
+        test_id = t_row["id"] if t_row else None
+
+        # Check existing rule
+        cur.execute("""
+            SELECT id FROM reference_ranges
+            WHERE parameter_name = ? AND age_min = ? AND age_max = ? AND (sex = ? OR (sex IS NULL AND ? IS NULL))
+        """, (pname, age_min, age_max, sex, sex))
+        existing = cur.fetchone()
+        if not existing:
+            cur.execute("""
+                INSERT INTO reference_ranges (test_id, parameter_name, age_min, age_max, sex, normal_min, normal_max, critical_min, critical_max, unit)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (test_id, pname, age_min, age_max, sex, n_min, n_max, c_min, c_max, unit))
+        else:
+            cur.execute("""
+                UPDATE reference_ranges
+                SET test_id = ?, normal_min = ?, normal_max = ?, critical_min = ?, critical_max = ?, unit = ?
+                WHERE id = ?
+            """, (test_id, n_min, n_max, c_min, c_max, unit, existing["id"]))
 
 
 def seed_database():
@@ -260,6 +347,7 @@ def seed_database():
                 WHERE id = ?
             """, (t["default_unit"], t["ref_range"], t["sort_order"], opts, tp_row["id"]))
 
+    seed_reference_ranges(cur)
     conn.commit()
     conn.close()
     print(f"Seeding done: {len(sec_map)} sections, {len(TESTS)} tests.")

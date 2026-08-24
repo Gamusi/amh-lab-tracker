@@ -5,10 +5,48 @@ from reportlab.platypus import SimpleDocTemplate, Spacer, Table, TableStyle, Kee
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.enums import TA_CENTER
 from reportlab.lib import colors
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
+from . import evaluator
 
 PAGE_WIDTH, PAGE_HEIGHT = A4
 SAFE_MARGIN_X = 56.69
 SAFE_WINDOW_Y = 600.95
+
+FONT_REGULAR = 'Helvetica'
+FONT_BOLD = 'Helvetica-Bold'
+FONT_SYMBOL = 'Helvetica'
+
+def _init_fonts():
+    global FONT_REGULAR, FONT_BOLD, FONT_SYMBOL
+    fonts_dir = os.path.abspath(
+        os.path.join(os.path.dirname(__file__), "..", "..", "assets", "fonts")
+    )
+    segoe_path = os.path.join(fonts_dir, "segoeui.ttf")
+    segoe_bold_path = os.path.join(fonts_dir, "segoeuib.ttf")
+    symbol_path = os.path.join(fonts_dir, "seguisym.ttf")
+    
+    if not os.path.exists(symbol_path) and os.path.exists(r"C:\Windows\Fonts\seguisym.ttf"):
+        symbol_path = r"C:\Windows\Fonts\seguisym.ttf"
+    if not os.path.exists(segoe_path) and os.path.exists(r"C:\Windows\Fonts\segoeui.ttf"):
+        segoe_path = r"C:\Windows\Fonts\segoeui.ttf"
+    if not os.path.exists(segoe_bold_path) and os.path.exists(r"C:\Windows\Fonts\segoeuib.ttf"):
+        segoe_bold_path = r"C:\Windows\Fonts\segoeuib.ttf"
+        
+    try:
+        if os.path.exists(symbol_path):
+            pdfmetrics.registerFont(TTFont('SegoeUISymbol', symbol_path))
+            FONT_SYMBOL = 'SegoeUISymbol'
+        if os.path.exists(segoe_path):
+            pdfmetrics.registerFont(TTFont('SegoeUI', segoe_path))
+            FONT_REGULAR = 'SegoeUI'
+        if os.path.exists(segoe_bold_path):
+            pdfmetrics.registerFont(TTFont('SegoeUIBold', segoe_bold_path))
+            FONT_BOLD = 'SegoeUIBold'
+    except Exception:
+        pass
+
+_init_fonts()
 
 def _draw_background_hook(canvas, doc):
     canvas.saveState()
@@ -34,10 +72,10 @@ def _build_metadata_table(order_data: dict) -> Table:
     
     t = Table(data, colWidths=[90, 150, 80, 160])
     t.setStyle(TableStyle([
-        ('FONTNAME', (0,0), (-1,-1), 'Helvetica'),
+        ('FONTNAME', (0,0), (-1,-1), FONT_REGULAR),
         ('FONTSIZE', (0,0), (-1,-1), 8.5),
-        ('FONTNAME', (0,0), (0,-1), 'Helvetica-Bold'), # Left labels
-        ('FONTNAME', (2,0), (2,-1), 'Helvetica-Bold'), # Right labels
+        ('FONTNAME', (0,0), (0,-1), FONT_BOLD), # Left labels
+        ('FONTNAME', (2,0), (2,-1), FONT_BOLD), # Right labels
         ('ALIGN', (0,0), (-1,-1), 'LEFT'),
         ('BOTTOMPADDING', (0,0), (-1,-1), 2),
         ('TOPPADDING', (0,0), (-1,-1), 2),
@@ -56,36 +94,65 @@ def _build_department_table(dept_name: str, tests: list) -> KeepTogether:
         
     data.append(["Test", "Result", "Unit", "Flag", "Reference"])
     
-    result_style = ParagraphStyle(name="ResultStyle", fontName="Helvetica", fontSize=9, leading=11)
+    result_style = ParagraphStyle(name="ResultStyle", fontName=FONT_REGULAR, fontSize=9, leading=11)
+    flag_center_style = ParagraphStyle(name="FlagCenterStyle", fontName=FONT_BOLD, fontSize=9, leading=11, alignment=TA_CENTER)
     
     for t in tests:
         res_text = str(t.get("result") or "")
         res_para = Paragraph(res_text, result_style) if res_text else ""
+        flag_text = str(t.get("flag") or "")
+        t_name = str(t.get("test_name") or "")
+        if not flag_text and evaluator.is_qualitative_abnormal(res_text, str(t.get("reference") or ""), param_name=t_name):
+            flag_text = "\u26A0"
+        if flag_text == "[!]":
+            flag_text = "\u26A0"
+
+        if flag_text == "\u26A0":
+            if FONT_SYMBOL != 'Helvetica':
+                flag_cell = Paragraph(f'<font name="{FONT_SYMBOL}" color="#dc2626">\u26A0</font>', flag_center_style)
+            else:
+                flag_cell = Paragraph('<font color="#dc2626"><b>\u26A0</b></font>', flag_center_style)
+        else:
+            flag_cell = flag_text
+
         data.append([
-            t.get("test_name", ""),
+            t_name,
             res_para,
             t.get("unit", ""),
-            t.get("flag", ""),
+            flag_cell,
             t.get("reference", "")
         ])
         
     t = Table(data, colWidths=[140, 80, 60, 60, 140])
     
     style_cmds = [
-        ('FONTNAME', (0,0), (-1,-1), 'Helvetica'),
-        ('FONTSIZE', (0,0), (-1,-1), 8.5),
+        ('FONTNAME', (0,0), (-1,-1), FONT_REGULAR),
+        ('FONTSIZE', (0,0), (-1,-1), 8),
+        ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#e0e0e0')),
+        ('TOPPADDING', (0,0), (-1,-1), 4),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 4),
         ('ALIGN', (0,0), (-1,-1), 'LEFT'),
-        ('BOTTOMPADDING', (0,0), (-1,-1), 3),
-        ('TOPPADDING', (0,0), (-1,-1), 3),
+        ('ALIGN', (3,0), (3,-1), 'CENTER'),
+        ('TEXTCOLOR', (3,0), (3,-1), colors.HexColor('#dc2626')),
+        ('FONTNAME', (3,0), (3,-1), FONT_BOLD),
     ]
+    
+    for i, test in enumerate(tests):
+        flag = test.get("flag", "")
+        res_t = str(test.get("result") or "")
+        t_name = str(test.get("test_name") or "")
+        if flag in ["High", "Low", "Abnormal", "Reactive", "Positive", "H", "L", "H*", "L*", "*", "\u26A0", "[!]"] or evaluator.is_qualitative_abnormal(res_t, str(test.get("reference") or ""), param_name=t_name):
+            row_idx = i + (2 if show_dept else 1)
+            style_cmds.append(('TEXTCOLOR', (1, row_idx), (1, row_idx), colors.HexColor('#dc2626')))
+            style_cmds.append(('FONTNAME', (1, row_idx), (1, row_idx), FONT_BOLD))
     
     header_row_idx = 1 if show_dept else 0
     if show_dept:
-        style_cmds.append(('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'))
+        style_cmds.append(('FONTNAME', (0,0), (-1,0), FONT_BOLD))
         style_cmds.append(('BACKGROUND', (0,0), (-1,0), colors.HexColor('#f0f0f0')))
         style_cmds.append(('SPAN', (0,0), (-1,0)))
         
-    style_cmds.append(('FONTNAME', (0, header_row_idx), (-1, header_row_idx), 'Helvetica-Bold'))
+    style_cmds.append(('FONTNAME', (0, header_row_idx), (-1, header_row_idx), FONT_BOLD))
     style_cmds.append(('LINEBELOW', (0, header_row_idx), (-1, header_row_idx), 1, colors.black))
     
     t.setStyle(TableStyle(style_cmds))
@@ -105,7 +172,7 @@ def _build_signatures_table(order_data: dict, compact: bool = False) -> KeepToge
     
     t = Table(data, colWidths=[240, 240])
     t.setStyle(TableStyle([
-        ('FONTNAME', (0,0), (-1,-1), 'Helvetica-Bold'),
+        ('FONTNAME', (0,0), (-1,-1), FONT_BOLD),
         ('FONTSIZE', (0,0), (-1,-1), 8.5),
         ('ALIGN', (0,0), (0,-1), 'LEFT'),
         ('ALIGN', (1,0), (1,-1), 'LEFT'),
@@ -117,44 +184,87 @@ def _build_signatures_table(order_data: dict, compact: bool = False) -> KeepToge
     return KeepTogether([Spacer(1, spacer_h), t])
 
 
+def _clean_urinalysis_name(name: str) -> str:
+    name_str = str(name).strip()
+    if "(" in name_str and ")" in name_str:
+        base = name_str.split("(")[0].strip()
+        if base.lower() in ["proteins", "glucose", "bilirubin", "ketones", "blood", "nitrates", "nitrate", "leukocytes", "leukocyte esterase"]:
+            if base.lower() in ["nitrates", "nitrate"]:
+                return "Nitrate"
+            if base.lower() in ["leukocytes", "leukocyte esterase"]:
+                return "Leukocyte Esterase"
+            return base
+    return name_str
+
+
 def _build_urinalysis_table(urinalysis_test: dict) -> KeepTogether:
     items = []
+    ua_p_style = ParagraphStyle(name="UaParaStyle", fontName=FONT_REGULAR, fontSize=7.5, leading=9)
+    
     if urinalysis_test.get("parameters"):
         for p in urinalysis_test["parameters"]:
-            pname = p.get("name") or p.get("parameter_name") or ""
+            pname = _clean_urinalysis_name(p.get("name") or p.get("parameter_name") or "")
             pres = p.get("result") if p.get("result") is not None else p.get("result_value", "")
-            items.append((str(pname), str(pres)))
+            
+            pflag = p.get("flag") or ("\u26A0" if p.get("is_positive") else "")
+            if not pflag and evaluator.is_qualitative_abnormal(str(pres), param_name=pname):
+                pflag = "\u26A0"
+            if pflag == "[!]":
+                pflag = "\u26A0"
+
+            if pflag == "\u26A0":
+                if FONT_SYMBOL != 'Helvetica':
+                    pres_cell = Paragraph(f'{pres} <font name="{FONT_SYMBOL}" color="#dc2626">\u26A0</font>', ua_p_style)
+                else:
+                    pres_cell = Paragraph(f'{pres} <font color="#dc2626"><b>\u26A0</b></font>', ua_p_style)
+            else:
+                pres_cell = str(pres)
+
+            items.append((str(pname), pres_cell))
     else:
         result_str = str(urinalysis_test.get("result") or "")
         import json
+        raw_items = []
         try:
             parsed = json.loads(result_str)
             if isinstance(parsed, dict):
                 for k, v in parsed.items():
-                    items.append((str(k), str(v)))
+                    raw_items.append((str(k), str(v)))
             elif isinstance(parsed, list):
                 for item in parsed:
                     if isinstance(item, dict):
-                        items.append((str(item.get("name", "")), str(item.get("result", ""))))
+                        raw_items.append((str(item.get("name", "")), str(item.get("result", ""))))
             else:
-                items.append(("Result", result_str))
+                raw_items.append(("Result", result_str))
         except Exception:
             if "\n" in result_str:
                 lines = result_str.split("\n")
                 for line in lines:
                     if ":" in line:
                         k, v = line.split(":", 1)
-                        items.append((k.strip(), v.strip()))
+                        raw_items.append((k.strip(), v.strip()))
                     else:
-                        items.append(("", line.strip()))
+                        raw_items.append(("", line.strip()))
             elif "," in result_str and ":" in result_str:
                 parts = result_str.split(",")
                 for p in parts:
                     if ":" in p:
                         k, v = p.split(":", 1)
-                        items.append((k.strip(), v.strip()))
+                        raw_items.append((k.strip(), v.strip()))
             else:
-                items.append(("Result", result_str))
+                raw_items.append(("Result", result_str))
+
+        for k, v in raw_items:
+            clean_k = _clean_urinalysis_name(k)
+            flag = "\u26A0" if evaluator.is_qualitative_abnormal(str(v), param_name=clean_k) else ""
+            if flag == "\u26A0":
+                if FONT_SYMBOL != 'Helvetica':
+                    v_cell = Paragraph(f'{v} <font name="{FONT_SYMBOL}" color="#dc2626">\u26A0</font>', ua_p_style)
+                else:
+                    v_cell = Paragraph(f'{v} <font color="#dc2626"><b>\u26A0</b></font>', ua_p_style)
+            else:
+                v_cell = str(v)
+            items.append((str(clean_k), v_cell))
 
     if not items:
         items = [("Result", str(urinalysis_test.get("result") or ""))]
@@ -333,12 +443,18 @@ def _build_cbc_table(order_data: dict, cbc_test: dict) -> list:
         flag_val = match.get("flag", "") if match else ""
         ref_val = match.get("reference_range") or match.get("reference") or def_ref if match else def_ref
         
-        # Format flag: Low, High, *, etc.
+        # Format flag: Low, High, \u26A0, L*, H*
         flag_display = ""
         if flag_val:
-            if flag_val in ("L", "Low", "l"): flag_display = "Low"
+            if flag_val in ("\u26A0", "[!]", "*"):
+                if FONT_SYMBOL != 'Helvetica':
+                    flag_display = Paragraph(f'<font name="{FONT_SYMBOL}" color="#dc2626">\u26A0</font>', ParagraphStyle(name="CbcFlagSym", fontName=FONT_BOLD, fontSize=8, alignment=TA_CENTER))
+                else:
+                    flag_display = Paragraph('<font color="#dc2626"><b>\u26A0</b></font>', ParagraphStyle(name="CbcFlagSym", fontName=FONT_BOLD, fontSize=8, alignment=TA_CENTER))
+            elif flag_val in ("L*", "Low*"): flag_display = "L*"
+            elif flag_val in ("H*", "High*"): flag_display = "H*"
+            elif flag_val in ("L", "Low", "l"): flag_display = "Low"
             elif flag_val in ("H", "High", "h"): flag_display = "High"
-            elif flag_val == "*": flag_display = "*"
             else: flag_display = str(flag_val)
 
         return [display_name, str(res_val), str(unit_val or ""), flag_display, f"[ {ref_val} ]" if ref_val else ""]

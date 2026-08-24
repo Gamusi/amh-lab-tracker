@@ -2,7 +2,11 @@ import sqlite3
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException
 from ..database import get_db
-from ..schemas import TestCreate, TestResponse, WardCreate, WardUpdate, WardResponse, ClinicianCreate, ClinicianUpdate, ClinicianResponse
+from ..schemas import (
+    TestCreate, TestResponse, WardCreate, WardUpdate, WardResponse, 
+    ClinicianCreate, ClinicianUpdate, ClinicianResponse,
+    ReferenceRangeCreate, ReferenceRangeUpdate, ReferenceRangeResponse
+)
 from ..models import User
 from ..auth import get_current_user, require_admin
 
@@ -239,6 +243,97 @@ def delete_clinician(clinician_id: int, conn: sqlite3.Connection = Depends(get_d
     if user_id:
         conn.execute("INSERT INTO audit_log (user_id, action, detail) VALUES (?, ?, ?)", (user_id, "delete_clinician", f"Soft deleted clinician ID {clinician_id} ({existing['name']})"))
         conn.commit()
+    return {"status": "deleted"}
+
+
+# Reference Ranges Configuration
+@router.get("/reference-ranges", response_model=List[ReferenceRangeResponse])
+def get_reference_ranges(conn: sqlite3.Connection = Depends(get_db), current_user: dict = Depends(get_current_user)):
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT id, test_id, parameter_name, age_min, age_max, sex, normal_min, normal_max, critical_min, critical_max, unit
+        FROM reference_ranges
+        ORDER BY parameter_name ASC, age_min ASC, id ASC
+    """)
+    return [dict(r) for r in cur.fetchall()]
+
+
+@router.post("/reference-ranges", response_model=ReferenceRangeResponse)
+def create_reference_range(req: ReferenceRangeCreate, admin_user: dict = Depends(require_admin), conn: sqlite3.Connection = Depends(get_db)):
+    param_name = req.parameter_name.strip()
+    if not param_name:
+        raise HTTPException(status_code=400, detail="Parameter name cannot be empty")
+    
+    cur = conn.cursor()
+    cur.execute("""
+        INSERT INTO reference_ranges (test_id, parameter_name, age_min, age_max, sex, normal_min, normal_max, critical_min, critical_max, unit)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (req.test_id, param_name, req.age_min if req.age_min is not None else 0, req.age_max if req.age_max is not None else 999, req.sex, req.normal_min, req.normal_max, req.critical_min, req.critical_max, req.unit))
+    rid = cur.lastrowid
+    conn.commit()
+
+    conn.execute("INSERT INTO audit_log (user_id, action, detail) VALUES (?, ?, ?)", (admin_user["id"], "create_reference_range", f"Created reference range rule ID {rid} for '{param_name}'"))
+    conn.commit()
+
+    return ReferenceRangeResponse(
+        id=rid, test_id=req.test_id, parameter_name=param_name,
+        age_min=req.age_min if req.age_min is not None else 0,
+        age_max=req.age_max if req.age_max is not None else 999,
+        sex=req.sex, normal_min=req.normal_min, normal_max=req.normal_max,
+        critical_min=req.critical_min, critical_max=req.critical_max, unit=req.unit
+    )
+
+
+@router.put("/reference-ranges/{range_id}", response_model=ReferenceRangeResponse)
+def update_reference_range(range_id: int, req: ReferenceRangeUpdate, admin_user: dict = Depends(require_admin), conn: sqlite3.Connection = Depends(get_db)):
+    cur = conn.cursor()
+    cur.execute("SELECT id, test_id, parameter_name, age_min, age_max, sex, normal_min, normal_max, critical_min, critical_max, unit FROM reference_ranges WHERE id = ?", (range_id,))
+    existing = cur.fetchone()
+    if not existing:
+        raise HTTPException(status_code=404, detail="Reference range not found")
+
+    new_test_id = req.test_id if req.test_id is not None else existing["test_id"]
+    new_param = req.parameter_name.strip() if req.parameter_name is not None else existing["parameter_name"]
+    new_age_min = req.age_min if req.age_min is not None else existing["age_min"]
+    new_age_max = req.age_max if req.age_max is not None else existing["age_max"]
+    new_sex = req.sex if req.sex is not None else existing["sex"]
+    new_norm_min = req.normal_min if req.normal_min is not None else existing["normal_min"]
+    new_norm_max = req.normal_max if req.normal_max is not None else existing["normal_max"]
+    new_crit_min = req.critical_min if req.critical_min is not None else existing["critical_min"]
+    new_crit_max = req.critical_max if req.critical_max is not None else existing["critical_max"]
+    new_unit = req.unit if req.unit is not None else existing["unit"]
+
+    cur.execute("""
+        UPDATE reference_ranges
+        SET test_id = ?, parameter_name = ?, age_min = ?, age_max = ?, sex = ?, normal_min = ?, normal_max = ?, critical_min = ?, critical_max = ?, unit = ?
+        WHERE id = ?
+    """, (new_test_id, new_param, new_age_min, new_age_max, new_sex, new_norm_min, new_norm_max, new_crit_min, new_crit_max, new_unit, range_id))
+    conn.commit()
+
+    conn.execute("INSERT INTO audit_log (user_id, action, detail) VALUES (?, ?, ?)", (admin_user["id"], "update_reference_range", f"Updated reference range rule ID {range_id} for '{new_param}'"))
+    conn.commit()
+
+    return ReferenceRangeResponse(
+        id=range_id, test_id=new_test_id, parameter_name=new_param,
+        age_min=new_age_min, age_max=new_age_max, sex=new_sex,
+        normal_min=new_norm_min, normal_max=new_norm_max,
+        critical_min=new_crit_min, critical_max=new_crit_max, unit=new_unit
+    )
+
+
+@router.delete("/reference-ranges/{range_id}")
+def delete_reference_range(range_id: int, admin_user: dict = Depends(require_admin), conn: sqlite3.Connection = Depends(get_db)):
+    cur = conn.cursor()
+    cur.execute("SELECT id, parameter_name FROM reference_ranges WHERE id = ?", (range_id,))
+    existing = cur.fetchone()
+    if not existing:
+        raise HTTPException(status_code=404, detail="Reference range not found")
+
+    cur.execute("DELETE FROM reference_ranges WHERE id = ?", (range_id,))
+    conn.commit()
+
+    conn.execute("INSERT INTO audit_log (user_id, action, detail) VALUES (?, ?, ?)", (admin_user["id"], "delete_reference_range", f"Deleted reference range rule ID {range_id} ('{existing['parameter_name']}')"))
+    conn.commit()
     return {"status": "deleted"}
 
 

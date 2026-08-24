@@ -191,27 +191,29 @@ def create_pdf_report(
     pdf_bytes = generate_pdf(request.order_data, request.results_data)
     return Response(content=pdf_bytes, media_type="application/pdf")
 
-def _compute_flag(val_str, ref_str):
-    if not val_str or not ref_str: return ""
+def _compute_flag(val_str, ref_str=None):
+    if not val_str: return ""
     try:
-        val = float(val_str)
-        ref = ref_str.replace(" ", "")
-        if '-' in ref:
-            min_v, max_v = map(float, ref.split('-'))
-            if val < min_v: return 'Low'
-            if val > max_v: return 'High'
-        elif '>=' in ref:
-            if val < float(ref.replace('>=', '')): return 'Low'
-        elif '<=' in ref:
-            if val > float(ref.replace('<=', '')): return 'High'
-        elif '>' in ref:
-            if val <= float(ref.replace('>', '')): return 'Low'
-        elif '<' in ref:
-            if val >= float(ref.replace('<', '')): return 'High'
+        val = float(str(val_str).strip().split()[0])
+        if ref_str:
+            ref = ref_str.replace(" ", "")
+            if '-' in ref:
+                min_v, max_v = map(float, ref.split('-'))
+                if val < min_v: return 'L'
+                if val > max_v: return 'H'
+            elif '>=' in ref:
+                if val < float(ref.replace('>=', '')): return 'L'
+            elif '<=' in ref:
+                if val > float(ref.replace('<=', '')): return 'H'
+            elif '>' in ref:
+                if val <= float(ref.replace('>', '')): return 'L'
+            elif '<' in ref:
+                if val >= float(ref.replace('<', '')): return 'H'
     except Exception:
-        if isinstance(val_str, str) and isinstance(ref_str, str):
-            if val_str.strip().lower() != ref_str.strip().lower() and "negative" in ref_str.lower():
-                return "Abnormal"
+        pass
+        
+    if evaluator.is_qualitative_abnormal(val_str, ref_str):
+        return "\u26A0"
     return ""
 
 @router.get("/visit/{visit_id}/pdf")
@@ -263,6 +265,8 @@ def get_visit_report_pdf(visit_id: int, db: sqlite3.Connection = Depends(get_db)
             t.name AS test_name, 
             t.parent_rollup_id,
             tr.result_value, 
+            tr.result_unit,
+            tr.clinical_flag,
             t.ref_range,
             t.default_unit,
             s.name AS section_name, 
@@ -295,6 +299,7 @@ def get_visit_report_pdf(visit_id: int, db: sqlite3.Connection = Depends(get_db)
             tp.parameter_name, 
             tr.result_value, 
             tr.result_unit, 
+            tr.clinical_flag,
             tp.unit AS default_unit, 
             tp.ref_range, 
             tr.is_positive
@@ -310,12 +315,13 @@ def get_visit_report_pdf(visit_id: int, db: sqlite3.Connection = Depends(get_db)
         oid = pr["order_id"]
         if oid not in params_by_order:
             params_by_order[oid] = []
+        p_flag = pr["clinical_flag"] or _compute_flag(pr["result_value"], pr["ref_range"])
         params_by_order[oid].append({
             "name": pr["parameter_name"],
             "result": pr["result_value"],
             "unit": pr["result_unit"] or pr["default_unit"] or "",
             "reference_range": pr["ref_range"] or "",
-            "flag": _compute_flag(pr["result_value"], pr["ref_range"])
+            "flag": p_flag
         })
 
     results_by_section = {}
@@ -342,13 +348,14 @@ def get_visit_report_pdf(visit_id: int, db: sqlite3.Connection = Depends(get_db)
         if not analyzer_timestamp and row["entered_at"]:
             analyzer_timestamp = row["entered_at"]
             
+        t_flag = row["clinical_flag"] or _compute_flag(result_value, row["ref_range"])
         test_data = {
             "test_name": test_name,
             "result": result_value,
-            "unit": row["default_unit"] or "",
+            "unit": row["result_unit"] or row["default_unit"] or "",
             "reference": row["ref_range"] or "",
             "reference_range": row["ref_range"] or "",
-            "flag": _compute_flag(result_value, row["ref_range"]),
+            "flag": t_flag,
             "sample_id": row["sample_id"] or "",
             "timestamp": row["entered_at"] or "",
             "parameters": params_by_order.get(order_id, [])

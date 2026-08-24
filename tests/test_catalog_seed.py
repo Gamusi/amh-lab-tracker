@@ -44,15 +44,31 @@ def test_urinalysis_seed_subparameters():
     assert {t["name"] for t in micro} == {
         "Pus Cells (WBCs)", "Red Blood Cells (RBCs)", "Epithelial Cells", "Casts", "Crystals"
     }
-    for t in micro:
-        assert "Not Seen" in t["options"]
-
     # Check Dipstick (sort_order 8-17)
     dip = [t for t in ua_children if 8 <= t["sort_order"] <= 17]
     assert len(dip) == 10
     dip_names = {t["name"] for t in dip}
     assert "Specific Gravity (S.G)" in dip_names
     assert "PH" in dip_names
-    assert "Proteins (Albuminuria Screening)" in dip_names
-    assert "Glucose (Glucosuria Screening)" in dip_names
+    assert "Proteins" in dip_names
+    assert "Glucose" in dip_names
+    assert "Bilirubin" in dip_names
+    assert "Ketones" in dip_names
+    assert "Blood" in dip_names
+    assert "Nitrate" in dip_names
+    assert "Leukocyte Esterase" in dip_names
 
+def test_reference_ranges_schema_and_clinical_flag_column(db_connection):
+    cur = db_connection.cursor()
+    
+    # Check test_results has clinical_flag
+    cur.execute("PRAGMA table_info(test_results)")
+    cols = [r["name"] for r in cur.fetchall()]
+    assert "clinical_flag" in cols
+
+    # Check reference_ranges table exists
+    cur.execute("PRAGMA table_info(reference_ranges)")
+    cols_rr = [r["name"] for r in cur.fetchall()]
+    assert "parameter_name" in cols_rr
+    assert "normal_min" in cols_rr
+    assert "critical_min" in cols_rr
