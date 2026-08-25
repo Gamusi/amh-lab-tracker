@@ -7,6 +7,7 @@ from ..auth import get_current_user, require_admin
 from ..schemas import VisitCreate, TestResultCreate, ParameterResultItem, AddOrdersRequest, ClientUpdate, BulkOrderDeleteRequest, BulkVisitDeleteRequest
 from ..evaluator import evaluate_result
 from ..biochem_validator import validate_biochem_parameter, validate_panel_consistency
+from .stock import deplete_kit_stock
 
 logger = logging.getLogger("amh_clients")
 
@@ -580,6 +581,39 @@ def enter_result(req: TestResultCreate, conn: sqlite3.Connection = Depends(get_d
             """, (req.order_id, req.result_value, saved_unit, clinical_flag, is_positive, current_user["id"], now_str, verified_by, verified_time))
 
     cur.execute("UPDATE test_orders SET status = ? WHERE id = ?", (order_status, req.order_id))
+
+    # Generalized Stock / Diagnostic Kit FEFO Auto-Depletion Engine
+    cur.execute("SELECT id FROM diagnostic_kit_transactions WHERE order_id = ? AND transaction_type = 'TEST_USAGE'", (req.order_id,))
+    already_depleted = cur.fetchone() is not None
+
+    if not already_depleted:
+        cur.execute("SELECT name, tracks_stock, consumable_name FROM tests WHERE id = ?", (order["test_id"],))
+        t_info = cur.fetchone()
+        t_name = t_info["name"] if t_info else ""
+        t_tracks = t_info["tracks_stock"] if t_info else 0
+        t_consumable = t_info["consumable_name"] if t_info else None
+
+        if "hiv" in t_name.lower() and req.parameter_results:
+            for pr in req.parameter_results:
+                if pr.result_value and str(pr.result_value).strip():
+                    cur.execute("SELECT parameter_name FROM test_parameters WHERE id = ?", (pr.parameter_id,))
+                    p_info = cur.fetchone()
+                    if p_info and p_info["parameter_name"]:
+                        try:
+                            deplete_kit_stock(conn, kit_name=p_info["parameter_name"], order_id=req.order_id, user_id=current_user["id"], count=1)
+                        except Exception as e:
+                            logger.warning(f"HIV Stock depletion skipped/failed for {p_info['parameter_name']}: {e}")
+        elif "urinalysis" in t_name.lower():
+            try:
+                deplete_kit_stock(conn, kit_name="Siemens Multistix 10SG Reagent Strips", order_id=req.order_id, user_id=current_user["id"], count=1)
+            except Exception as e:
+                logger.warning(f"Urinalysis strip depletion skipped/failed: {e}")
+        elif t_tracks or t_consumable:
+            target_kit = t_consumable or t_name
+            try:
+                deplete_kit_stock(conn, test_id=order["test_id"], kit_name=target_kit, order_id=req.order_id, user_id=current_user["id"], count=1)
+            except Exception as e:
+                logger.warning(f"Stock depletion skipped/failed for {target_kit}: {e}")
 
     # Auto-increment DailyEntry counts (with HIV algorithm rollup support)
     increment_daily_entry(cur, today_str, order["test_id"], overall_positive, current_user["id"])

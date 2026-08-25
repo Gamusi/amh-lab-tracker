@@ -50,6 +50,8 @@ SCHEMA_SQL = """
         panic_value_low FLOAT,
         panic_value_high FLOAT,
         options TEXT,
+        tracks_stock BOOLEAN NOT NULL DEFAULT 0,
+        consumable_name TEXT,
         UNIQUE(name, section_id)
     );
 
@@ -172,6 +174,32 @@ SCHEMA_SQL = """
         plausible_max REAL,
         unit TEXT
     );
+
+    CREATE TABLE IF NOT EXISTS diagnostic_kit_lots (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        test_id INTEGER REFERENCES tests(id),
+        kit_name TEXT NOT NULL,
+        category TEXT DEFAULT 'General',
+        lot_number TEXT NOT NULL,
+        expiry_date DATE NOT NULL,
+        initial_quantity INTEGER NOT NULL,
+        current_quantity INTEGER NOT NULL,
+        min_threshold INTEGER DEFAULT 25,
+        is_active BOOLEAN DEFAULT 1,
+        received_date DATE DEFAULT (DATE('now')),
+        received_by_user_id INTEGER REFERENCES users(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS diagnostic_kit_transactions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        lot_id INTEGER NOT NULL REFERENCES diagnostic_kit_lots(id),
+        transaction_type TEXT NOT NULL,
+        quantity_delta INTEGER NOT NULL,
+        order_id INTEGER REFERENCES test_orders(id),
+        reason TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        user_id INTEGER REFERENCES users(id)
+    );
 """
 
 def get_connection():
@@ -208,6 +236,8 @@ def init_db():
     # Safe Migrations for existing database columns
     migrations = [
         ("tests", "parent_rollup_id", "INTEGER REFERENCES tests(id)"),
+        ("tests", "tracks_stock", "BOOLEAN NOT NULL DEFAULT 0"),
+        ("tests", "consumable_name", "TEXT"),
         ("test_orders", "sample_id", "TEXT"),
         ("test_orders", "visit_id", "INTEGER REFERENCES visits(id)"),
         ("test_results", "parameter_id", "INTEGER REFERENCES test_parameters(id)"),
@@ -235,7 +265,8 @@ def init_db():
         ("reference_ranges", "sanity_min", "REAL"),
         ("reference_ranges", "sanity_max", "REAL"),
         ("reference_ranges", "plausible_min", "REAL"),
-        ("reference_ranges", "plausible_max", "REAL")
+        ("reference_ranges", "plausible_max", "REAL"),
+        ("diagnostic_kit_lots", "min_threshold", "INTEGER DEFAULT 25")
     ]
     for table, col, col_def in migrations:
         try:
@@ -392,6 +423,25 @@ def init_db():
                     SET unit = ?, ref_range = ?, sort_order = ?, options = ?
                     WHERE id = ?
                 """, (punit, pref, porder, popts, existing_p[0]))
+
+    # Set default stock-tracking flags on existing kit/strip tests
+    STOCK_TRACKED_TESTS = [
+        ("HIV Testing", "HIV Diagnostic Kits"),
+        ("Malaria RDT", "Malaria Rapid Diagnostic Test (RDT)"),
+        ("HBsAg (Hepatitis B)", "HBsAg Rapid Test Strip"),
+        ("HCV Ab (Hepatitis C)", "HCV Ab Rapid Test Strip"),
+        ("HCG Urine", "HCG Urine Pregnancy Strip"),
+        ("H.Pylori Ag (Stool Antigen)", "H. Pylori Stool Ag / Serum Ab Cassette"),
+        ("H.Pylori Ab (Serum Antibody)", "H. Pylori Stool Ag / Serum Ab Cassette"),
+        ("URINALYSIS", "Siemens Multistix 10SG Reagent Strips"),
+        ("CrAg (Cryptococcal Antigen)", "CrAg Lateral Flow Strip"),
+        ("TB LAM (Urine Tuberculosis LAM)", "TB LAM Urine Ag Strip"),
+        ("BAT (Brucella Antigen Test)", "BAT (Brucella Antigen Test) Slide"),
+        ("VDRL/RPR (Syphilis Screening)", "Syphilis TPHA / RPR Test Reagents"),
+        ("TPHA (Confirmatory Syphilis Test)", "Syphilis TPHA / RPR Test Reagents"),
+    ]
+    for tname, cname in STOCK_TRACKED_TESTS:
+        cursor.execute("UPDATE tests SET tracks_stock = 1, consumable_name = ? WHERE LOWER(name) = LOWER(?)", (cname, tname))
 
     conn.commit()
     conn.close()

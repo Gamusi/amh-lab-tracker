@@ -45,6 +45,8 @@ class TestBase(BaseModel):
     default_unit: Optional[str] = None
     options: Optional[str] = None
     parent_rollup_id: Optional[int] = None
+    tracks_stock: Optional[bool] = False
+    consumable_name: Optional[str] = None
 
 class TestCreate(TestBase):
     pass
@@ -241,6 +243,81 @@ class ReferenceRangeResponse(ReferenceRangeBase):
 
     class Config:
         from_attributes = True
+
+class StockReceiveRequest(BaseModel):
+    kit_name: str
+    category: Optional[str] = "General"
+    lot_number: str
+    expiry_date: str # YYYY-MM-DD
+    initial_quantity: int
+    min_threshold: Optional[int] = 25
+    test_id: Optional[int] = None
+
+class StockAdjustRequest(BaseModel):
+    lot_id: int
+    transaction_type: str # 'WASTAGE_QC', 'ADJUSTMENT'
+    quantity_delta: int # Negative for deduction/wastage, positive for stock-in adjustment
+    reason: str
+
+class StockLotResponse(BaseModel):
+    id: int
+    test_id: Optional[int] = None
+    kit_name: str
+    category: str
+    lot_number: str
+    expiry_date: str
+    initial_quantity: int
+    current_quantity: int
+    min_threshold: int
+    is_active: bool
+    received_date: Optional[str] = None
+    status: str # 'Active', 'Low Stock', 'Near Expiry', 'Expired'
+
+    class Config:
+        from_attributes = True
+
+class StockSummaryResponse(BaseModel):
+    kit_name: str
+    category: str
+    total_quantity: int
+    min_threshold: int
+    active_lots_count: int
+    expiring_soon_count: int
+    expired_count: int
+    status: str
+
+class StockTransactionResponse(BaseModel):
+    id: int
+    lot_id: int
+    kit_name: str
+    lot_number: str
+    category: str
+    transaction_type: str
+    quantity_delta: int
+    order_id: Optional[int] = None
+    reason: Optional[str] = None
+    created_at: str
+    username: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+class StockAlertResponse(BaseModel):
+    alert_type: str # 'LOW_STOCK', 'NEAR_EXPIRY', 'EXPIRED'
+    message: str
+    kit_name: str
+    lot_number: Optional[str] = None
+    expiry_date: Optional[str] = None
+    current_quantity: int
+    min_threshold: int
+
+class StockReconciliationItem(BaseModel):
+    kit_name: str
+    category: str
+    tests_completed: int
+    kits_consumed: int
+    wastage_recorded: int
+    variance: int
 
 
 

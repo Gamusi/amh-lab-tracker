@@ -128,6 +128,8 @@ const app = {
     'chevron-right': `<svg class="lucide" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>`,
     'check-circle': `<svg class="lucide" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>`,
     'alert-triangle': `<svg class="lucide" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" x2="12" y1="9" y2="13"/><line x1="12" x2="12.01" y1="17" y2="17"/></svg>`,
+    'boxes': `<svg class="lucide" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>`,
+    'refresh-cw': `<svg class="lucide" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>`,
     'log-out': `<svg class="lucide" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg>`
   },
 
@@ -497,6 +499,7 @@ const app = {
 
     const container = document.getElementById('view-container');
     if (viewName === 'daily-log') this.renderDailyLog(container);
+    else if (viewName === 'inventory') this.renderInventory(container);
     else if (viewName === 'reports') this.renderReports(container);
     else if (viewName === 'trends') this.renderTrends(container);
     else if (viewName === 'clients') this.renderClients(container);
@@ -4081,6 +4084,8 @@ const app = {
         document.getElementById('test-config-options').value = '';
       }
       document.getElementById('test-config-tracked').checked = !!test.is_tracked;
+      document.getElementById('test-config-tracks-stock').checked = !!test.tracks_stock;
+      document.getElementById('test-config-consumable-name').value = test.consumable_name || '';
     } else {
       document.getElementById('test-config-title').textContent = 'Add New Test';
       document.getElementById('test-config-id').value = '';
@@ -4088,8 +4093,11 @@ const app = {
       document.getElementById('test-config-unit').value = '';
       document.getElementById('test-config-options').value = '';
       document.getElementById('test-config-tracked').checked = true;
+      document.getElementById('test-config-tracks-stock').checked = false;
+      document.getElementById('test-config-consumable-name').value = '';
     }
     this.handleTestResultTypeChange();
+    this.handleTestStockTrackingToggle();
     modal.style.display = 'flex';
     
     form.onsubmit = __async(function*(e) {
@@ -4097,6 +4105,19 @@ const app = {
       yield this.saveTestConfig();
     });
   }),
+
+  handleTestStockTrackingToggle: function() {
+    const isTracks = document.getElementById('test-config-tracks-stock').checked;
+    const group = document.getElementById('test-config-consumable-group');
+    if (group) group.style.display = isTracks ? 'block' : 'none';
+    if (isTracks) {
+      const nameInput = document.getElementById('test-config-consumable-name');
+      if (nameInput && !nameInput.value.trim()) {
+        const testName = document.getElementById('test-config-name').value.trim();
+        if (testName) nameInput.value = testName;
+      }
+    }
+  },
 
   handleTestResultTypeChange: function() {
     const rType = document.getElementById('test-config-result-type').value;
@@ -4146,6 +4167,8 @@ const app = {
     const default_unit = document.getElementById('test-config-unit').value.trim() || null;
     const optionsRaw = document.getElementById('test-config-options').value;
     const is_tracked = document.getElementById('test-config-tracked').checked;
+    const tracks_stock = document.getElementById('test-config-tracks-stock').checked;
+    const consumable_name = tracks_stock ? (document.getElementById('test-config-consumable-name').value.trim() || name) : null;
     const parentRaw = document.getElementById('test-config-parent') ? document.getElementById('test-config-parent').value : '';
     const parent_rollup_id = parentRaw ? parseInt(parentRaw, 10) : null;
 
@@ -4159,7 +4182,7 @@ const app = {
       options = JSON.stringify(optionsRaw.split(',').map(s => s.trim()).filter(s => s));
     }
 
-    const payload = { name, section_id, is_tracked, result_type, default_unit, options, sort_order: 0, parent_rollup_id };
+    const payload = { name, section_id, is_tracked, result_type, default_unit, options, sort_order: 0, parent_rollup_id, tracks_stock, consumable_name };
     
     try {
       let res;
@@ -4262,6 +4285,550 @@ const app = {
       `;
     } catch (e) {
       console.error('Audit log error:', e);
+    }
+  }),
+
+  renderInventory: __async(function*(container) {
+    container.innerHTML = `
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 12px;">
+        <div>
+          <h2 style="color: var(--primary-color); margin: 0; font-size: 1.35rem;">Diagnostic Test Kit & Consumables Inventory</h2>
+          <p style="color: var(--text-muted); font-size: 0.85rem; margin-top: 4px;">Track physical test kits, rapid strips, cassettes, and FEFO lot balances.</p>
+        </div>
+        <div style="display: flex; gap: 10px;">
+          <button class="btn btn-secondary" id="btn-toggle-reconcile" onclick="app.toggleInventoryView('reconcile')">
+            ${this.icon('refresh-cw')} Consumption Reconciliation
+          </button>
+          <button class="btn btn-primary" onclick="app.openReceiveStockModal()">
+            ${this.icon('plus')} Receive New Stock Lot
+          </button>
+        </div>
+      </div>
+
+      <!-- Alerts Banner Container -->
+      <div id="inventory-alerts-container" style="margin-bottom: 16px;"></div>
+
+      <!-- Category Filter Tabs -->
+      <div style="display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; background: #FFFFFF; padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border-color);" id="inventory-cat-filters">
+        <button class="btn btn-secondary btn-sm inv-cat-btn active" style="font-weight: 600;" onclick="app.filterInventoryCategory('all', this)">All Diagnostic Kits</button>
+        <button class="btn btn-secondary btn-sm inv-cat-btn" onclick="app.filterInventoryCategory('HIV', this)">Serology / HIV</button>
+        <button class="btn btn-secondary btn-sm inv-cat-btn" onclick="app.filterInventoryCategory('Parasitology', this)">Parasitology & Malaria</button>
+        <button class="btn btn-secondary btn-sm inv-cat-btn" onclick="app.filterInventoryCategory('Serology', this)">General Serology</button>
+        <button class="btn btn-secondary btn-sm inv-cat-btn" onclick="app.filterInventoryCategory('Urinalysis', this)">Urinalysis Strips</button>
+        <button class="btn btn-secondary btn-sm inv-cat-btn" onclick="app.filterInventoryCategory('Molecular', this)">Molecular / EID</button>
+      </div>
+
+      <!-- Ledger Main View -->
+      <div id="inventory-ledger-view">
+        <!-- Stock Overview Summary Table -->
+        <div class="card" style="margin-bottom: 20px;">
+          <div class="card-header">
+            <span class="card-title">${this.icon('boxes')} Available Stock Balances & Minimum Buffer Status</span>
+          </div>
+          <div id="inventory-summary-container" style="padding: 16px; overflow-x: auto;">
+            <p style="color: var(--text-muted);">Loading inventory summary...</p>
+          </div>
+        </div>
+
+        <!-- Active Lots Details Table -->
+        <div class="card" style="margin-bottom: 20px;">
+          <div class="card-header">
+            <span class="card-title">${this.icon('clipboard-list')} Active Lot Ledger (FEFO Auto-Depletion Order)</span>
+          </div>
+          <div id="inventory-lots-container" style="padding: 16px; overflow-x: auto;">
+            <p style="color: var(--text-muted);">Loading lot details...</p>
+          </div>
+        </div>
+
+        <!-- Stock Transaction Audit Log -->
+        <details class="card" style="margin-bottom: 20px;">
+          <summary class="card-header" style="cursor: pointer; list-style: none;">
+            <span class="card-title">${this.icon('file-text')} Stock Movement & Usage History (Audit Log)</span>
+          </summary>
+          <div id="inventory-transactions-container" style="padding: 16px; overflow-x: auto;">
+            <p style="color: var(--text-muted);">Loading transaction log...</p>
+          </div>
+        </details>
+      </div>
+
+      <!-- Reconciliation View (Hidden by default) -->
+      <div id="inventory-reconciliation-view" style="display: none;">
+        <div class="card" style="margin-bottom: 20px;">
+          <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+            <span class="card-title">${this.icon('refresh-cw')} Consumption vs. Clinical Test Volume Reconciliation</span>
+            <button class="btn btn-secondary btn-sm" onclick="app.toggleInventoryView('ledger')">Back to Stock Ledger</button>
+          </div>
+          <div style="padding: 16px;">
+            <div style="display: flex; gap: 12px; align-items: flex-end; margin-bottom: 16px; flex-wrap: wrap;">
+              <div class="form-group">
+                <label style="font-size: 0.8rem; font-weight: 600; display: block; margin-bottom: 4px;">From Date:</label>
+                <input type="date" id="reconcile-from-date" style="padding: 6px 10px; border: 1px solid var(--border-color); border-radius: 4px;">
+              </div>
+              <div class="form-group">
+                <label style="font-size: 0.8rem; font-weight: 600; display: block; margin-bottom: 4px;">To Date:</label>
+                <input type="date" id="reconcile-to-date" style="padding: 6px 10px; border: 1px solid var(--border-color); border-radius: 4px;">
+              </div>
+              <button class="btn btn-primary btn-sm" onclick="app.loadInventoryReconciliation()" style="padding: 7px 16px;">Generate Reconciliation</button>
+            </div>
+            <div id="inventory-reconciliation-table-container">
+              <p style="color: var(--text-muted);">Select date range and click Generate Reconciliation.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+
+    yield this.loadInventoryData('all');
+  }),
+
+  loadInventoryData: __async(function*(category = 'all') {
+    this.currentInventoryCategory = category;
+    yield this.loadInventoryAlerts();
+    yield this.loadInventorySummary(category);
+    yield this.loadInventoryLots(category);
+    yield this.loadInventoryTransactions();
+  }),
+
+  filterInventoryCategory: __async(function*(category, btn) {
+    document.querySelectorAll('.inv-cat-btn').forEach(b => {
+      b.classList.remove('active');
+      b.style.fontWeight = 'normal';
+    });
+    if (btn) {
+      btn.classList.add('active');
+      btn.style.fontWeight = '600';
+    }
+    yield this.loadInventoryData(category);
+  }),
+
+  loadInventoryAlerts: __async(function*() {
+    const alertDiv = document.getElementById('inventory-alerts-container');
+    if (!alertDiv) return;
+    try {
+      const res = yield fetch('/api/stock/alerts');
+      if (!res.ok) return;
+      const alerts = yield res.json();
+      if (!alerts || alerts.length === 0) {
+        alertDiv.innerHTML = '';
+        return;
+      }
+
+      let alertsHtml = '<div style="display: flex; flex-direction: column; gap: 8px;">';
+      alerts.forEach(a => {
+        const isExpired = a.alert_type === 'EXPIRED';
+        const isLow = a.alert_type === 'LOW_STOCK';
+        const borderColor = isExpired ? 'var(--danger-color)' : (isLow ? 'var(--warning-color)' : '#EAB308');
+        const bgColor = isExpired ? '#FEF2F2' : (isLow ? '#FFFBEB' : '#FEFCE8');
+        const textColor = isExpired ? '#991B1B' : (isLow ? '#92400E' : '#713F12');
+
+        alertsHtml += `
+          <div style="background: ${bgColor}; border-left: 4px solid ${borderColor}; padding: 10px 14px; border-radius: 4px; color: ${textColor}; font-size: 0.88rem; display: flex; justify-content: space-between; align-items: center;">
+            <span><strong>${this.escape(a.alert_type.replace('_', ' '))}:</strong> ${this.escape(a.message)}</span>
+            <button class="btn btn-secondary btn-sm" style="padding: 2px 8px; font-size: 0.75rem;" onclick="app.openReceiveStockModal('${this.escape(a.kit_name)}')">Receive Stock</button>
+          </div>
+        `;
+      });
+      alertsHtml += '</div>';
+      alertDiv.innerHTML = alertsHtml;
+    } catch(e) {
+      console.error('Inventory alerts error:', e);
+    }
+  }),
+
+  loadInventorySummary: __async(function*(category = 'all') {
+    const container = document.getElementById('inventory-summary-container');
+    if (!container) return;
+    try {
+      const url = '/api/stock/summary' + (category !== 'all' ? '?category=' + encodeURIComponent(category) : '');
+      const res = yield fetch(url);
+      if (!res.ok) throw new Error('API returned ' + res.status);
+      const items = yield res.json();
+
+      if (items.length === 0) {
+        container.innerHTML = '<p style="color: var(--text-muted); padding: 12px;">No diagnostic kits found in this category.</p>';
+        return;
+      }
+
+      let rows = '';
+      items.forEach(item => {
+        let statusColor = '#166534';
+        if (item.status === 'Depleted') statusColor = 'var(--danger-color)';
+        else if (item.status === 'Low Stock') statusColor = 'var(--warning-color)';
+        else if (item.status === 'Near Expiry') statusColor = '#B45309';
+
+        rows += `
+          <tr>
+            <td><strong>${this.escape(item.kit_name)}</strong></td>
+            <td>${this.escape(item.category)}</td>
+            <td><strong>${item.total_quantity}</strong></td>
+            <td>${item.min_threshold}</td>
+            <td>${item.active_lots_count}</td>
+            <td style="font-weight: 600; color: ${statusColor};">${this.escape(item.status)}</td>
+            <td>
+              <button class="btn btn-secondary" style="padding: 2px 8px; font-size: 0.8rem;" onclick="app.openReceiveStockModal('${this.escape(item.kit_name)}')">+ Add Lot</button>
+            </td>
+          </tr>
+        `;
+      });
+
+      container.innerHTML = `
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Diagnostic Kit / Consumable</th>
+              <th>Category</th>
+              <th>Total Units Available</th>
+              <th>Min Buffer Threshold</th>
+              <th>Active Lots</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      `;
+    } catch (e) {
+      container.innerHTML = '<p style="color: var(--danger-color);">Failed to load inventory summary.</p>';
+    }
+  }),
+
+  loadInventoryLots: __async(function*(category = 'all') {
+    const container = document.getElementById('inventory-lots-container');
+    if (!container) return;
+    try {
+      const url = '/api/stock/lots?active_only=true' + (category !== 'all' ? '&category=' + encodeURIComponent(category) : '');
+      const res = yield fetch(url);
+      if (!res.ok) throw new Error('API returned ' + res.status);
+      const lots = yield res.json();
+
+      if (lots.length === 0) {
+        container.innerHTML = '<p style="color: var(--text-muted); padding: 12px;">No active lots registered.</p>';
+        return;
+      }
+
+      let rows = '';
+      lots.forEach(l => {
+        let statusColor = '#166534';
+        if (l.status === 'Expired' || l.status === 'Depleted') statusColor = 'var(--danger-color)';
+        else if (l.status === 'Low Stock' || l.status === 'Near Expiry') statusColor = 'var(--warning-color)';
+
+        rows += `
+          <tr>
+            <td><code>${this.escape(l.lot_number)}</code></td>
+            <td><strong>${this.escape(l.kit_name)}</strong></td>
+            <td>${this.escape(l.category)}</td>
+            <td>${this.escape(l.expiry_date)}</td>
+            <td>${l.initial_quantity}</td>
+            <td><strong>${l.current_quantity}</strong></td>
+            <td style="font-weight: 600; color: ${statusColor};">${this.escape(l.status)}</td>
+            <td>
+              <button class="btn btn-secondary" style="padding: 2px 8px; font-size: 0.8rem;" onclick="app.openAdjustStockModal(${l.id}, '${this.escape(l.kit_name)}', '${this.escape(l.lot_number)}', ${l.current_quantity})">
+                Adjust / Wastage
+              </button>
+            </td>
+          </tr>
+        `;
+      });
+
+      container.innerHTML = `
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Lot Number</th>
+              <th>Diagnostic Kit</th>
+              <th>Category</th>
+              <th>Expiry Date</th>
+              <th>Initial Qty</th>
+              <th>Current Balance</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      `;
+    } catch (e) {
+      container.innerHTML = '<p style="color: var(--danger-color);">Failed to load lot ledger.</p>';
+    }
+  }),
+
+  loadInventoryTransactions: __async(function*() {
+    const container = document.getElementById('inventory-transactions-container');
+    if (!container) return;
+    try {
+      const res = yield fetch('/api/stock/transactions?limit=50');
+      if (!res.ok) throw new Error('API returned ' + res.status);
+      const txs = yield res.json();
+
+      if (txs.length === 0) {
+        container.innerHTML = '<p style="color: var(--text-muted); padding: 12px;">No stock transactions recorded yet.</p>';
+        return;
+      }
+
+      let rows = '';
+      txs.forEach(t => {
+        const isDeduction = t.quantity_delta < 0;
+        const deltaColor = isDeduction ? 'var(--danger-color)' : '#166534';
+        const deltaPrefix = isDeduction ? '' : '+';
+
+        rows += `
+          <tr>
+            <td>${t.created_at ? t.created_at.replace('T', ' ').substring(0, 19) : ''}</td>
+            <td><strong>${this.escape(t.kit_name)}</strong></td>
+            <td><code>${this.escape(t.lot_number)}</code></td>
+            <td>${this.escape(t.transaction_type)}</td>
+            <td style="font-weight: 700; color: ${deltaColor};">${deltaPrefix}${t.quantity_delta}</td>
+            <td>${this.escape(t.reason || '')}</td>
+            <td>${this.escape(t.username || 'System')}</td>
+          </tr>
+        `;
+      });
+
+      container.innerHTML = `
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th style="width: 170px;">Date & Time</th>
+              <th>Diagnostic Kit</th>
+              <th>Lot No</th>
+              <th>Type</th>
+              <th>Delta</th>
+              <th>Reason</th>
+              <th>Staff User</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      `;
+    } catch(e) {
+      container.innerHTML = '<p style="color: var(--danger-color);">Failed to load transaction audit log.</p>';
+    }
+  }),
+
+  toggleInventoryView: function(viewType) {
+    const ledger = document.getElementById('inventory-ledger-view');
+    const reconcile = document.getElementById('inventory-reconciliation-view');
+    const filters = document.getElementById('inventory-cat-filters');
+    const toggleBtn = document.getElementById('btn-toggle-reconcile');
+
+    if (viewType === 'reconcile') {
+      if (ledger) ledger.style.display = 'none';
+      if (filters) filters.style.display = 'none';
+      if (reconcile) reconcile.style.display = 'block';
+      if (toggleBtn) toggleBtn.style.display = 'none';
+
+      // Set default dates (start of month to today)
+      const now = new Date();
+      const firstDay = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+      const today = now.toISOString().split('T')[0];
+      const fromInput = document.getElementById('reconcile-from-date');
+      const toInput = document.getElementById('reconcile-to-date');
+      if (fromInput && !fromInput.value) fromInput.value = firstDay;
+      if (toInput && !toInput.value) toInput.value = today;
+
+      this.loadInventoryReconciliation();
+    } else {
+      if (ledger) ledger.style.display = 'block';
+      if (filters) filters.style.display = 'flex';
+      if (reconcile) reconcile.style.display = 'none';
+      if (toggleBtn) toggleBtn.style.display = 'inline-block';
+    }
+  },
+
+  loadInventoryReconciliation: __async(function*() {
+    const container = document.getElementById('inventory-reconciliation-table-container');
+    if (!container) return;
+    const fromDate = document.getElementById('reconcile-from-date').value;
+    const toDate = document.getElementById('reconcile-to-date').value;
+
+    container.innerHTML = '<p style="color: var(--text-muted);">Calculating reconciliation metrics...</p>';
+    try {
+      let url = '/api/stock/reconciliation';
+      if (fromDate || toDate) {
+        url += `?from_date=${encodeURIComponent(fromDate)}&to_date=${encodeURIComponent(toDate)}`;
+      }
+      const res = yield fetch(url);
+      if (!res.ok) throw new Error('API returned ' + res.status);
+      const data = yield res.json();
+
+      if (data.length === 0) {
+        container.innerHTML = '<p style="color: var(--text-muted); padding: 12px;">No reconciliation data found for this period.</p>';
+        return;
+      }
+
+      let rows = '';
+      data.forEach(r => {
+        const varColor = r.variance === 0 ? '#166534' : (r.variance > 0 ? '#B45309' : 'var(--danger-color)');
+        rows += `
+          <tr>
+            <td><strong>${this.escape(r.kit_name)}</strong></td>
+            <td>${this.escape(r.category)}</td>
+            <td><strong>${r.tests_completed}</strong></td>
+            <td>${r.kits_consumed}</td>
+            <td>${r.wastage_recorded}</td>
+            <td style="font-weight: 700; color: ${varColor};">${r.variance > 0 ? '+' : ''}${r.variance}</td>
+          </tr>
+        `;
+      });
+
+      container.innerHTML = `
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Diagnostic Kit / Consumable</th>
+              <th>Category</th>
+              <th>Clinical Tests Done</th>
+              <th>Kits Deducted</th>
+              <th>Wastage / QC</th>
+              <th>Consumption Variance</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      `;
+    } catch(e) {
+      container.innerHTML = '<p style="color: var(--danger-color);">Failed to load reconciliation report.</p>';
+    }
+  }),
+
+  openReceiveStockModal: __async(function*(kitName = '') {
+    const form = document.getElementById('receive-stock-form');
+    if (form) form.reset();
+
+    // Populate datalist with registered kits
+    try {
+      const res = yield fetch('/api/stock/summary');
+      if (res.ok) {
+        const kits = yield res.json();
+        const datalist = document.getElementById('registered-kits-list');
+        if (datalist) {
+          datalist.innerHTML = '';
+          kits.forEach(k => {
+            datalist.innerHTML += `<option value="${this.escape(k.kit_name)}">`;
+          });
+        }
+      }
+    } catch(e) {}
+
+    const kitInput = document.getElementById('receive-stock-kit');
+    if (kitInput && kitName) kitInput.value = kitName;
+
+    // Set default expiration date to 1 year from today
+    const expInput = document.getElementById('receive-stock-expiry');
+    if (expInput) {
+      const nextYear = new Date();
+      nextYear.setFullYear(nextYear.getFullYear() + 1);
+      expInput.value = nextYear.toISOString().split('T')[0];
+    }
+
+    const modal = document.getElementById('receive-stock-modal');
+    if (modal) modal.style.display = 'flex';
+  }),
+
+  submitReceiveStock: __async(function*(e) {
+    e.preventDefault();
+    const kit_name = document.getElementById('receive-stock-kit').value.trim();
+    const category = document.getElementById('receive-stock-category').value;
+    const lot_number = document.getElementById('receive-stock-lot-no').value.trim();
+    const expiry_date = document.getElementById('receive-stock-expiry').value;
+    const initial_quantity = parseInt(document.getElementById('receive-stock-quantity').value, 10);
+    const min_threshold = parseInt(document.getElementById('receive-stock-threshold').value, 10) || 25;
+
+    if (!kit_name || !lot_number || !expiry_date || isNaN(initial_quantity) || initial_quantity <= 0) {
+      this.showNotificationModal("Validation Error", "Please provide complete and valid lot information.", true);
+      return;
+    }
+
+    const payload = { kit_name, category, lot_number, expiry_date, initial_quantity, min_threshold };
+
+    try {
+      const res = yield fetch('/api/stock/receive', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      if (res.ok) {
+        document.getElementById('receive-stock-modal').style.display = 'none';
+        this.showNotificationModal("Success", `Stock lot received successfully (${initial_quantity} units of ${kit_name}).`);
+        yield this.loadInventoryData(this.currentInventoryCategory || 'all');
+      } else {
+        const err = yield res.json();
+        this.showNotificationModal("Error", err.detail || 'Failed to receive stock lot.', true);
+      }
+    } catch(e) {
+      this.showNotificationModal("Error", 'Connection error while saving stock receipt.', true);
+    }
+  }),
+
+  openAdjustStockModal: function(lotId, kitName, lotNumber, currentQty) {
+    document.getElementById('adjust-stock-lot-id').value = lotId;
+    document.getElementById('adjust-stock-lot-info').textContent = `${kitName} (Lot ${lotNumber}) — Current Balance: ${currentQty} units`;
+    document.getElementById('adjust-stock-type').value = 'WASTAGE_QC';
+    document.getElementById('adjust-stock-delta').value = '1';
+    document.getElementById('adjust-stock-reason').value = '';
+    this.handleAdjustStockTypeChange();
+    document.getElementById('adjust-stock-modal').style.display = 'flex';
+  },
+
+  handleAdjustStockTypeChange: function() {
+    const type = document.getElementById('adjust-stock-type').value;
+    const label = document.getElementById('adjust-stock-qty-label');
+    const input = document.getElementById('adjust-stock-delta');
+    if (type === 'WASTAGE_QC') {
+      if (label) label.textContent = 'Number of Units to Deduct / Waste (e.g. 2) *:';
+      if (input) {
+        input.placeholder = 'e.g. 2';
+        input.min = '1';
+      }
+    } else {
+      if (label) label.textContent = 'Adjustment Amount (+ to add, - to reduce) *:';
+      if (input) {
+        input.placeholder = 'e.g. +5 or -3';
+        input.removeAttribute('min');
+      }
+    }
+  },
+
+  submitAdjustStock: __async(function*(e) {
+    e.preventDefault();
+    const lot_id = parseInt(document.getElementById('adjust-stock-lot-id').value, 10);
+    const transaction_type = document.getElementById('adjust-stock-type').value;
+    let quantity_delta = parseInt(document.getElementById('adjust-stock-delta').value, 10);
+    const reason = document.getElementById('adjust-stock-reason').value.trim();
+
+    if (isNaN(quantity_delta) || quantity_delta === 0) {
+      this.showNotificationModal("Validation Error", "Number of units must not be zero.", true);
+      return;
+    }
+    if (!reason) {
+      this.showNotificationModal("Validation Error", "A detailed reason is required for stock adjustments.", true);
+      return;
+    }
+
+    if (transaction_type === 'WASTAGE_QC' && quantity_delta > 0) {
+      quantity_delta = -quantity_delta;
+    }
+
+    const payload = { lot_id, transaction_type, quantity_delta, reason };
+
+    try {
+      const res = yield fetch('/api/stock/adjust', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      if (res.ok) {
+        document.getElementById('adjust-stock-modal').style.display = 'none';
+        this.showNotificationModal("Success", "Stock adjusted successfully.");
+        yield this.loadInventoryData(this.currentInventoryCategory || 'all');
+      } else {
+        const err = yield res.json();
+        this.showNotificationModal("Error", err.detail || 'Failed to adjust stock.', true);
+      }
+    } catch(e) {
+      this.showNotificationModal("Error", 'Connection error while adjusting stock.', true);
     }
   }),
 
