@@ -136,6 +136,11 @@ def is_qualitative_abnormal(result_val: str, ref_val: str = None, param_name: st
                 return False
             if v_low == "turbid":
                 return True
+        if any(term in p_low for term in ["widal", "salmonella", "to", "th", "ao", "bh", "o antigen", "h antigen"]):
+            if any(n in v_low for n in ["< 1:20", "<1:20", "1:20", "1:40", "not done", "negative", "nil", "not seen"]) and not any(t in v_low for t in ["1:80", "1:160", "1:320", "1:640", ">= 1:640", ">=1:640"]):
+                return False
+            if any(t in v_low for t in ["1:80", "1:160", "1:320", "1:640", ">= 1:640", ">=1:640"]) or "positive" in v_low or "reactive" in v_low:
+                return True
 
     # Normal exact matches
     normal_exact = {
@@ -143,13 +148,25 @@ def is_qualitative_abnormal(result_val: str, ref_val: str = None, param_name: st
         "clear", "slightly turbid", "normal", "yellow",
         "formed, no blood/mucus", "semi-formed, no blood/mucus",
         "no ova, cysts, or trophozoites seen", "hyaline casts (0-1 / lpf)",
-        "1-2 / lpf", "3-4 / lpf", "few", "1.0 eu/dl", "normal (1.0 eu/dl)"
+        "1-2 / lpf", "3-4 / lpf", "few", "1.0 eu/dl", "normal (1.0 eu/dl)",
+        "not done", "< 1:20", "<1:20", "1:20", "1:40",
+        "negative (not detected)", "not detected", "no growth after 48 hours"
     }
     if v_low in normal_exact:
         return False
 
+    # Defensive check: if text clearly indicates non-reactivity / negativity
+    if (v_low.startswith("non-reactive") or v_low.startswith("non reactive") or 
+        (v_low.startswith("negative") and "positive" not in v_low) or
+        "not detected" in v_low):
+        return False
+
     # Explicit abnormal markers
-    if any(m in v_low for m in ["positive", "reactive", "abnormal", "detected", "turbid"]):
+    if (("positive" in v_low) or 
+        ("reactive" in v_low and "non-reactive" not in v_low and "non reactive" not in v_low) or 
+        ("abnormal" in v_low) or 
+        ("detected" in v_low and "not detected" not in v_low) or 
+        ("turbid" in v_low)):
         return True
 
     # Dipstick semiquantitative pluses or trace
@@ -282,5 +299,212 @@ def evaluate_result(test_name: str, result_value: str, dob: datetime.date = None
         "flag": flag,
         "is_abnormal": is_abnormal
     }
+
+
+def derive_hiv_outcome(kit_results: list | dict) -> dict:
+    """
+    Derives conclusive HIV diagnosis according to the Uganda MoH / UVRI 3-Test Algorithm:
+    A1: MHS Kwiq Test / Determine (Screening)
+    A2: HIV 1/2 Stat-Pak (Confirmatory)
+    A3: SD Bioline / Uni-Gold (Tie-Breaker)
+    Also supports HIVST self-tests and EID Molecular PCR protocols.
+    """
+    if isinstance(kit_results, dict):
+        kit_map = {str(k).strip().lower(): str(v).strip() for k, v in kit_results.items()}
+    elif isinstance(kit_results, list):
+        kit_map = {}
+        for item in kit_results:
+            if isinstance(item, dict):
+                k_name = str(item.get("name") or item.get("parameter_name") or "").strip().lower()
+                k_res = str(item.get("result") if item.get("result") is not None else item.get("result_value", "")).strip()
+                if k_name:
+                    kit_map[k_name] = k_res
+    else:
+        kit_map = {}
+
+    def is_pos_or_react(val: str) -> bool:
+        v = str(val).strip().lower()
+        if not v or v in ("not done", "none", "null", ""):
+            return False
+        if v.startswith("non-reactive") or v.startswith("non reactive") or "not detected" in v:
+            return False
+        return any(x in v for x in ("reactive", "positive", "detected"))
+
+    def is_neg_or_non_react(val: str) -> bool:
+        v = str(val).strip().lower()
+        if not v or v in ("not done", "none", "null", ""):
+            return False
+        return any(x in v for x in ("non-reactive", "non reactive", "negative", "not detected"))
+
+    # 1. Check EID Molecular PCR protocols
+    eid_keys = [k for k in kit_map if "pcr" in k or "eid" in k]
+    if eid_keys:
+        eid_pos = any(is_pos_or_react(kit_map[k]) for k in eid_keys)
+        eid_neg = any(is_neg_or_non_react(kit_map[k]) for k in eid_keys)
+        if eid_pos:
+            return {
+                "conclusive_status": "Positive",
+                "display_result": "HIV-Positive (EID PCR Detected)",
+                "clinical_flag": "\u26A0",
+                "reference": "Negative (Not Detected)",
+                "advisory": "Infant HIV DNA/RNA detected. Immediate pediatric ART referral recommended."
+            }
+        elif eid_neg:
+            return {
+                "conclusive_status": "Negative",
+                "display_result": "HIV-Negative (EID PCR Not Detected)",
+                "clinical_flag": None,
+                "reference": "Negative (Not Detected)",
+                "advisory": "No infant HIV DNA/RNA detected on current PCR run."
+            }
+
+    # 2. Check HIVST Self-Tests (if only HIVST tested)
+    hivst_keys = [k for k in kit_map if "oraquick" in k or "self-test" in k or "hivst" in k]
+    rdt_keys = [k for k in kit_map if any(x in k for x in ("kwiq", "determine", "stat-pak", "statpak", "bioline", "uni-gold"))]
+    
+    if hivst_keys and not any(is_pos_or_react(kit_map[k]) or is_neg_or_non_react(kit_map[k]) for k in rdt_keys):
+        if any(is_pos_or_react(kit_map[k]) for k in hivst_keys):
+            return {
+                "conclusive_status": "Preliminary Positive",
+                "display_result": "Preliminary Positive (Self-Test Screening)",
+                "clinical_flag": "\u26A0",
+                "reference": "Non-Reactive",
+                "advisory": "Self-test is screening only. Must undergo full 3-test clinical algorithm before ART."
+            }
+        elif any(is_neg_or_non_react(kit_map[k]) for k in hivst_keys):
+            return {
+                "conclusive_status": "Negative",
+                "display_result": "Non-Reactive (Negative Self-Test)",
+                "clinical_flag": None,
+                "reference": "Non-Reactive",
+                "advisory": "Routine prevention counseling recommended."
+            }
+
+    # 3. Standard Ugandan National 3-Test RDT Algorithm
+    a1_val = None
+    for k, v in kit_map.items():
+        if any(x in k for x in ("kwiq", "determine")):
+            if v and v.lower() != "not done":
+                a1_val = v
+                break
+
+    a2_val = None
+    for k, v in kit_map.items():
+        if any(x in k for x in ("stat-pak", "statpak")):
+            if v and v.lower() != "not done":
+                a2_val = v
+                break
+
+    a3_val = None
+    for k, v in kit_map.items():
+        if any(x in k for x in ("bioline", "uni-gold")):
+            if v and v.lower() != "not done":
+                a3_val = v
+                break
+
+    if not a1_val and not a2_val and not a3_val:
+        raw_vals = [v for v in kit_map.values() if v and v.lower() != "not done"]
+        if any(is_pos_or_react(v) for v in raw_vals):
+            return {
+                "conclusive_status": "Positive",
+                "display_result": "Reactive (Positive)",
+                "clinical_flag": "\u26A0",
+                "reference": "Non-Reactive",
+                "advisory": "Reactive antibody finding."
+            }
+        else:
+            return {
+                "conclusive_status": "Negative",
+                "display_result": "Non-Reactive (Negative)",
+                "clinical_flag": None,
+                "reference": "Non-Reactive",
+                "advisory": "Routine prevention counseling recommended."
+            }
+
+    a1_pos = is_pos_or_react(a1_val) if a1_val else False
+    a2_pos = is_pos_or_react(a2_val) if a2_val else False
+    a3_pos = is_pos_or_react(a3_val) if a3_val else False
+
+    # A1 Non-Reactive -> Final Negative
+    if a1_val and not a1_pos:
+        return {
+            "conclusive_status": "Negative",
+            "display_result": "Non-Reactive (Negative)",
+            "clinical_flag": None,
+            "reference": "Non-Reactive",
+            "advisory": "Screening test non-reactive. Routine prevention counseling recommended."
+        }
+
+    # A1 Reactive
+    if a1_pos:
+        if a2_val is not None:
+            if a2_pos:
+                if a3_val is not None:
+                    if a3_pos:
+                        # Concordant Positive: A1+, A2+, A3+
+                        return {
+                            "conclusive_status": "Positive",
+                            "display_result": "Reactive (Positive)",
+                            "clinical_flag": "\u26A0",
+                            "reference": "Non-Reactive",
+                            "advisory": "Concordant 3-test reactive. Refer to ART clinic for baseline CD4/VL."
+                        }
+                    else:
+                        # Inconclusive: A1+, A2+, A3-
+                        return {
+                            "conclusive_status": "Inconclusive",
+                            "display_result": "Inconclusive (Discordant)",
+                            "clinical_flag": "\u26A0",
+                            "reference": "Non-Reactive",
+                            "advisory": "Discrepant antibody pattern. Do NOT initiate ART. Repeat blood draw in 14 days."
+                        }
+                else:
+                    # A1+ and A2+ entered, A3 pending
+                    return {
+                        "conclusive_status": "Positive",
+                        "display_result": "Reactive (A1+/A2+ Confirmed)",
+                        "clinical_flag": "\u26A0",
+                        "reference": "Non-Reactive",
+                        "advisory": "Concordant reactive screening and confirmatory tests."
+                    }
+            else:
+                # A1+ and A2-
+                if a3_val is not None:
+                    if not a3_pos:
+                        # Discordant resolved negative: A1+, A2-, A3-
+                        return {
+                            "conclusive_status": "Negative",
+                            "display_result": "Non-Reactive (Resolved Discordance)",
+                            "clinical_flag": None,
+                            "reference": "Non-Reactive",
+                            "advisory": "Discordance resolved negative (A2 & A3 non-reactive)."
+                        }
+                    else:
+                        # Inconclusive: A1+, A2-, A3+
+                        return {
+                            "conclusive_status": "Inconclusive",
+                            "display_result": "Inconclusive (Discordant)",
+                            "clinical_flag": "\u26A0",
+                            "reference": "Non-Reactive",
+                            "advisory": "Discrepant antibody pattern (Stat-Pak negative). Repeat blood draw in 14 days."
+                        }
+                else:
+                    # A1+ and A2-, A3 pending
+                    return {
+                        "conclusive_status": "Inconclusive",
+                        "display_result": "Discordant (A3 Tie-Breaker Required)",
+                        "clinical_flag": "\u26A0",
+                        "reference": "Non-Reactive",
+                        "advisory": "Discordant screening/confirmation. Perform tie-breaker test (SD Bioline / Uni-Gold)."
+                    }
+
+    return {
+        "conclusive_status": "Negative",
+        "display_result": "Non-Reactive (Negative)",
+        "clinical_flag": None,
+        "reference": "Non-Reactive",
+        "advisory": "Routine prevention counseling recommended."
+    }
+
 
 

@@ -44,8 +44,10 @@ PANELS = {
     'STOOL ANALYSIS': [
         'Stool Analysis (Macroscopy)', 'Stool Analysis (Microscopy)', 'Stool Occult Blood'
     ],
-    'HIV Testing Service': [
-        'Determine', 'Stat-Pak', 'SD Bioline'
+    'HIV Testing': [
+        'MHS HIV 1/2 Kwiq Test', 'Determine™ HIV-1/2', 'HIV 1/2 Stat-Pak®', 'SD Bioline HIV-1/2',
+        'OraQuick® HIV Self-Test', 'Fingerstick HIVST',
+        'EID 1st PCR (4-6 Weeks)', 'EID 2nd PCR (9 Months)', 'EID Final Rapid Test (18 Months)'
     ]
 }
 
@@ -58,7 +60,7 @@ TESTS = [
     {'name': 'LIPID PROFILE', 'section': 'Clinical Biochemistry', 'is_tracked': 0, 'result_type': 'panel', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': None, 'parent_name': None, 'sort_order': 0},
     {'name': 'URINALYSIS', 'section': 'Urinalysis Profile', 'is_tracked': 1, 'result_type': 'panel', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': None, 'parent_name': None, 'sort_order': 0},
     {'name': 'STOOL ANALYSIS', 'section': 'Parasitology & Stool Diagnostics', 'is_tracked': 1, 'result_type': 'panel', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': None, 'parent_name': None, 'sort_order': 0},
-    {'name': 'HIV Testing Service', 'section': 'Serology & Clinical Immunology', 'is_tracked': 1, 'result_type': 'panel', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': None, 'parent_name': None, 'sort_order': 0},
+    {'name': 'HIV Testing', 'section': 'Serology & Clinical Immunology', 'is_tracked': 1, 'result_type': 'panel', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': None, 'parent_name': None, 'sort_order': 0},
     {'name': 'E.S.R (Erythrocyte Sedimentation Rate)', 'section': 'Hematology', 'is_tracked': 0, 'result_type': 'quantitative', 'default_unit': 'mm/hour', 'secondary_unit': None, 'ref_range': None, 'options': None, 'parent_name': None, 'sort_order': 0},
     {'name': 'Aptt (Activated Partial Thromboplastin Time)', 'section': 'Hematology', 'is_tracked': 0, 'result_type': 'quantitative', 'default_unit': 'Seconds', 'secondary_unit': None, 'ref_range': None, 'options': None, 'parent_name': None, 'sort_order': 0},
     {'name': 'Prothrombin Time (PT)', 'section': 'Hematology', 'is_tracked': 0, 'result_type': 'quantitative', 'default_unit': 'Seconds', 'secondary_unit': None, 'ref_range': None, 'options': None, 'parent_name': None, 'sort_order': 0},
@@ -67,7 +69,8 @@ TESTS = [
     {'name': 'Clotting Time (CT)', 'section': 'Hematology', 'is_tracked': 0, 'result_type': 'quantitative', 'default_unit': 'Minutes', 'secondary_unit': None, 'ref_range': None, 'options': None, 'parent_name': None, 'sort_order': 0},
     {'name': 'Reticulocyte Count', 'section': 'Hematology', 'is_tracked': 0, 'result_type': 'quantitative', 'default_unit': '%', 'secondary_unit': None, 'ref_range': None, 'options': None, 'parent_name': None, 'sort_order': 0},
     {'name': 'Sickling Test (Sodium Metabisulfite)', 'section': 'Hematology', 'is_tracked': 1, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['Positive', 'Negative'], 'parent_name': None, 'sort_order': 0},
-    {'name': 'WIDAL (Salmonella Typhi Agglutination)', 'section': 'Serology & Clinical Immunology', 'is_tracked': 1, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['Negative', 'Positive (TO 1:80, TH 1:80)', 'Positive (TO 1:160, TH 1:160)', 'Positive (TO 1:320, TH 1:320)'], 'parent_name': None, 'sort_order': 0},
+    {'name': 'WIDAL (Salmonella Typhi Agglutination)', 'section': 'Serology & Clinical Immunology', 'is_tracked': 1, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['Negative', 'Positive'], 'parent_name': None, 'sort_order': 0},
+
     {'name': 'VDRL/RPR (Syphilis Screening)', 'section': 'Serology & Clinical Immunology', 'is_tracked': 1, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['Non-Reactive', 'Reactive (1:2)', 'Reactive (1:4)', 'Reactive (1:8)', 'Reactive (1:16)', 'Reactive (1:32)', 'Reactive (1:64)'], 'parent_name': None, 'sort_order': 0},
     {'name': 'HBsAg (Hepatitis B)', 'section': 'Serology & Clinical Immunology', 'is_tracked': 1, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['Positive', 'Negative'], 'parent_name': None, 'sort_order': 0},
     {'name': 'BAT (Brucella Antigen Test)', 'section': 'Serology & Clinical Immunology', 'is_tracked': 1, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['Negative', 'Positive (1:80)', 'Positive (1:160)', 'Positive (1:320)'], 'parent_name': None, 'sort_order': 0},
@@ -170,9 +173,15 @@ TESTS = [
     {'name': 'Stool Analysis (Macroscopy)', 'section': 'Parasitology & Stool Diagnostics', 'is_tracked': 0, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['Formed, No blood/mucus', 'Semi-formed, No blood/mucus', 'Loose', 'Watery', 'Blood present', 'Mucus present', 'Blood and mucus present'], 'parent_name': 'STOOL ANALYSIS', 'sort_order': 1},
     {'name': 'Stool Analysis (Microscopy)', 'section': 'Parasitology & Stool Diagnostics', 'is_tracked': 0, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['No ova, cysts, or trophozoites seen', 'E. histolytica cysts seen', 'E. histolytica trophozoites seen', 'G. lamblia cysts seen', 'G. lamblia trophozoites seen', 'Hookworm ova seen', 'Ascaris lumbricoides ova seen', 'Schistosoma mansoni ova seen', 'Trichuris trichiura ova seen'], 'parent_name': 'STOOL ANALYSIS', 'sort_order': 2},
     {'name': 'Stool Occult Blood', 'section': 'Parasitology & Stool Diagnostics', 'is_tracked': 0, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['Negative', 'Positive'], 'parent_name': 'STOOL ANALYSIS', 'sort_order': 3},
-    {'name': 'Determine', 'section': 'Serology & Clinical Immunology', 'is_tracked': 0, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['Non-Reactive', 'Reactive'], 'parent_name': 'HIV Testing Service', 'sort_order': 1},
-    {'name': 'Stat-Pak', 'section': 'Serology & Clinical Immunology', 'is_tracked': 0, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['Non-Reactive', 'Reactive'], 'parent_name': 'HIV Testing Service', 'sort_order': 2},
-    {'name': 'SD Bioline', 'section': 'Serology & Clinical Immunology', 'is_tracked': 0, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['Non-Reactive', 'Reactive'], 'parent_name': 'HIV Testing Service', 'sort_order': 3}
+    {'name': 'MHS HIV 1/2 Kwiq Test', 'section': 'Serology & Clinical Immunology', 'is_tracked': 0, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['Non-Reactive', 'Reactive'], 'parent_name': 'HIV Testing', 'sort_order': 1},
+    {'name': 'Determine™ HIV-1/2', 'section': 'Serology & Clinical Immunology', 'is_tracked': 0, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['Non-Reactive', 'Reactive'], 'parent_name': 'HIV Testing', 'sort_order': 2},
+    {'name': 'HIV 1/2 Stat-Pak®', 'section': 'Serology & Clinical Immunology', 'is_tracked': 0, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['Non-Reactive', 'Reactive'], 'parent_name': 'HIV Testing', 'sort_order': 3},
+    {'name': 'SD Bioline HIV-1/2', 'section': 'Serology & Clinical Immunology', 'is_tracked': 0, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['Non-Reactive', 'Reactive'], 'parent_name': 'HIV Testing', 'sort_order': 4},
+    {'name': 'OraQuick® HIV Self-Test', 'section': 'Serology & Clinical Immunology', 'is_tracked': 0, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['Non-Reactive', 'Reactive'], 'parent_name': 'HIV Testing', 'sort_order': 5},
+    {'name': 'Fingerstick HIVST', 'section': 'Serology & Clinical Immunology', 'is_tracked': 0, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['Non-Reactive', 'Reactive'], 'parent_name': 'HIV Testing', 'sort_order': 6},
+    {'name': 'EID 1st PCR (4-6 Weeks)', 'section': 'Serology & Clinical Immunology', 'is_tracked': 0, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['Negative (Not Detected)', 'Positive (Detected)'], 'parent_name': 'HIV Testing', 'sort_order': 7},
+    {'name': 'EID 2nd PCR (9 Months)', 'section': 'Serology & Clinical Immunology', 'is_tracked': 0, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['Negative (Not Detected)', 'Positive (Detected)'], 'parent_name': 'HIV Testing', 'sort_order': 8},
+    {'name': 'EID Final Rapid Test (18 Months)', 'section': 'Serology & Clinical Immunology', 'is_tracked': 0, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['Non-Reactive', 'Reactive'], 'parent_name': 'HIV Testing', 'sort_order': 9}
 ]
 
 DEFAULT_REFERENCE_RANGES = [
@@ -342,11 +351,16 @@ def seed_reference_ranges(cur):
             """, (test_id, n_min, n_max, c_min, c_max, s_min, s_max, p_min, p_max, unit, existing["id"]))
 
 
-def seed_database():
-    print("Initializing database schema...")
-    init_db()
-    conn = get_connection()
-    conn.row_factory = sqlite3.Row
+def seed_database(conn=None):
+    should_close = False
+    if conn is None:
+        print("Initializing database schema...")
+        init_db()
+        conn = get_connection()
+        conn.row_factory = sqlite3.Row
+        should_close = True
+    else:
+        conn.row_factory = sqlite3.Row
     cur = conn.cursor()
 
     # Wards
@@ -370,7 +384,7 @@ def seed_database():
 
     # Rename migrations
     cur.execute("UPDATE tests SET name = 'Complete Blood Count (CBC)' WHERE name = 'CBC'")
-    cur.execute("UPDATE tests SET name = 'HIV Testing Service' WHERE name = 'HIV (MoH Three-Test Algorithm)'")
+    cur.execute("UPDATE tests SET name = 'HIV Testing' WHERE name IN ('HIV (MoH Three-Test Algorithm)', 'HIV Testing Service')")
 
     # Clean relative count test names
     rel_names = [
@@ -440,6 +454,11 @@ def seed_database():
 
     conn.commit()
 
+    # Clean legacy short-named parameters under HIV Testing if any
+    hiv_parent_id = test_id_map.get("HIV Testing")
+    if hiv_parent_id:
+        cur.execute("DELETE FROM test_parameters WHERE test_id = ? AND parameter_name IN ('Determine', 'Stat-Pak', 'SD Bioline')", (hiv_parent_id,))
+
     for t in TESTS:
         if not t.get("parent_name"):
             continue
@@ -478,9 +497,35 @@ def seed_database():
                 WHERE id = ?
             """, (t["default_unit"], t.get("secondary_unit"), t["ref_range"], t["sort_order"], opts, tp_row["id"]))
 
+    # Seed WIDAL parameters under WIDAL test
+    cur.execute("SELECT id FROM tests WHERE name LIKE '%WIDAL%'")
+    widal_row = cur.fetchone()
+    if widal_row:
+        widal_id = widal_row["id"]
+        WIDAL_PARAMS = [
+            ("Salmonella typhi O (TO)", None, "Significant if >= 1:80", 1, '["Not Done", "< 1:20 (Low / Normal)", "1:20 (Low / Normal)", "1:40 (Low / Normal)", "1:80 (Borderline Significant)", "1:160 (High / Reactive)", "1:320 (High / Reactive)", ">= 1:640 (Very High / Reactive)"]'),
+            ("Salmonella typhi H (TH)", None, "Significant if >= 1:80", 2, '["Not Done", "< 1:20 (Low / Normal)", "1:20 (Low / Normal)", "1:40 (Low / Normal)", "1:80 (Borderline Significant)", "1:160 (High / Reactive)", "1:320 (High / Reactive)", ">= 1:640 (Very High / Reactive)"]'),
+            ("Salmonella paratyphi A (AO)", None, "Significant if >= 1:80", 3, '["Not Done", "< 1:20 (Low / Normal)", "1:20 (Low / Normal)", "1:40 (Low / Normal)", "1:80 (Borderline Significant)", "1:160 (High / Reactive)", "1:320 (High / Reactive)", ">= 1:640 (Very High / Reactive)"]'),
+            ("Salmonella paratyphi B (BH)", None, "Significant if >= 1:80", 4, '["Not Done", "< 1:20 (Low / Normal)", "1:20 (Low / Normal)", "1:40 (Low / Normal)", "1:80 (Borderline Significant)", "1:160 (High / Reactive)", "1:320 (High / Reactive)", ">= 1:640 (Very High / Reactive)"]'),
+        ]
+        for pname, punit, pref, porder, popts in WIDAL_PARAMS:
+            cur.execute("SELECT id FROM test_parameters WHERE test_id = ? AND parameter_name = ?", (widal_id, pname))
+            tp_r = cur.fetchone()
+            if not tp_r:
+                cur.execute("""
+                    INSERT INTO test_parameters (test_id, parameter_name, unit, ref_range, sort_order, options)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                """, (widal_id, pname, punit, pref, porder, popts))
+            else:
+                cur.execute("""
+                    UPDATE test_parameters SET unit = ?, ref_range = ?, sort_order = ?, options = ?
+                    WHERE id = ?
+                """, (punit, pref, porder, popts, tp_r["id"]))
+
     seed_reference_ranges(cur)
     conn.commit()
-    conn.close()
+    if should_close:
+        conn.close()
     print(f"Seeding done: {len(sec_map)} sections, {len(TESTS)} tests.")
 
 

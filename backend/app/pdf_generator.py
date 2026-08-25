@@ -164,6 +164,45 @@ def _build_department_table(dept_name: str, tests: list) -> KeepTogether:
                     flag_cell,
                     Paragraph(p_ref, ref_style) if p_ref else ""
                 ])
+
+            if "hiv" in panel_name.lower() and params:
+                hiv_derived = evaluator.derive_hiv_outcome(params)
+                h_flag = hiv_derived.get("clinical_flag")
+                if h_flag:
+                    if FONT_SYMBOL != 'Helvetica':
+                        h_flag_cell = Paragraph(f'<font name="{FONT_SYMBOL}" color="#dc2626">\u26A0</font>', flag_center_style)
+                    else:
+                        h_flag_cell = Paragraph('<font color="#dc2626"><b>\u26A0</b></font>', flag_center_style)
+                else:
+                    h_flag_cell = ""
+
+                h_res_para = Paragraph(f"<b>{hiv_derived['display_result']}</b>", result_abnormal_style if h_flag else result_style)
+                data.append([
+                    Paragraph("<b>Final HIV Interpretation:</b>", param_title_style),
+                    h_res_para,
+                    Paragraph("", unit_style),
+                    h_flag_cell,
+                    Paragraph(hiv_derived.get("reference") or "Non-Reactive", ref_style)
+                ])
+                summary_row_idx = len(data) - 1
+                style_cmds.append(('BACKGROUND', (0, summary_row_idx), (-1, summary_row_idx), colors.HexColor('#f1f5f9')))
+
+                if hiv_derived.get("advisory"):
+                    adv_row_idx = len(data)
+                    adv_style = ParagraphStyle(
+                        name=f"HivAdv_{adv_row_idx}",
+                        fontName=FONT_REGULAR,
+                        fontSize=7.5,
+                        leading=9.5,
+                        textColor=colors.HexColor('#334155'),
+                        leftIndent=8
+                    )
+                    data.append([
+                        Paragraph(f"<i>Clinical Note: {hiv_derived['advisory']}</i>", adv_style),
+                        "", "", "", ""
+                    ])
+                    style_cmds.append(('SPAN', (0, adv_row_idx), (-1, adv_row_idx)))
+                    style_cmds.append(('BACKGROUND', (0, adv_row_idx), (-1, adv_row_idx), colors.HexColor('#f8fafc')))
         else:
             # Standalone single test
             res_text = str(t.get("result") or "")

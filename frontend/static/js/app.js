@@ -2208,17 +2208,45 @@ const app = {
          uaHtml += '</div></div>';
        });
        paramsContainer.innerHTML = uaHtml;
-    } else if (nameLower.includes('widal')) {
-       singleContainer.innerHTML = `
-         <label>Result:</label>
-         <select id="widal-res" onchange="document.getElementById('widal-titers').style.display = this.value==='Positive' ? 'block' : 'none'" style="width:100%; padding:8px; margin-bottom:8px;">
-           <option>Negative</option><option>Positive</option>
-         </select>
-         <div id="widal-titers" style="display:none;">
-           <label>Titers (if Positive):</label>
-           <input type="text" id="widal-tit-val" placeholder="e.g. TO 1:160, TH 1:80" style="width:100%; padding:8px;">
-         </div>
-       `;
+    } else if (nameLower.indexOf('widal') !== -1) {
+       singleContainer.style.display = 'block';
+       paramsContainer.style.display = 'none';
+
+       var widalParamRes = yield fetch('/api/config/tests/' + testId + '/parameters');
+       var widalParams = [];
+       if (widalParamRes.ok) {
+         widalParams = yield widalParamRes.json();
+       }
+       widalParams.sort(function(a, b) { return (a.sort_order || 0) - (b.sort_order || 0); });
+
+       var isPos = isEdit && existingVal && existingVal.toLowerCase().indexOf('positive') !== -1;
+       var widalHtml = '<div style="margin-bottom: 12px;">' +
+         '<label style="font-size:0.85rem; font-weight:600; color:var(--text-dark);">WIDAL Primary Result:</label>' +
+         '<select id="widal-res" onchange="var c = document.getElementById(\'widal-titers-container\'); if(c) c.style.display = (this.value === \'Positive\' ? \'block\' : \'none\');" style="width:100%; padding:8px; border:1px solid var(--border-color); border-radius:4px; margin-top:4px; font-size:0.9rem;">' +
+           '<option value="Negative"' + (!isPos ? ' selected' : '') + '>Negative (Non-Reactive)</option>' +
+           '<option value="Positive"' + (isPos ? ' selected' : '') + '>Positive (Reactive)</option>' +
+         '</select>' +
+       '</div>' +
+       '<div id="widal-titers-container" style="display:' + (isPos ? 'block' : 'none') + '; padding:12px; background:var(--bg-light, #f8fafc); border:1px solid var(--border-color, #e2e8f0); border-radius:6px; margin-top:10px;">' +
+         '<div style="font-size:0.8rem; font-weight:600; color:var(--text-muted); margin-bottom:8px;">Antigen Titration Breakdown (Optional):</div>' +
+         '<div id="widal-antigen-grid" style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">';
+
+       var DEFAULT_TITERS = ["Not Done", "< 1:20 (Low / Normal)", "1:20 (Low / Normal)", "1:40 (Low / Normal)", "1:80 (Borderline Significant)", "1:160 (High / Reactive)", "1:320 (High / Reactive)", ">= 1:640 (Very High / Reactive)"];
+       widalParams.forEach(function(p) {
+         var pName = p.parameter_name || p.name || '';
+         var opts = DEFAULT_TITERS;
+         try { if (p.options) opts = JSON.parse(p.options); } catch(e) {}
+         var optsHtml = opts.map(function(o) {
+           return '<option value="' + o.split('"').join('&quot;') + '">' + o + '</option>';
+         }).join('');
+         widalHtml += '<div class="widal-param-row" data-param-id="' + p.id + '" data-param-name="' + pName.split('"').join('&quot;') + '" style="display:flex; flex-direction:column; gap:3px;">' +
+           '<label style="font-size:0.8rem; font-weight:600; color:var(--text-dark);">' + pName + '</label>' +
+           '<select class="widal-param-val" style="width:100%; padding:6px 8px; border:1px solid var(--border-color); border-radius:4px; font-size:0.85rem;">' + optsHtml + '</select>' +
+         '</div>';
+       });
+
+       widalHtml += '</div></div>';
+       singleContainer.innerHTML = widalHtml;
     } else {
         // Use the new dynamic system
         let options = [];
@@ -2280,7 +2308,8 @@ const app = {
           if (paramsList && paramsList.length > 0) {
             singleContainer.style.display = 'none';
             paramsContainer.style.display = 'block';
-            let html = '<h5 style="color: var(--primary-color); margin-bottom: 8px;">Panel Parameters:</h5>';
+            let html = '<h5 style="color: var(--primary-color); margin-bottom: 8px;">' + (nameLower.indexOf('hiv') !== -1 ? 'HIV Diagnostic Kits & Protocols:' : 'Panel Parameters:') + '</h5>';
+            const isHiv = nameLower.indexOf('hiv') !== -1;
             paramsList.forEach(p => {
               let unitDisplay = '';
               if (p.unit && p.secondary_unit) {
@@ -2295,6 +2324,9 @@ const app = {
               let valInputHtml = '';
               let pOpts = [];
               try { if (p.options) pOpts = JSON.parse(p.options); } catch(e) {}
+              if (isHiv && pOpts && pOpts.length > 0 && pOpts.indexOf('Not Done') === -1) {
+                pOpts = ['Not Done'].concat(pOpts);
+              }
               if (pOpts && pOpts.length > 0) {
                 let optsHtml = pOpts.map(o => `<option value="${this.escape(o)}">${this.escape(o)}</option>`).join('');
                 valInputHtml = `<select class="modal-param-val" style="width: 100%; padding: 6px 8px; border: 1px solid var(--border-color); border-radius: 4px; font-size: 0.85rem;">${optsHtml}</select>`;
@@ -2303,7 +2335,7 @@ const app = {
               }
 
               html += `
-                 <div style="display: grid; grid-template-columns: 1.8fr 1.1fr 1.1fr; gap: 8px; align-items: center; padding: 6px 0; border-bottom: 1px solid #edf2f7;" class="modal-param-row" data-param-id="${p.id}">
+                 <div style="display: grid; grid-template-columns: 1.8fr 1.1fr 1.1fr; gap: 8px; align-items: center; padding: 6px 0; border-bottom: 1px solid #edf2f7;" class="modal-param-row" data-param-id="${p.id}" data-param-name="${this.escape(p.parameter_name)}">
                    <div><strong style="font-size: 0.85rem; color: var(--text-dark);">${this.escape(p.parameter_name)}</strong></div>
                    <div>${valInputHtml}</div>
                    <div style="display: flex; gap: 4px; align-items: center;">
@@ -2344,6 +2376,8 @@ const app = {
        
        if (paramsContainer.style.display === 'block') {
          paramResults = [];
+         let anyReactive = false;
+         let anyTested = false;
          const rows = paramsContainer.querySelectorAll('.modal-param-row');
          rows.forEach(r => {
             const pid = parseInt(r.getAttribute('data-param-id'), 10);
@@ -2353,15 +2387,51 @@ const app = {
             if (uElem) {
               punit = uElem.tagName === 'SELECT' ? uElem.value : (uElem.getAttribute('data-unit') || uElem.textContent.trim());
             }
-            if (pval) {
+            if (pval && pval !== 'Not Done') {
+              anyTested = true;
+              if (pval === 'Reactive' || pval === 'Positive (Detected)') {
+                anyReactive = true;
+              }
               paramResults.push({ parameter_id: pid, result_value: pval, result_unit: punit });
             }
          });
 
-       } else if (nameLower.includes('widal')) {
-         const res = document.getElementById('widal-res').value;
-         const tit = document.getElementById('widal-tit-val').value;
-         finalVal = res === 'Positive' && tit ? `${res} (${tit})` : res;
+         if (nameLower.indexOf('hiv') !== -1) {
+           finalVal = anyReactive ? 'Reactive' : (anyTested ? 'Non-Reactive' : 'Completed');
+         } else {
+           finalVal = 'Completed';
+         }
+
+       } else if (nameLower.indexOf('widal') !== -1) {
+         const wRes = document.getElementById('widal-res').value;
+         if (wRes === 'Positive') {
+           const wRows = singleContainer.querySelectorAll('.widal-param-row');
+           const wSummary = [];
+           const wParamsList = [];
+           wRows.forEach(r => {
+             const pid = parseInt(r.getAttribute('data-param-id'), 10);
+             const pname = r.getAttribute('data-param-name') || '';
+             const pval = r.querySelector('.widal-param-val').value;
+             if (pval && pval !== 'Not Done') {
+               wParamsList.push({ parameter_id: pid, result_value: pval });
+               let shortName = pname;
+               if (pname.indexOf('(') !== -1 && pname.indexOf(')') !== -1) {
+                 shortName = pname.split('(')[1].split(')')[0];
+               }
+               wSummary.push(shortName + ' ' + pval);
+             }
+           });
+           if (wSummary.length > 0) {
+             finalVal = 'Positive (' + wSummary.join(', ') + ')';
+             paramResults = wParamsList;
+           } else {
+             finalVal = 'Positive';
+             paramResults = null;
+           }
+         } else {
+           finalVal = 'Negative';
+           paramResults = null;
+         }
        } else if (document.getElementById('qual-res')) {
          finalVal = document.getElementById('qual-res').value;
        } else {

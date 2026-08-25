@@ -949,6 +949,186 @@ def test_staff_can_edit_test_results_with_reason(mock_db):
     assert row["edited_by_user_id"] == 2
 
 
+def test_widal_optional_titration_and_hiv_result_interpretation(mock_db):
+    conn = mock_db["conn"]
+    cur = conn.cursor()
+    cur.execute("INSERT INTO clients (client_number, full_name, sex) VALUES ('AMH-SERO-1', 'Grace N', 'Female')")
+    cid = cur.lastrowid
+    cur.execute("INSERT INTO visits (client_id, ward_of_origin, lab_number) VALUES (?, 'OPD', 'AMH-26-8-995')", (cid,))
+    vid = cur.lastrowid
+
+    # Create WIDAL test in tests and test_parameters
+    cur.execute("INSERT INTO tests (name, section_id, is_active, is_tracked, result_type) VALUES ('WIDAL (Salmonella Typhi Agglutination)', ?, 1, 1, 'options')", (mock_db["section_id"],))
+    widal_id = cur.lastrowid
+    WIDAL_PARAMS = [
+        ("Salmonella typhi O (TO)", None, "Significant if >= 1:80", 1),
+        ("Salmonella typhi H (TH)", None, "Significant if >= 1:80", 2),
+        ("Salmonella paratyphi A (AO)", None, "Significant if >= 1:80", 3),
+        ("Salmonella paratyphi B (BH)", None, "Significant if >= 1:80", 4),
+    ]
+    w_param_ids = {}
+    for pname, punit, pref, porder in WIDAL_PARAMS:
+        cur.execute("INSERT INTO test_parameters (test_id, parameter_name, unit, ref_range, sort_order) VALUES (?, ?, ?, ?, ?)", (widal_id, pname, punit, pref, porder))
+        w_param_ids[pname] = cur.lastrowid
+
+    # Create HIV parent test and kit parameters
+    cur.execute("INSERT INTO tests (name, section_id, is_active, is_tracked, result_type) VALUES ('HIV Testing', ?, 1, 1, 'panel')", (mock_db["section_id"],))
+    hiv_id = cur.lastrowid
+    HIV_PARAMS = [
+        ("MHS HIV 1/2 Kwiq Test", None, None, 1),
+        ("Determine™ HIV-1/2", None, None, 2),
+        ("HIV 1/2 Stat-Pak®", None, None, 3),
+    ]
+    hiv_param_ids = {}
+    for pname, punit, pref, porder in HIV_PARAMS:
+        cur.execute("INSERT INTO test_parameters (test_id, parameter_name, unit, ref_range, sort_order) VALUES (?, ?, ?, ?, ?)", (hiv_id, pname, punit, pref, porder))
+        hiv_param_ids[pname] = cur.lastrowid
+
+    # Order 1: Simple Positive WIDAL (slide test without titers)
+    cur.execute("INSERT INTO test_orders (visit_id, test_id, status) VALUES (?, ?, 'pending')", (vid, widal_id))
+    w_oid1 = cur.lastrowid
+    conn.commit()
+
+    res_w1 = client.post("/api/clients/results", json={
+        "order_id": w_oid1,
+        "result_value": "Positive"
+    })
+    assert res_w1.status_code == 200
+
+    cur.execute("SELECT result_value, clinical_flag, is_positive FROM test_results WHERE order_id = ?", (w_oid1,))
+    r1 = cur.fetchone()
+    assert r1["result_value"] == "Positive"
+    assert r1["is_positive"] == 1
+    assert r1["clinical_flag"] == "\u26A0"
+
+    # Order 2: Detailed WIDAL with significant titers (TO >= 1:80)
+    cur.execute("INSERT INTO test_orders (visit_id, test_id, status) VALUES (?, ?, 'pending')", (vid, widal_id))
+    w_oid2 = cur.lastrowid
+    conn.commit()
+
+    w_payload = [
+        {"parameter_id": p_id, "result_value": "1:160" if "TO" in p_name else ("1:80" if "TH" in p_name else "< 1:20")}
+        for p_name, p_id in w_param_ids.items()
+    ]
+    res_w2 = client.post("/api/clients/results", json={
+        "order_id": w_oid2,
+        "result_value": "Positive (TO 1:160, TH 1:80)",
+        "parameter_results": w_payload
+    })
+    assert res_w2.status_code == 200
+
+    cur.execute("SELECT parameter_id, result_value, clinical_flag, is_positive FROM test_results WHERE order_id = ?", (w_oid2,))
+    w2_results = cur.fetchall()
+    assert len(w2_results) == 4
+    for r in w2_results:
+        if r["result_value"] in ("1:160", "1:80"):
+            assert r["is_positive"] == 1
+            assert r["clinical_flag"] == "\u26A0"
+        elif r["result_value"] == "< 1:20":
+            assert r["is_positive"] == 0
+            assert r["clinical_flag"] is None
+
+    # Order 3: HIV Multi-Kit Testing
+    cur.execute("INSERT INTO test_orders (visit_id, test_id, status) VALUES (?, ?, 'pending')", (vid, hiv_id))
+    h_oid = cur.lastrowid
+    conn.commit()
+
+    hiv_payload = [
+        {"parameter_id": hiv_param_ids["MHS HIV 1/2 Kwiq Test"], "result_value": "Reactive"},
+        {"parameter_id": hiv_param_ids["Determine™ HIV-1/2"], "result_value": "Reactive"},
+        {"parameter_id": hiv_param_ids["HIV 1/2 Stat-Pak®"], "result_value": "Non-Reactive"}
+    ]
+    res_hiv = client.post("/api/clients/results", json={
+        "order_id": h_oid,
+        "result_value": "Completed",
+        "parameter_results": hiv_payload
+    })
+    assert res_hiv.status_code == 200
+
+    cur.execute("SELECT parameter_id, result_value, clinical_flag, is_positive FROM test_results WHERE order_id = ?", (h_oid,))
+    h_results = cur.fetchall()
+    assert len(h_results) == 3
+    for r in h_results:
+        if r["result_value"] == "Reactive":
+            assert r["is_positive"] == 1
+            assert r["clinical_flag"] == "\u26A0"
+        else:
+            assert r["is_positive"] == 0
+            assert r["clinical_flag"] is None
+
+
+def test_hiv_conclusive_algorithm_derivations():
+    from backend.app.evaluator import derive_hiv_outcome
+
+    # 1. Screening Non-Reactive -> Negative
+    out1 = derive_hiv_outcome([{"name": "MHS HIV 1/2 Kwiq Test", "result": "Non-Reactive"}])
+    assert out1["conclusive_status"] == "Negative"
+    assert "Non-Reactive (Negative)" in out1["display_result"]
+    assert out1["clinical_flag"] is None
+
+    # 2. Concordant Reactive (A1+, A2+, A3+) -> Positive
+    out2 = derive_hiv_outcome([
+        {"name": "MHS HIV 1/2 Kwiq Test", "result": "Reactive"},
+        {"name": "HIV 1/2 Stat-Pak®", "result": "Reactive"},
+        {"name": "SD Bioline HIV-1/2", "result": "Reactive"}
+    ])
+    assert out2["conclusive_status"] == "Positive"
+    assert "Reactive (Positive)" in out2["display_result"]
+    assert out2["clinical_flag"] == "\u26A0"
+    assert "CD4" in out2["advisory"]
+
+    # 3. Discordant Resolved Negative (A1+, A2-, A3-) -> Negative
+    out3 = derive_hiv_outcome([
+        {"name": "MHS HIV 1/2 Kwiq Test", "result": "Reactive"},
+        {"name": "HIV 1/2 Stat-Pak®", "result": "Non-Reactive"},
+        {"name": "SD Bioline HIV-1/2", "result": "Non-Reactive"}
+    ])
+    assert out3["conclusive_status"] == "Negative"
+    assert "Resolved Discordance" in out3["display_result"]
+    assert out3["clinical_flag"] is None
+
+    # 4. Inconclusive Discrepant (A1+, A2+, A3-) -> Inconclusive
+    out4 = derive_hiv_outcome([
+        {"name": "MHS HIV 1/2 Kwiq Test", "result": "Reactive"},
+        {"name": "HIV 1/2 Stat-Pak®", "result": "Reactive"},
+        {"name": "SD Bioline HIV-1/2", "result": "Non-Reactive"}
+    ])
+    assert out4["conclusive_status"] == "Inconclusive"
+    assert "Inconclusive" in out4["display_result"]
+    assert out4["clinical_flag"] == "\u26A0"
+    assert "14 days" in out4["advisory"]
+
+    # 5. Inconclusive Discrepant (A1+, A2-, A3+) -> Inconclusive
+    out5 = derive_hiv_outcome([
+        {"name": "MHS HIV 1/2 Kwiq Test", "result": "Reactive"},
+        {"name": "HIV 1/2 Stat-Pak®", "result": "Non-Reactive"},
+        {"name": "SD Bioline HIV-1/2", "result": "Reactive"}
+    ])
+    assert out5["conclusive_status"] == "Inconclusive"
+    assert "Inconclusive" in out5["display_result"]
+    assert out5["clinical_flag"] == "\u26A0"
+
+    # 6. EID PCR Positive
+    out6 = derive_hiv_outcome([{"name": "EID 1st PCR (4-6 Weeks)", "result": "Positive (Detected)"}])
+    assert out6["conclusive_status"] == "Positive"
+    assert "EID PCR Detected" in out6["display_result"]
+    assert out6["clinical_flag"] == "\u26A0"
+
+    # 7. EID PCR Negative
+    out7 = derive_hiv_outcome([{"name": "EID 1st PCR (4-6 Weeks)", "result": "Negative (Not Detected)"}])
+    assert out7["conclusive_status"] == "Negative"
+    assert "EID PCR Not Detected" in out7["display_result"]
+    assert out7["clinical_flag"] is None
+
+    # 8. HIVST Self-Test Screening
+    out8 = derive_hiv_outcome([{"name": "OraQuick® HIV Self-Test", "result": "Reactive"}])
+    assert out8["conclusive_status"] == "Preliminary Positive"
+    assert "Self-Test Screening" in out8["display_result"]
+    assert out8["clinical_flag"] == "\u26A0"
+
+
+
+
 
 
 

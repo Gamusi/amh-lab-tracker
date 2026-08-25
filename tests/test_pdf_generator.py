@@ -165,3 +165,55 @@ def test_urinalysis_and_general_tests_fit_on_single_page():
     # Verify single page output (Page /Count 1)
     assert b"/Count 1" in pdf_bytes or b"/Type /Page" in pdf_bytes
 
+
+def test_widal_and_hiv_pdf_report_rendering():
+    order_data = {
+        "lab_number": "AMH-26-8-777",
+        "full_name": "Sarah K",
+        "age": "24",
+        "sex": "Female",
+        "requested_by": "Dr. Sarah",
+        "ward_of_origin": "OPD",
+        "ordered_date": "2026-08-25"
+    }
+
+    # Case 1: Simple Negative WIDAL and Non-Reactive HIV
+    results_simple = [
+        {
+            "department": "Serology & Clinical Immunology",
+            "tests": [
+                {"test_name": "WIDAL (Salmonella Typhi Agglutination)", "result": "Negative", "unit": "", "flag": "", "reference": "Negative"},
+                {"test_name": "HIV Testing", "result": "Non-Reactive", "unit": "", "flag": "", "reference": "Non-Reactive"}
+            ]
+        }
+    ]
+    pdf_simple = generate_pdf(order_data, results_simple)
+    assert isinstance(pdf_simple, bytes)
+    assert len(pdf_simple) > 1000
+
+    # Case 2: Positive WIDAL with detailed titers & HIV Multi-Kit Panel
+    widal_titers = [
+        {"name": "Salmonella typhi O (TO)", "result": "1:160", "reference": "Significant if >= 1:80"},
+        {"name": "Salmonella typhi H (TH)", "result": "1:80", "reference": "Significant if >= 1:80"},
+        {"name": "Salmonella paratyphi A (AO)", "result": "< 1:20", "reference": "Significant if >= 1:80"},
+        {"name": "Salmonella paratyphi B (BH)", "result": "Not Done", "reference": "Significant if >= 1:80"},
+    ]
+    hiv_kits = [
+        {"name": "MHS HIV 1/2 Kwiq Test", "result": "Reactive", "flag": "\u26A0", "reference": "Non-Reactive"},
+        {"name": "HIV 1/2 Stat-Pak®", "result": "Reactive", "flag": "\u26A0", "reference": "Non-Reactive"},
+        {"name": "SD Bioline HIV-1/2", "result": "Non-Reactive", "flag": "", "reference": "Non-Reactive"},
+    ]
+    results_detailed = [
+        {
+            "department": "Serology & Clinical Immunology",
+            "tests": [
+                {"test_name": "WIDAL (Salmonella Typhi Agglutination)", "result": "Positive (TO 1:160, TH 1:80)", "parameters": widal_titers},
+                {"test_name": "HIV Testing", "result": "Reactive", "parameters": hiv_kits}
+            ]
+        }
+    ]
+    pdf_detailed = generate_pdf(order_data, results_detailed)
+    assert isinstance(pdf_detailed, bytes)
+    assert len(pdf_detailed) > 1000
+
+

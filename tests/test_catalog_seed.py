@@ -14,7 +14,7 @@ def test_qualitative_and_semi_qualitative_tests_tracking_configuration():
         is_tracked = bool(t["is_tracked"])
         
         # Binary / Infectious assays must be tracked
-        if name in ("Malaria RDT", "HBsAg (Hepatitis B)", "HIV (MoH Three-Test Algorithm)", "TB LAM (Urine Tuberculosis LAM)", "COVID19RDT", "CrAg (Cryptococcal Antigen)", "HCV Ab (Hepatitis C)", "TPHA (Confirmatory Syphilis Test)"):
+        if name in ("Malaria RDT", "HBsAg (Hepatitis B)", "HIV Testing", "HIV Testing Service", "HIV (MoH Three-Test Algorithm)", "TB LAM (Urine Tuberculosis LAM)", "COVID19RDT", "CrAg (Cryptococcal Antigen)", "HCV Ab (Hepatitis C)", "TPHA (Confirmatory Syphilis Test)"):
             assert is_tracked is True, f"{name} must be tracked"
             assert res_type in ("qualitative", "options", "panel")
 
@@ -94,3 +94,51 @@ def test_biochemistry_panels_seeded_reference_ranges(db_connection):
     assert fbs_mg is not None
     assert fbs_mg["sanity_min"] == 18.0
     assert fbs_mg["sanity_max"] == 900.0
+
+
+def test_hiv_testing_catalog_seeding(db_connection):
+    import json
+    from backend.app.seed import seed_database
+    seed_database(conn=db_connection)
+    cur = db_connection.cursor()
+
+    cur.execute("SELECT id FROM tests WHERE name IN ('HIV Testing', 'HIV Testing Service')")
+    hiv_row = cur.fetchone()
+    assert hiv_row is not None
+    hiv_id = hiv_row["id"]
+
+    cur.execute("SELECT parameter_name, options FROM test_parameters WHERE test_id = ?", (hiv_id,))
+    params = {r["parameter_name"]: json.loads(r["options"]) if r["options"] else [] for r in cur.fetchall()}
+
+    assert "MHS HIV 1/2 Kwiq Test" in params
+    assert "Determine™ HIV-1/2" in params or "Determine" in params
+    assert "HIV 1/2 Stat-Pak®" in params or "Stat-Pak" in params
+    assert "SD Bioline HIV-1/2" in params or "SD Bioline" in params
+    assert any("OraQuick" in p for p in params)
+    assert any("1st PCR" in p for p in params)
+    assert len(params) == 9
+
+
+def test_widal_structured_antigen_parameters(db_connection):
+    import json
+    from backend.app.seed import seed_database
+    seed_database(conn=db_connection)
+    cur = db_connection.cursor()
+
+    cur.execute("SELECT id FROM tests WHERE name LIKE '%WIDAL%'")
+    widal_row = cur.fetchone()
+    assert widal_row is not None
+    widal_id = widal_row["id"]
+
+    cur.execute("SELECT parameter_name, options FROM test_parameters WHERE test_id = ? ORDER BY sort_order", (widal_id,))
+    widal_params = cur.fetchall()
+    assert len(widal_params) == 4
+    names = [r["parameter_name"] for r in widal_params]
+    assert any("TO" in n or "O Antigen" in n for n in names)
+    assert any("TH" in n or "H Antigen" in n for n in names)
+
+    opts = json.loads(widal_params[0]["options"])
+    assert "Not Done" in opts
+    assert any("1:80" in o for o in opts)
+    assert any("1:160" in o for o in opts)
+

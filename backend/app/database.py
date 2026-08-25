@@ -336,6 +336,63 @@ def init_db():
                     WHERE id = ?
                 """, (punit, pref, porder, popts, existing_p[0]))
 
+    # Pre-seed HIV test parameters
+    HIV_PARAMS = [
+        ("MHS HIV 1/2 Kwiq Test", None, None, 1, '["Non-Reactive", "Reactive"]'),
+        ("Determine™ HIV-1/2", None, None, 2, '["Non-Reactive", "Reactive"]'),
+        ("HIV 1/2 Stat-Pak®", None, None, 3, '["Non-Reactive", "Reactive"]'),
+        ("SD Bioline HIV-1/2", None, None, 4, '["Non-Reactive", "Reactive"]'),
+        ("OraQuick® HIV Self-Test", None, None, 5, '["Non-Reactive", "Reactive"]'),
+        ("Fingerstick HIVST", None, None, 6, '["Non-Reactive", "Reactive"]'),
+        ("EID 1st PCR (4-6 Weeks)", None, None, 7, '["Negative (Not Detected)", "Positive (Detected)"]'),
+        ("EID 2nd PCR (9 Months)", None, None, 8, '["Negative (Not Detected)", "Positive (Detected)"]'),
+        ("EID Final Rapid Test (18 Months)", None, None, 9, '["Non-Reactive", "Reactive"]'),
+    ]
+    cursor.execute("UPDATE tests SET name = 'HIV Testing' WHERE name IN ('HIV (MoH Three-Test Algorithm)', 'HIV Testing Service')")
+    cursor.execute("SELECT id FROM tests WHERE name IN ('HIV Testing', 'HIV Testing Service')")
+    for hiv_row in cursor.fetchall():
+        hiv_id = hiv_row[0]
+        cursor.execute("DELETE FROM test_parameters WHERE test_id = ? AND parameter_name IN ('Determine', 'Stat-Pak', 'SD Bioline')", (hiv_id,))
+        for pname, punit, pref, porder, popts in HIV_PARAMS:
+            cursor.execute("SELECT id FROM test_parameters WHERE test_id = ? AND parameter_name = ?", (hiv_id, pname))
+            existing_p = cursor.fetchone()
+            if not existing_p:
+                cursor.execute("""
+                    INSERT INTO test_parameters (test_id, parameter_name, unit, ref_range, sort_order, options)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                """, (hiv_id, pname, punit, pref, porder, popts))
+            else:
+                cursor.execute("""
+                    UPDATE test_parameters
+                    SET unit = ?, ref_range = ?, sort_order = ?, options = ?
+                    WHERE id = ?
+                """, (punit, pref, porder, popts, existing_p[0]))
+
+    # Pre-seed WIDAL test parameters
+    WIDAL_PARAMS = [
+        ("Salmonella typhi O (TO)", None, "Significant if >= 1:80", 1, '["Not Done", "< 1:20 (Low / Normal)", "1:20 (Low / Normal)", "1:40 (Low / Normal)", "1:80 (Borderline Significant)", "1:160 (High / Reactive)", "1:320 (High / Reactive)", ">= 1:640 (Very High / Reactive)"]'),
+        ("Salmonella typhi H (TH)", None, "Significant if >= 1:80", 2, '["Not Done", "< 1:20 (Low / Normal)", "1:20 (Low / Normal)", "1:40 (Low / Normal)", "1:80 (Borderline Significant)", "1:160 (High / Reactive)", "1:320 (High / Reactive)", ">= 1:640 (Very High / Reactive)"]'),
+        ("Salmonella paratyphi A (AO)", None, "Significant if >= 1:80", 3, '["Not Done", "< 1:20 (Low / Normal)", "1:20 (Low / Normal)", "1:40 (Low / Normal)", "1:80 (Borderline Significant)", "1:160 (High / Reactive)", "1:320 (High / Reactive)", ">= 1:640 (Very High / Reactive)"]'),
+        ("Salmonella paratyphi B (BH)", None, "Significant if >= 1:80", 4, '["Not Done", "< 1:20 (Low / Normal)", "1:20 (Low / Normal)", "1:40 (Low / Normal)", "1:80 (Borderline Significant)", "1:160 (High / Reactive)", "1:320 (High / Reactive)", ">= 1:640 (Very High / Reactive)"]'),
+    ]
+    cursor.execute("SELECT id FROM tests WHERE LOWER(name) LIKE '%widal%'")
+    for widal_row in cursor.fetchall():
+        widal_id = widal_row[0]
+        for pname, punit, pref, porder, popts in WIDAL_PARAMS:
+            cursor.execute("SELECT id FROM test_parameters WHERE test_id = ? AND parameter_name = ?", (widal_id, pname))
+            existing_p = cursor.fetchone()
+            if not existing_p:
+                cursor.execute("""
+                    INSERT INTO test_parameters (test_id, parameter_name, unit, ref_range, sort_order, options)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                """, (widal_id, pname, punit, pref, porder, popts))
+            else:
+                cursor.execute("""
+                    UPDATE test_parameters
+                    SET unit = ?, ref_range = ?, sort_order = ?, options = ?
+                    WHERE id = ?
+                """, (punit, pref, porder, popts, existing_p[0]))
+
     conn.commit()
     conn.close()
     logger.info("Database schema initialized and migrated successfully")
