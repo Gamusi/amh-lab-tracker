@@ -2291,10 +2291,21 @@ const app = {
               } else if (p.unit) {
                 unitDisplay = `<span class="modal-param-unit" data-unit="${this.escape(p.unit)}" style="font-size: 0.8rem; color: var(--text-muted);">${this.escape(p.unit)}</span>`;
               }
+
+              let valInputHtml = '';
+              let pOpts = [];
+              try { if (p.options) pOpts = JSON.parse(p.options); } catch(e) {}
+              if (pOpts && pOpts.length > 0) {
+                let optsHtml = pOpts.map(o => `<option value="${this.escape(o)}">${this.escape(o)}</option>`).join('');
+                valInputHtml = `<select class="modal-param-val" style="width: 100%; padding: 6px 8px; border: 1px solid var(--border-color); border-radius: 4px; font-size: 0.85rem;">${optsHtml}</select>`;
+              } else {
+                valInputHtml = `<input type="text" class="modal-param-val" placeholder="Value" style="width: 100%; padding: 6px 8px; border: 1px solid var(--border-color); border-radius: 4px; box-sizing: border-box; font-size: 0.85rem;">`;
+              }
+
               html += `
                  <div style="display: grid; grid-template-columns: 1.8fr 1.1fr 1.1fr; gap: 8px; align-items: center; padding: 6px 0; border-bottom: 1px solid #edf2f7;" class="modal-param-row" data-param-id="${p.id}">
                    <div><strong style="font-size: 0.85rem; color: var(--text-dark);">${this.escape(p.parameter_name)}</strong></div>
-                   <div><input type="text" class="modal-param-val" placeholder="Value" style="width: 100%; padding: 6px 8px; border: 1px solid var(--border-color); border-radius: 4px; box-sizing: border-box; font-size: 0.85rem;"></div>
+                   <div>${valInputHtml}</div>
                    <div style="display: flex; gap: 4px; align-items: center;">
                      ${unitDisplay}
                      ${p.ref_range ? `<span style="font-size: 0.75rem; color: var(--text-muted); white-space: nowrap;">(${this.escape(p.ref_range)})</span>` : ''}
