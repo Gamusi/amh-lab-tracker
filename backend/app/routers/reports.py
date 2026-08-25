@@ -7,6 +7,7 @@ from ..database import get_db
 from ..auth import get_current_user
 from ..pdf_generator import generate_pdf
 from .. import evaluator
+from .. import biochem_validator
 
 router = APIRouter(prefix="/api/reports", tags=["Reports"])
 
@@ -272,19 +273,23 @@ def get_visit_report_pdf(visit_id: int, db: sqlite3.Connection = Depends(get_db)
             s.name AS section_name, 
             to_ord.ordered_at, 
             to_ord.sample_id,
-            tr.entered_at,
-            u_enter.full_name AS entered_by_name,
+            COALESCE(tr.entered_at, tr_p.entered_at) AS entered_at,
+            COALESCE(u_enter.full_name, u_enter_p.full_name) AS entered_by_name,
             u_ord.full_name AS ordered_by_name,
-            u_ver.full_name AS verified_by_name
+            COALESCE(u_ver.full_name, u_ver_p.full_name) AS verified_by_name
         FROM test_orders to_ord
-        LEFT JOIN test_results tr ON tr.order_id = to_ord.id
+        LEFT JOIN test_results tr ON tr.order_id = to_ord.id AND tr.parameter_id IS NULL
+        LEFT JOIN test_results tr_p ON tr_p.order_id = to_ord.id AND tr_p.parameter_id IS NOT NULL
         JOIN tests t ON to_ord.test_id = t.id
         JOIN sections s ON t.section_id = s.id
         LEFT JOIN users u_enter ON tr.entered_by_user_id = u_enter.id
+        LEFT JOIN users u_enter_p ON tr_p.entered_by_user_id = u_enter_p.id
         LEFT JOIN users u_ord ON to_ord.ordered_by_user_id = u_ord.id
         LEFT JOIN users u_ver ON tr.verified_by_user_id = u_ver.id
-        WHERE to_ord.visit_id = ? AND to_ord.status IN ('completed', 'entered') AND tr.result_value IS NOT NULL
-        ORDER BY s.sort_order, t.sort_order, tr.id
+        LEFT JOIN users u_ver_p ON tr_p.verified_by_user_id = u_ver_p.id
+        WHERE to_ord.visit_id = ? AND to_ord.status IN ('completed', 'entered')
+        GROUP BY to_ord.id
+        ORDER BY s.sort_order, t.sort_order, to_ord.id
     """, (visit_id,))
     
     rows = cur.fetchall()
@@ -292,6 +297,17 @@ def get_visit_report_pdf(visit_id: int, db: sqlite3.Connection = Depends(get_db)
     if not rows:
         raise HTTPException(status_code=400, detail="No completed test results found for this visit. Enter results before printing.")
     
+    dob_obj = None
+    age_int = None
+    if dob:
+        try:
+            dob_obj = datetime.datetime.strptime(dob, "%Y-%m-%d").date()
+            age_int = evaluator.calculate_age(dob_obj, datetime.date.today())
+        except Exception:
+            pass
+    if age_int is None and visit_row["age_years"] is not None:
+        age_int = int(visit_row["age_years"])
+
     # Query any test_results linked to test_parameters for this visit
     cur.execute("""
         SELECT 
@@ -302,26 +318,73 @@ def get_visit_report_pdf(visit_id: int, db: sqlite3.Connection = Depends(get_db)
             tr.clinical_flag,
             tp.unit AS default_unit, 
             tp.ref_range, 
-            tr.is_positive
+            tr.is_positive,
+            tr.entered_at,
+            u_enter.full_name AS entered_by_name,
+            u_ver.full_name AS verified_by_name
         FROM test_results tr
         JOIN test_parameters tp ON tr.parameter_id = tp.id
         JOIN test_orders to_ord ON tr.order_id = to_ord.id
-        WHERE to_ord.visit_id = ?
+        LEFT JOIN users u_enter ON tr.entered_by_user_id = u_enter.id
+        LEFT JOIN users u_ver ON tr.verified_by_user_id = u_ver.id
+        WHERE to_ord.visit_id = ? AND tr.parameter_id IS NOT NULL
         ORDER BY tp.sort_order, tp.id
     """, (visit_id,))
     param_rows = cur.fetchall()
     params_by_order = {}
+    ordered_date = None
+    technician_name = None
+    verified_by = None
+    analyzer_sample_id = None
+    analyzer_timestamp = None
+
     for pr in param_rows:
         oid = pr["order_id"]
         if oid not in params_by_order:
             params_by_order[oid] = []
-        p_flag = pr["clinical_flag"] or _compute_flag(pr["result_value"], pr["ref_range"])
+        
+        if not technician_name and pr["entered_by_name"]:
+            technician_name = pr["entered_by_name"]
+        if not verified_by and pr["verified_by_name"]:
+            verified_by = pr["verified_by_name"]
+        if not analyzer_timestamp and pr["entered_at"]:
+            analyzer_timestamp = pr["entered_at"]
+        
+        p_name = pr["parameter_name"]
+        p_val = pr["result_value"]
+        p_unit = pr["result_unit"] or pr["default_unit"] or ""
+        p_ref = pr["ref_range"]
+        p_flag = pr["clinical_flag"]
+
+        if not p_ref:
+            rule = biochem_validator._find_matching_rule(db, p_name, age=age_int, sex=sex, unit=p_unit)
+            if rule:
+                n_min = rule.get("normal_min")
+                n_max = rule.get("normal_max")
+                if n_min is not None and n_max is not None:
+                    p_ref = f"{n_min} - {n_max}"
+                elif n_min is not None:
+                    p_ref = f">= {n_min}"
+                elif n_max is not None:
+                    p_ref = f"< {n_max}"
+            else:
+                eval_res = evaluator.evaluate_result(p_name, p_val, dob=dob_obj, sex=sex, entry_date=datetime.date.today(), db=db, unit=p_unit)
+                if eval_res and eval_res.get("reference"):
+                    p_ref = eval_res.get("reference")
+
+        if not p_flag:
+            eval_res = evaluator.evaluate_result(p_name, p_val, dob=dob_obj, sex=sex, entry_date=datetime.date.today(), db=db, unit=p_unit)
+            if eval_res and eval_res.get("flag"):
+                p_flag = eval_res.get("flag")
+            else:
+                p_flag = _compute_flag(p_val, p_ref)
+
         params_by_order[oid].append({
-            "name": pr["parameter_name"],
-            "result": pr["result_value"],
-            "unit": pr["result_unit"] or pr["default_unit"] or "",
-            "reference_range": pr["ref_range"] or "",
-            "flag": p_flag
+            "name": p_name,
+            "result": p_val,
+            "unit": p_unit,
+            "reference_range": p_ref or "",
+            "flag": p_flag or ""
         })
 
     results_by_section = {}
@@ -332,10 +395,14 @@ def get_visit_report_pdf(visit_id: int, db: sqlite3.Connection = Depends(get_db)
     analyzer_timestamp = None
     
     for row in rows:
+        order_id = row["order_id"]
         test_name = row["test_name"]
         result_value = row["result_value"]
         section_name = row["section_name"]
-        order_id = row["order_id"]
+        order_params = params_by_order.get(order_id, [])
+
+        if not result_value and not order_params:
+            continue
             
         if not ordered_date and row["ordered_at"]:
             ordered_date = row["ordered_at"][:10]
@@ -348,17 +415,44 @@ def get_visit_report_pdf(visit_id: int, db: sqlite3.Connection = Depends(get_db)
         if not analyzer_timestamp and row["entered_at"]:
             analyzer_timestamp = row["entered_at"]
             
-        t_flag = row["clinical_flag"] or _compute_flag(result_value, row["ref_range"])
+        t_unit = row["result_unit"] or row["default_unit"] or ""
+        t_ref = row["ref_range"]
+        t_flag = row["clinical_flag"]
+
+        if not order_params:
+            if not t_ref:
+                rule = biochem_validator._find_matching_rule(db, test_name, age=age_int, sex=sex, unit=t_unit)
+                if rule:
+                    n_min = rule.get("normal_min")
+                    n_max = rule.get("normal_max")
+                    if n_min is not None and n_max is not None:
+                        t_ref = f"{n_min} - {n_max}"
+                    elif n_min is not None:
+                        t_ref = f">= {n_min}"
+                    elif n_max is not None:
+                        t_ref = f"< {n_max}"
+                else:
+                    eval_res = evaluator.evaluate_result(test_name, result_value, dob=dob_obj, sex=sex, entry_date=datetime.date.today(), db=db, unit=t_unit)
+                    if eval_res and eval_res.get("reference"):
+                        t_ref = eval_res.get("reference")
+
+            if not t_flag:
+                eval_res = evaluator.evaluate_result(test_name, result_value, dob=dob_obj, sex=sex, entry_date=datetime.date.today(), db=db, unit=t_unit)
+                if eval_res and eval_res.get("flag"):
+                    t_flag = eval_res.get("flag")
+                else:
+                    t_flag = _compute_flag(result_value, t_ref)
+
         test_data = {
             "test_name": test_name,
-            "result": result_value,
-            "unit": row["result_unit"] or row["default_unit"] or "",
-            "reference": row["ref_range"] or "",
-            "reference_range": row["ref_range"] or "",
-            "flag": t_flag,
+            "result": result_value if not order_params else "Completed",
+            "unit": t_unit,
+            "reference": t_ref or "",
+            "reference_range": t_ref or "",
+            "flag": t_flag or "",
             "sample_id": row["sample_id"] or "",
             "timestamp": row["entered_at"] or "",
-            "parameters": params_by_order.get(order_id, [])
+            "parameters": order_params
         }
         
         if section_name not in results_by_section:

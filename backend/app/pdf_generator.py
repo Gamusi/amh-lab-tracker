@@ -83,68 +83,122 @@ def _build_metadata_table(order_data: dict) -> Table:
     return t
 
 def _build_department_table(dept_name: str, tests: list) -> KeepTogether:
-    # 5-column layout: Test (140), Result (80), Unit (60), Flag (60), Reference (140)
+    # 5-column layout: Test (150), Result (75), Unit (60), Flag (55), Reference (140) = 480 pt total
     data = []
     
     internal_categories = ["Main", "Referrals", "Out-Reaches"]
     show_dept = dept_name not in internal_categories
     
+    dept_title_style = ParagraphStyle(name="DeptTitleStyle", fontName=FONT_BOLD, fontSize=9, leading=11)
+    tbl_header_style = ParagraphStyle(name="TblHeaderStyle", fontName=FONT_BOLD, fontSize=8.5, leading=10.5)
+    panel_title_style = ParagraphStyle(name="PanelTitleStyle", fontName=FONT_BOLD, fontSize=8.5, leading=10.5)
+    test_title_style = ParagraphStyle(name="TestTitleStyle", fontName=FONT_REGULAR, fontSize=8.5, leading=10.5)
+    param_title_style = ParagraphStyle(name="ParamTitleStyle", fontName=FONT_REGULAR, fontSize=8.5, leading=10.5, leftIndent=8)
+    unit_style = ParagraphStyle(name="UnitStyle", fontName=FONT_REGULAR, fontSize=8, leading=10)
+    ref_style = ParagraphStyle(name="RefStyle", fontName=FONT_REGULAR, fontSize=8, leading=10)
+    result_style = ParagraphStyle(name="ResultStyle", fontName=FONT_REGULAR, fontSize=8.5, leading=10.5)
+    result_abnormal_style = ParagraphStyle(name="ResultAbnormalStyle", fontName=FONT_BOLD, fontSize=8.5, leading=10.5, textColor=colors.HexColor('#dc2626'))
+    flag_center_style = ParagraphStyle(name="FlagCenterStyle", fontName=FONT_BOLD, fontSize=8.5, leading=10.5, alignment=TA_CENTER)
+    
     if show_dept:
-        data.append([dept_name, "", "", "", ""])
+        data.append([Paragraph(dept_name, dept_title_style), "", "", "", ""])
         
-    data.append(["Test", "Result", "Unit", "Flag", "Reference"])
-    
-    result_style = ParagraphStyle(name="ResultStyle", fontName=FONT_REGULAR, fontSize=9, leading=11)
-    flag_center_style = ParagraphStyle(name="FlagCenterStyle", fontName=FONT_BOLD, fontSize=9, leading=11, alignment=TA_CENTER)
-    
-    for t in tests:
-        res_text = str(t.get("result") or "")
-        res_para = Paragraph(res_text, result_style) if res_text else ""
-        flag_text = str(t.get("flag") or "")
-        t_name = str(t.get("test_name") or "")
-        if not flag_text and evaluator.is_qualitative_abnormal(res_text, str(t.get("reference") or ""), param_name=t_name):
-            flag_text = "\u26A0"
-        if flag_text == "[!]":
-            flag_text = "\u26A0"
-
-        if flag_text == "\u26A0":
-            if FONT_SYMBOL != 'Helvetica':
-                flag_cell = Paragraph(f'<font name="{FONT_SYMBOL}" color="#dc2626">\u26A0</font>', flag_center_style)
-            else:
-                flag_cell = Paragraph('<font color="#dc2626"><b>\u26A0</b></font>', flag_center_style)
-        else:
-            flag_cell = flag_text
-
-        data.append([
-            t_name,
-            res_para,
-            t.get("unit", ""),
-            flag_cell,
-            t.get("reference", "")
-        ])
-        
-    t = Table(data, colWidths=[140, 80, 60, 60, 140])
+    data.append([
+        Paragraph("Test", tbl_header_style),
+        Paragraph("Result", tbl_header_style),
+        Paragraph("Unit", tbl_header_style),
+        Paragraph("Flag", tbl_header_style),
+        Paragraph("Reference", tbl_header_style)
+    ])
     
     style_cmds = [
         ('FONTNAME', (0,0), (-1,-1), FONT_REGULAR),
         ('FONTSIZE', (0,0), (-1,-1), 8),
         ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#e0e0e0')),
-        ('TOPPADDING', (0,0), (-1,-1), 4),
-        ('BOTTOMPADDING', (0,0), (-1,-1), 4),
+        ('TOPPADDING', (0,0), (-1,-1), 3.5),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 3.5),
         ('ALIGN', (0,0), (-1,-1), 'LEFT'),
         ('ALIGN', (3,0), (3,-1), 'CENTER'),
-        ('TEXTCOLOR', (3,0), (3,-1), colors.HexColor('#dc2626')),
-        ('FONTNAME', (3,0), (3,-1), FONT_BOLD),
+        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
     ]
-    
-    for i, test in enumerate(tests):
-        flag = test.get("flag", "")
-        res_t = str(test.get("result") or "")
-        t_name = str(test.get("test_name") or "")
-        if flag in ["High", "Low", "Abnormal", "Reactive", "Positive", "H", "L", "H*", "L*", "*", "\u26A0", "[!]"] or evaluator.is_qualitative_abnormal(res_t, str(test.get("reference") or ""), param_name=t_name):
-            row_idx = i + (2 if show_dept else 1)
-            style_cmds.append(('TEXTCOLOR', (1, row_idx), (1, row_idx), colors.HexColor('#dc2626')))
-            style_cmds.append(('FONTNAME', (1, row_idx), (1, row_idx), FONT_BOLD))
+
+    for t in tests:
+        params = t.get("parameters")
+        if params and len(params) > 0:
+            # Render Panel Subheader
+            panel_name = str(t.get("test_name") or "")
+            data.append([Paragraph(panel_name, panel_title_style), "", "", "", ""])
+            panel_row_idx = len(data) - 1
+            style_cmds.append(('BACKGROUND', (0, panel_row_idx), (-1, panel_row_idx), colors.HexColor('#f8fafc')))
+            style_cmds.append(('SPAN', (0, panel_row_idx), (-1, panel_row_idx)))
+
+            for p in params:
+                p_name = str(p.get("name") or p.get("parameter_name") or "")
+                p_res = str(p.get("result") if p.get("result") is not None else p.get("result_value", ""))
+                p_unit = str(p.get("unit") or "")
+                p_ref = str(p.get("reference_range") or p.get("reference") or "")
+                p_flag = str(p.get("flag") or "")
+
+                if not p_flag and evaluator.is_qualitative_abnormal(p_res, p_ref, param_name=p_name):
+                    p_flag = "\u26A0"
+                if p_flag == "[!]":
+                    p_flag = "\u26A0"
+
+                if p_flag == "\u26A0":
+                    if FONT_SYMBOL != 'Helvetica':
+                        flag_cell = Paragraph(f'<font name="{FONT_SYMBOL}" color="#dc2626">\u26A0</font>', flag_center_style)
+                    else:
+                        flag_cell = Paragraph('<font color="#dc2626"><b>\u26A0</b></font>', flag_center_style)
+                elif p_flag:
+                    flag_cell = Paragraph(f'<font color="#dc2626">{p_flag}</font>', flag_center_style)
+                else:
+                    flag_cell = ""
+
+                is_abnormal = p_flag in ["High", "Low", "Abnormal", "Reactive", "Positive", "H", "L", "H*", "L*", "*", "\u26A0", "[!]"] or evaluator.is_qualitative_abnormal(p_res, p_ref, param_name=p_name)
+                res_para = Paragraph(p_res, result_abnormal_style if is_abnormal else result_style) if p_res else ""
+                
+                data.append([
+                    Paragraph(p_name, param_title_style),
+                    res_para,
+                    Paragraph(p_unit, unit_style) if p_unit else "",
+                    flag_cell,
+                    Paragraph(p_ref, ref_style) if p_ref else ""
+                ])
+        else:
+            # Standalone single test
+            res_text = str(t.get("result") or "")
+            flag_text = str(t.get("flag") or "")
+            t_name = str(t.get("test_name") or "")
+            t_unit = str(t.get("unit") or "")
+            t_ref = str(t.get("reference") or t.get("reference_range") or "")
+
+            if not flag_text and evaluator.is_qualitative_abnormal(res_text, t_ref, param_name=t_name):
+                flag_text = "\u26A0"
+            if flag_text == "[!]":
+                flag_text = "\u26A0"
+
+            if flag_text == "\u26A0":
+                if FONT_SYMBOL != 'Helvetica':
+                    flag_cell = Paragraph(f'<font name="{FONT_SYMBOL}" color="#dc2626">\u26A0</font>', flag_center_style)
+                else:
+                    flag_cell = Paragraph('<font color="#dc2626"><b>\u26A0</b></font>', flag_center_style)
+            elif flag_text:
+                flag_cell = Paragraph(f'<font color="#dc2626">{flag_text}</font>', flag_center_style)
+            else:
+                flag_cell = ""
+
+            is_abnormal = flag_text in ["High", "Low", "Abnormal", "Reactive", "Positive", "H", "L", "H*", "L*", "*", "\u26A0", "[!]"] or evaluator.is_qualitative_abnormal(res_text, t_ref, param_name=t_name)
+            res_para = Paragraph(res_text, result_abnormal_style if is_abnormal else result_style) if res_text else ""
+
+            data.append([
+                Paragraph(t_name, test_title_style),
+                res_para,
+                Paragraph(t_unit, unit_style) if t_unit else "",
+                flag_cell,
+                Paragraph(t_ref, ref_style) if t_ref else ""
+            ])
+        
+    t_elem = Table(data, colWidths=[150, 75, 60, 55, 140])
     
     header_row_idx = 1 if show_dept else 0
     if show_dept:
@@ -155,9 +209,9 @@ def _build_department_table(dept_name: str, tests: list) -> KeepTogether:
     style_cmds.append(('FONTNAME', (0, header_row_idx), (-1, header_row_idx), FONT_BOLD))
     style_cmds.append(('LINEBELOW', (0, header_row_idx), (-1, header_row_idx), 1, colors.black))
     
-    t.setStyle(TableStyle(style_cmds))
+    t_elem.setStyle(TableStyle(style_cmds))
     
-    return KeepTogether([t, Spacer(1, 10)])
+    return KeepTogether([t_elem, Spacer(1, 10)])
 
 def _build_signatures_table(order_data: dict, compact: bool = False) -> KeepTogether:
     tech = str(order_data.get("technician_name") or "").strip()

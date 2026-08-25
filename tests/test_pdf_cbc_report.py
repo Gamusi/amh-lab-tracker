@@ -156,3 +156,51 @@ def test_mixed_order_cbc_on_dedicated_page():
     assert "16.9" in page2_text
 
 
+def test_panel_test_grouped_rendering_in_pdf():
+    """Verify that biochemistry panels (LFTs, Electrolytes) render panel subheaders and child parameters without repeating parent."""
+    order_data = {
+        "full_name": "JOHN MUKASA",
+        "client_number": "AMH-C26-0246",
+        "lab_number": "246",
+        "age": "32y",
+        "sex": "Male",
+        "ordered_date": "2026-08-25",
+        "requested_by": "DR. TUGUME",
+        "ward_of_origin": "OPD",
+        "technician_name": "Tech Alex",
+        "verified_by": "Dr. Sarah"
+    }
+    results_data = [
+        {
+            "department": "Clinical Biochemistry",
+            "tests": [
+                {
+                    "test_name": "LFTS (Liver Function Tests)",
+                    "result": "Completed",
+                    "parameters": [
+                        {"name": "ALT / SGPT", "result": "25.0", "unit": "U/L", "flag": "", "reference_range": "< 41"},
+                        {"name": "AST / SGOT", "result": "22.0", "unit": "U/L", "flag": "", "reference_range": "< 38"},
+                        {"name": "Total Bilirubin", "result": "12.0", "unit": "µmol/L", "flag": "", "reference_range": "0 - 17"},
+                        {"name": "Direct Bilirubin", "result": "3.2", "unit": "µmol/L", "flag": "", "reference_range": "0 - 4.4"}
+                    ]
+                }
+            ]
+        }
+    ]
+    pdf_bytes = generate_pdf(order_data, results_data)
+    reader = pypdf.PdfReader(io.BytesIO(pdf_bytes))
+    assert len(reader.pages) == 1
+    page_text = reader.pages[0].extract_text()
+    assert "LFTS (Liver Function Tests)" in page_text
+    assert "ALT / SGPT" in page_text
+    assert "AST / SGOT" in page_text
+    assert "Total Bilirubin" in page_text
+    assert "Direct Bilirubin" in page_text
+    assert "25.0" in page_text
+    assert "12.0" in page_text
+    assert "3.2" in page_text
+    # Should only appear once as panel header
+    assert page_text.count("LFTS (Liver Function Tests)") == 1
+
+
+
