@@ -2,12 +2,16 @@ import datetime, sqlite3
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import Response
 from pydantic import BaseModel
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from ..database import get_db
 from ..auth import get_current_user
 from ..pdf_generator import generate_pdf
 from .. import evaluator
 from .. import biochem_validator
+from .. import operations_analytics
+from .. import operations_pdf
+from .. import surveillance_analytics
+from .. import surveillance_pdf
 
 router = APIRouter(prefix="/api/reports", tags=["Reports"])
 
@@ -179,6 +183,96 @@ def get_hmis105_report(
         "end_date": e_str,
         "surveillance_items": surveillance_items
     }
+
+@router.get("/operations")
+def get_operations_report(
+    period_type: str = Query("Month"),
+    reference_date: Optional[str] = Query(None),
+    start_date: Optional[str] = Query(None),
+    end_date: Optional[str] = Query(None),
+    conn: sqlite3.Connection = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    return operations_analytics.calculate_operations_metrics(
+        conn=conn,
+        period_type=period_type,
+        reference_date=reference_date,
+        start_date=start_date,
+        end_date=end_date
+    )
+
+@router.get("/operations/pdf")
+def get_operations_report_pdf(
+    period_type: str = Query("Month"),
+    reference_date: Optional[str] = Query(None),
+    start_date: Optional[str] = Query(None),
+    end_date: Optional[str] = Query(None),
+    conn: sqlite3.Connection = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    data = operations_analytics.calculate_operations_metrics(
+        conn=conn,
+        period_type=period_type,
+        reference_date=reference_date,
+        start_date=start_date,
+        end_date=end_date
+    )
+    pdf_bytes = operations_pdf.generate_operations_pdf(data=data, current_user=current_user)
+    
+    p_info = data.get("period", {})
+    s_date = p_info.get("start_date", "start")
+    e_date = p_info.get("end_date", "end")
+    filename = f"AMH_Operations_Report_{period_type}_{s_date}_{e_date}.pdf"
+    
+    headers = {
+        "Content-Disposition": f'inline; filename="{filename}"'
+    }
+    return Response(content=pdf_bytes, media_type="application/pdf", headers=headers)
+
+@router.get("/surveillance")
+def get_surveillance_report(
+    period_type: str = Query("Month"),
+    reference_date: Optional[str] = Query(None),
+    start_date: Optional[str] = Query(None),
+    end_date: Optional[str] = Query(None),
+    conn: sqlite3.Connection = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    return surveillance_analytics.calculate_surveillance_metrics(
+        conn=conn,
+        period_type=period_type,
+        reference_date=reference_date,
+        start_date=start_date,
+        end_date=end_date
+    )
+
+@router.get("/surveillance/pdf")
+def get_surveillance_report_pdf(
+    period_type: str = Query("Month"),
+    reference_date: Optional[str] = Query(None),
+    start_date: Optional[str] = Query(None),
+    end_date: Optional[str] = Query(None),
+    conn: sqlite3.Connection = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    data = surveillance_analytics.calculate_surveillance_metrics(
+        conn=conn,
+        period_type=period_type,
+        reference_date=reference_date,
+        start_date=start_date,
+        end_date=end_date
+    )
+    pdf_bytes = surveillance_pdf.generate_surveillance_pdf(data=data, current_user=current_user)
+    
+    p_info = data.get("period", {})
+    s_date = p_info.get("start_date", "start")
+    e_date = p_info.get("end_date", "end")
+    filename = f"AMH_Surveillance_Report_{period_type}_{s_date}_{e_date}.pdf"
+    
+    headers = {
+        "Content-Disposition": f'inline; filename="{filename}"'
+    }
+    return Response(content=pdf_bytes, media_type="application/pdf", headers=headers)
 
 class ReportRequest(BaseModel):
     order_data: Dict[str, Any]

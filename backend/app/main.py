@@ -2,7 +2,7 @@ import os
 import time
 import logging
 from fastapi import FastAPI, Request
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from .database import init_db
 from .routers import auth, daily_log, config, reports, trends, audit, clients, integrations
