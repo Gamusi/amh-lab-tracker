@@ -112,6 +112,7 @@ const app = {
 
     'clipboard-list': `<svg class="lucide" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4"/><path d="M12 16h4"/><path d="M8 11h.01"/><path d="M8 16h.01"/></svg>`,
     'bar-chart-2': `<svg class="lucide" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" x2="18" y1="20" y2="10"/><line x1="12" x2="12" y1="20" y2="4"/><line x1="6" x2="6" y1="20" y2="14"/></svg>`,
+    'sliders': `<svg class="lucide" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" x2="4" y1="21" y2="14"/><line x1="4" x2="4" y1="10" y2="3"/><line x1="12" x2="12" y1="21" y2="12"/><line x1="12" x2="12" y1="8" y2="3"/><line x1="20" x2="20" y1="21" y2="16"/><line x1="20" x2="20" y1="12" y2="3"/><line x1="2" x2="6" y1="14" y2="14"/><line x1="10" x2="14" y1="8" y2="8"/><line x1="18" x2="22" y1="16" y2="16"/></svg>`,
     'trending-up': `<svg class="lucide" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>`,
     'file-text': `<svg class="lucide" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><polyline points="14 2 14 8 20 8"/><line x1="16" x2="8" y1="13" y2="13"/><line x1="16" x2="8" y1="17" y2="17"/><line x1="10" x2="8" y1="9" y2="9"/></svg>`,
     'settings': `<svg class="lucide" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.38a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>`,
@@ -1861,6 +1862,8 @@ const app = {
             } else {
               if (o.status === 'pending') {
                 actionBtns = `<button type="button" class="btn btn-primary btn-sm" style="padding:4px 8px; font-size:0.78rem;" onclick="app.showEnterResultModal(${o.order_id}, ${o.test_id}, '${this.escape(o.test_name)}', '', '', ${visitId})">Enter</button>`;
+              } else {
+                actionBtns = `<button type="button" class="btn btn-secondary btn-sm" style="padding:4px 8px; font-size:0.78rem;" onclick="app.showEnterResultModal(${o.order_id}, ${o.test_id}, '${this.escape(o.test_name)}', '${hasResult ? this.escape(o.results[0].result_value || '') : ''}', '${hasResult && o.results[0].result_unit ? this.escape(o.results[0].result_unit) : ''}', ${visitId})">Edit</button>`;
               }
             }
 
@@ -2340,7 +2343,7 @@ const app = {
               punit = uElem.tagName === 'SELECT' ? uElem.value : (uElem.getAttribute('data-unit') || uElem.textContent.trim());
             }
             if (pval) {
-              paramResults.push({ parameter_id: pid, result_value: pval });
+              paramResults.push({ parameter_id: pid, result_value: pval, result_unit: punit });
             }
          });
 
@@ -2387,11 +2390,6 @@ const app = {
             const editReason = document.getElementById('result-entry-reason') ? document.getElementById('result-entry-reason').value.trim() : '';
 
             if (isEditMode) {
-              const isAdmin = app.currentUser && (app.currentUser.role === 'admin' || app.currentUser.role === 'superadmin');
-              if (!isAdmin) {
-                app.showNotificationModal("Error", "Only administrators can edit saved results.", true);
-                return;
-              }
               if (!editReason) {
                 app.showNotificationModal("Error", "Reason for edit is required.", true);
                 return;
@@ -2831,7 +2829,10 @@ const app = {
         const err = yield res.json();
         app.showNotificationModal("Error", err.detail || "Failed to add clinician.", true);
       }
-    } catch(e) { console.error(e); }
+    } catch(e) {
+      console.error(e);
+      app.showNotificationModal("Error", "Network error adding clinician.", true);
+    }
   }),
 
   loadReferenceRangesConfig: __async(function*() {
@@ -2847,6 +2848,9 @@ const app = {
         const critMaxStr = r.critical_max !== null ? `> ${r.critical_max}` : '';
         const critCombined = (critMinStr || critMaxStr) ? `${critMinStr} ${critMaxStr}`.trim() : '—';
         const critStr = (critCombined !== '—') ? `<span style="color:#dc2626; font-weight:600;">${this.escape(critCombined)}</span>` : '—';
+        const sanityMinStr = r.sanity_min !== null ? `${r.sanity_min}` : '';
+        const sanityMaxStr = r.sanity_max !== null ? `${r.sanity_max}` : '';
+        const sanityStr = (sanityMinStr || sanityMaxStr) ? `${sanityMinStr || '0'} - ${sanityMaxStr || '∞'}` : '—';
         const ageStr = (r.age_min === 0 && r.age_max >= 900) ? 'All Ages' : `${r.age_min} - ${r.age_max}y`;
         const sexStr = r.sex ? r.sex : 'Any';
         rows += `
@@ -2856,6 +2860,7 @@ const app = {
             <td>${this.escape(sexStr)}</td>
             <td>${normStr}</td>
             <td>${critStr}</td>
+            <td><span style="font-size:0.8rem; color:var(--text-muted);">${sanityStr}</span></td>
             <td>${this.escape(r.unit || '—')}</td>
             <td style="text-align: right; white-space: nowrap;">
               <button class="btn btn-secondary btn-sm" onclick="app.showEditReferenceRangeModal(${r.id})" style="padding: 3px 8px; font-size: 0.78rem;">Edit</button>
@@ -2875,11 +2880,12 @@ const app = {
                 <th>Sex</th>
                 <th>Normal Interval</th>
                 <th>Critical Alert</th>
+                <th>Sanity Bounds</th>
                 <th>Unit</th>
                 <th style="text-align: right;">Actions</th>
               </tr>
             </thead>
-            <tbody>${rows || '<tr><td colspan="7" style="text-align:center; color:var(--text-muted);">No reference intervals configured.</td></tr>'}</tbody>
+            <tbody>${rows || '<tr><td colspan="8" style="text-align:center; color:var(--text-muted);">No reference intervals configured.</td></tr>'}</tbody>
           </table>
         `;
       }
@@ -2901,6 +2907,10 @@ const app = {
     document.getElementById('ref-range-modal-norm-max').value = '';
     document.getElementById('ref-range-modal-crit-min').value = '';
     document.getElementById('ref-range-modal-crit-max').value = '';
+    document.getElementById('ref-range-modal-sanity-min').value = '';
+    document.getElementById('ref-range-modal-sanity-max').value = '';
+    document.getElementById('ref-range-modal-plausible-min').value = '';
+    document.getElementById('ref-range-modal-plausible-max').value = '';
     document.getElementById('ref-range-modal-unit').value = '';
     document.getElementById('reference-range-modal').style.display = 'flex';
   },
@@ -2918,6 +2928,10 @@ const app = {
     document.getElementById('ref-range-modal-norm-max').value = r.normal_max !== null ? r.normal_max : '';
     document.getElementById('ref-range-modal-crit-min').value = r.critical_min !== null ? r.critical_min : '';
     document.getElementById('ref-range-modal-crit-max').value = r.critical_max !== null ? r.critical_max : '';
+    document.getElementById('ref-range-modal-sanity-min').value = r.sanity_min !== null ? r.sanity_min : '';
+    document.getElementById('ref-range-modal-sanity-max').value = r.sanity_max !== null ? r.sanity_max : '';
+    document.getElementById('ref-range-modal-plausible-min').value = r.plausible_min !== null ? r.plausible_min : '';
+    document.getElementById('ref-range-modal-plausible-max').value = r.plausible_max !== null ? r.plausible_max : '';
     document.getElementById('ref-range-modal-unit').value = r.unit || '';
     document.getElementById('reference-range-modal').style.display = 'flex';
   },
@@ -2933,6 +2947,10 @@ const app = {
     const normMax = document.getElementById('ref-range-modal-norm-max').value;
     const critMin = document.getElementById('ref-range-modal-crit-min').value;
     const critMax = document.getElementById('ref-range-modal-crit-max').value;
+    const sanityMin = document.getElementById('ref-range-modal-sanity-min').value;
+    const sanityMax = document.getElementById('ref-range-modal-sanity-max').value;
+    const plausibleMin = document.getElementById('ref-range-modal-plausible-min').value;
+    const plausibleMax = document.getElementById('ref-range-modal-plausible-max').value;
     const unit = document.getElementById('ref-range-modal-unit').value.trim() || null;
 
     const payload = {
@@ -2944,6 +2962,10 @@ const app = {
       normal_max: normMax !== '' ? parseFloat(normMax) : null,
       critical_min: critMin !== '' ? parseFloat(critMin) : null,
       critical_max: critMax !== '' ? parseFloat(critMax) : null,
+      sanity_min: sanityMin !== '' ? parseFloat(sanityMin) : null,
+      sanity_max: sanityMax !== '' ? parseFloat(sanityMax) : null,
+      plausible_min: plausibleMin !== '' ? parseFloat(plausibleMin) : null,
+      plausible_max: plausibleMax !== '' ? parseFloat(plausibleMax) : null,
       unit: unit
     };
 

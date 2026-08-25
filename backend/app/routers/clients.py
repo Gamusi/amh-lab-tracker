@@ -6,6 +6,7 @@ from ..database import get_db
 from ..auth import get_current_user, require_admin
 from ..schemas import VisitCreate, TestResultCreate, ParameterResultItem, AddOrdersRequest, ClientUpdate, BulkOrderDeleteRequest, BulkVisitDeleteRequest
 from ..evaluator import evaluate_result
+from ..biochem_validator import validate_biochem_parameter, validate_panel_consistency
 
 logger = logging.getLogger("amh_clients")
 
@@ -456,6 +457,7 @@ def enter_result(req: TestResultCreate, conn: sqlite3.Connection = Depends(get_d
             dob = None
     sex = order["sex"] or ""
     test_name = order["test_name"] or ""
+    age = (today.year - dob.year - ((today.month, today.day) < (dob.month, dob.day))) if dob else None
 
     overall_positive = False
 
@@ -466,24 +468,47 @@ def enter_result(req: TestResultCreate, conn: sqlite3.Connection = Depends(get_d
     order_status = "completed" if is_admin else "entered"
 
     if req.parameter_results:
+        param_map = {}
+        param_info_list = []
         for pr in req.parameter_results:
-            cur.execute("SELECT parameter_name FROM test_parameters WHERE id = ?", (pr.parameter_id,))
+            cur.execute("SELECT parameter_name, unit, secondary_unit FROM test_parameters WHERE id = ?", (pr.parameter_id,))
             p_row = cur.fetchone()
             param_name = ""
+            param_default_unit = None
             if p_row:
                 param_name = p_row["parameter_name"]
+                param_default_unit = p_row["unit"]
             else:
-                # Fallback: parameter_id may refer to a child test in the tests table (e.g. urinalysis sub-parameters)
-                cur.execute("SELECT name FROM tests WHERE id = ?", (pr.parameter_id,))
+                # Fallback: parameter_id may refer to a child test in the tests table
+                cur.execute("SELECT name, default_unit, secondary_unit FROM tests WHERE id = ?", (pr.parameter_id,))
                 t_row = cur.fetchone()
-                param_name = t_row["name"] if t_row else ""
+                if t_row:
+                    param_name = t_row["name"]
+                    param_default_unit = t_row["default_unit"]
 
-            eval_dict = evaluate_result(param_name, pr.result_value, dob, sex, today, db=cur)
+            effective_unit = pr.result_unit or req.result_unit or param_default_unit
+            param_map[param_name] = (pr.result_value, effective_unit)
+            param_info_list.append((pr, param_name, effective_unit))
+
+        # Cross-analyte panel consistency check
+        try:
+            validate_panel_consistency(param_map)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+
+        # Parameter validation, sanity checks, and scoring
+        for pr, param_name, effective_unit in param_info_list:
+            try:
+                eval_dict = validate_biochem_parameter(cur, param_name, pr.result_value, age=age, sex=sex, unit=effective_unit)
+            except ValueError as e:
+                raise HTTPException(status_code=400, detail=str(e))
+
             clinical_flag = eval_dict.get("flag")
             pr_is_positive = eval_dict.get("is_abnormal", False)
+            saved_unit = effective_unit or eval_dict.get("unit")
 
             if pr.result_value:
-                pr_val_lower = pr.result_value.strip().lower()
+                pr_val_lower = str(pr.result_value).strip().lower()
                 if pr_val_lower in ["positive", "abnormal", "reactive"] or pr_val_lower.startswith("positive") or pr_val_lower.startswith("reactive"):
                     pr_is_positive = True
                     if not clinical_flag:
@@ -496,8 +521,6 @@ def enter_result(req: TestResultCreate, conn: sqlite3.Connection = Depends(get_d
             res_row = cur.fetchone()
             if res_row:
                 if res_row["result_value"] is not None:
-                    if current_user.get("role") not in ["admin", "superadmin"]:
-                        raise HTTPException(status_code=403, detail="Only admins can edit existing test results")
                     if not req.edit_reason or not req.edit_reason.strip():
                         raise HTTPException(status_code=400, detail="Reason for editing result is required")
                     cur.execute("""
@@ -509,19 +532,24 @@ def enter_result(req: TestResultCreate, conn: sqlite3.Connection = Depends(get_d
                     UPDATE test_results
                     SET result_value = ?, is_positive = ?, result_unit = ?, clinical_flag = ?, edit_reason = ?, edited_by_user_id = ?, edited_at = ?, verified_by_user_id = ?, verified_at = ?
                     WHERE id = ?
-                """, (pr.result_value, pr_is_positive, req.result_unit, clinical_flag, req.edit_reason, current_user["id"], now_str, verified_by, verified_time, res_row["id"]))
+                """, (pr.result_value, pr_is_positive, saved_unit, clinical_flag, req.edit_reason, current_user["id"], now_str, verified_by, verified_time, res_row["id"]))
             else:
                 cur.execute("""
                     INSERT INTO test_results (order_id, parameter_id, result_value, result_unit, clinical_flag, is_positive, entered_by_user_id, entered_at, verified_by_user_id, verified_at)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """, (req.order_id, pr.parameter_id, pr.result_value, req.result_unit, clinical_flag, pr_is_positive, current_user["id"], now_str, verified_by, verified_time))
+                """, (req.order_id, pr.parameter_id, pr.result_value, saved_unit, clinical_flag, pr_is_positive, current_user["id"], now_str, verified_by, verified_time))
     else:
-        eval_dict = evaluate_result(test_name, req.result_value, dob, sex, today, db=cur)
+        try:
+            eval_dict = validate_biochem_parameter(cur, test_name, req.result_value, age=age, sex=sex, unit=req.result_unit)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+
         clinical_flag = eval_dict.get("flag")
         is_positive = eval_dict.get("is_abnormal", False)
+        saved_unit = req.result_unit or eval_dict.get("unit")
 
         if req.result_value:
-            val_lower = req.result_value.strip().lower()
+            val_lower = str(req.result_value).strip().lower()
             if val_lower in ["positive", "abnormal", "reactive"] or val_lower.startswith("positive") or val_lower.startswith("reactive"):
                 is_positive = True
                 if not clinical_flag:
@@ -533,25 +561,23 @@ def enter_result(req: TestResultCreate, conn: sqlite3.Connection = Depends(get_d
         res_row = cur.fetchone()
         if res_row:
             if res_row["result_value"] is not None:
-                if current_user.get("role") not in ["admin", "superadmin"]:
-                    raise HTTPException(status_code=403, detail="Only admins can edit existing test results")
                 if not req.edit_reason or not req.edit_reason.strip():
                     raise HTTPException(status_code=400, detail="Reason for editing result is required")
                 cur.execute("""
                     INSERT INTO audit_log (user_id, action, detail, timestamp)
                     VALUES (?, 'EDIT_RESULT', ?, ?)
-                """, (current_user["id"], f"order_id={req.order_id} old_value={res_row['result_value']!r} new_value={req.result_value!r} old_unit={res_row['result_unit']!r} new_unit={req.result_unit!r} reason={req.edit_reason!r}", now_str))
+                """, (current_user["id"], f"order_id={req.order_id} old_value={res_row['result_value']!r} new_value={req.result_value!r} old_unit={res_row['result_unit']!r} new_unit={saved_unit!r} reason={req.edit_reason!r}", now_str))
 
             cur.execute("""
                 UPDATE test_results
                 SET result_value = ?, is_positive = ?, result_unit = ?, clinical_flag = ?, edit_reason = ?, edited_by_user_id = ?, edited_at = ?, verified_by_user_id = ?, verified_at = ?
                 WHERE id = ?
-            """, (req.result_value, is_positive, req.result_unit, clinical_flag, req.edit_reason, current_user["id"], now_str, verified_by, verified_time, res_row["id"]))
+            """, (req.result_value, is_positive, saved_unit, clinical_flag, req.edit_reason, current_user["id"], now_str, verified_by, verified_time, res_row["id"]))
         else:
             cur.execute("""
                 INSERT INTO test_results (order_id, parameter_id, result_value, result_unit, clinical_flag, is_positive, entered_by_user_id, entered_at, verified_by_user_id, verified_at)
                 VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (req.order_id, req.result_value, req.result_unit, clinical_flag, is_positive, current_user["id"], now_str, verified_by, verified_time))
+            """, (req.order_id, req.result_value, saved_unit, clinical_flag, is_positive, current_user["id"], now_str, verified_by, verified_time))
 
     cur.execute("UPDATE test_orders SET status = ? WHERE id = ?", (order_status, req.order_id))
 

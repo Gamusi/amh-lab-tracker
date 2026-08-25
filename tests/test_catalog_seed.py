@@ -66,9 +66,31 @@ def test_reference_ranges_schema_and_clinical_flag_column(db_connection):
     cols = [r["name"] for r in cur.fetchall()]
     assert "clinical_flag" in cols
 
-    # Check reference_ranges table exists
+    # Check reference_ranges table exists and has sanity columns
     cur.execute("PRAGMA table_info(reference_ranges)")
     cols_rr = [r["name"] for r in cur.fetchall()]
     assert "parameter_name" in cols_rr
     assert "normal_min" in cols_rr
     assert "critical_min" in cols_rr
+    assert "sanity_min" in cols_rr
+    assert "sanity_max" in cols_rr
+    assert "plausible_min" in cols_rr
+    assert "plausible_max" in cols_rr
+
+def test_biochemistry_panels_seeded_reference_ranges(db_connection):
+    from backend.app.seed import seed_reference_ranges
+    cur = db_connection.cursor()
+    seed_reference_ranges(cur)
+    # Check Potassium has sanity limits
+    cur.execute("SELECT normal_min, normal_max, sanity_min, sanity_max, unit FROM reference_ranges WHERE parameter_name = 'Serum Potassium (K+)' AND unit = 'mmol/L'")
+    k_row = cur.fetchone()
+    assert k_row is not None
+    assert k_row["sanity_min"] == 1.0
+    assert k_row["sanity_max"] == 12.0
+
+    # Check Glucose has dual units seeded
+    cur.execute("SELECT normal_min, normal_max, sanity_min, sanity_max, unit FROM reference_ranges WHERE parameter_name = 'FBS (Fasting Blood Sugar)' AND unit = 'mg/dL'")
+    fbs_mg = cur.fetchone()
+    assert fbs_mg is not None
+    assert fbs_mg["sanity_min"] == 18.0
+    assert fbs_mg["sanity_max"] == 900.0

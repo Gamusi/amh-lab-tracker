@@ -181,6 +181,7 @@ class WardResponse(WardBase):
 class ParameterResultItem(BaseModel):
     parameter_id: int
     result_value: str
+    result_unit: Optional[str] = None
 
 class TestResultCreate(BaseModel):
     order_id: int
@@ -210,6 +211,10 @@ class ReferenceRangeBase(BaseModel):
     normal_max: Optional[float] = None
     critical_min: Optional[float] = None
     critical_max: Optional[float] = None
+    sanity_min: Optional[float] = None
+    sanity_max: Optional[float] = None
+    plausible_min: Optional[float] = None
+    plausible_max: Optional[float] = None
     unit: Optional[str] = None
 
 class ReferenceRangeCreate(ReferenceRangeBase):
@@ -225,6 +230,10 @@ class ReferenceRangeUpdate(BaseModel):
     normal_max: Optional[float] = None
     critical_min: Optional[float] = None
     critical_max: Optional[float] = None
+    sanity_min: Optional[float] = None
+    sanity_max: Optional[float] = None
+    plausible_min: Optional[float] = None
+    plausible_max: Optional[float] = None
     unit: Optional[str] = None
 
 class ReferenceRangeResponse(ReferenceRangeBase):

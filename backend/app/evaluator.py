@@ -35,7 +35,7 @@ def calculate_age(dob: datetime.date, entry_date: datetime.date) -> int:
         return 0
     return entry_date.year - dob.year - ((entry_date.month, entry_date.day) < (dob.month, dob.day))
 
-def _get_rules_from_db(param_name: str, db=None) -> tuple[Optional[str], List[Dict[str, Any]]]:
+def _get_rules_from_db(param_name: str, db=None, unit: Optional[str] = None) -> tuple[Optional[str], List[Dict[str, Any]]]:
     """Queries reference_ranges table for rules matching parameter_name or aliases."""
     if not param_name:
         return None, []
@@ -51,7 +51,7 @@ def _get_rules_from_db(param_name: str, db=None) -> tuple[Optional[str], List[Di
             candidates.append(k)
 
     rules = []
-    unit = None
+    matched_unit = unit
 
     conn = None
     should_close = False
@@ -70,16 +70,34 @@ def _get_rules_from_db(param_name: str, db=None) -> tuple[Optional[str], List[Di
 
         if cur is not None:
             placeholders = ",".join("?" for _ in candidates)
-            cur.execute(f"""
+            sql = f"""
                 SELECT parameter_name, age_min, age_max, sex, normal_min, normal_max, critical_min, critical_max, unit
                 FROM reference_ranges
                 WHERE LOWER(parameter_name) IN ({placeholders})
-                ORDER BY id ASC
-            """, [c.lower() for c in candidates])
+            """
+            params = [c.lower() for c in candidates]
+            if unit:
+                sql += " AND (LOWER(unit) = LOWER(?) OR unit IS NULL)"
+                params.append(unit.strip())
+            sql += " ORDER BY id ASC"
+
+            cur.execute(sql, params)
             rows = cur.fetchall()
+
+            if not rows and unit:
+                # Fallback if no rules matched the requested unit
+                sql_fallback = f"""
+                    SELECT parameter_name, age_min, age_max, sex, normal_min, normal_max, critical_min, critical_max, unit
+                    FROM reference_ranges
+                    WHERE LOWER(parameter_name) IN ({placeholders})
+                    ORDER BY id ASC
+                """
+                cur.execute(sql_fallback, [c.lower() for c in candidates])
+                rows = cur.fetchall()
+
             for r in rows:
-                if not unit and r["unit"]:
-                    unit = r["unit"]
+                if not matched_unit and r["unit"]:
+                    matched_unit = r["unit"]
                 rules.append({
                     "age_min": r["age_min"] if r["age_min"] is not None else 0,
                     "age_max": r["age_max"] if r["age_max"] is not None else 999,
@@ -96,7 +114,7 @@ def _get_rules_from_db(param_name: str, db=None) -> tuple[Optional[str], List[Di
         if should_close and conn:
             conn.close()
 
-    return unit, rules
+    return matched_unit, rules
 
 def is_qualitative_abnormal(result_val: str, ref_val: str = None, param_name: str = None) -> bool:
     if not result_val:
@@ -161,7 +179,7 @@ def is_qualitative_abnormal(result_val: str, ref_val: str = None, param_name: st
 
     return False
 
-def evaluate_result(test_name: str, result_value: str, dob: datetime.date = None, sex: str = None, entry_date: datetime.date = None, db=None) -> dict:
+def evaluate_result(test_name: str, result_value: str, dob: datetime.date = None, sex: str = None, entry_date: datetime.date = None, db=None, unit: Optional[str] = None) -> dict:
     if not test_name:
         return {
             "unit": None,
@@ -170,7 +188,7 @@ def evaluate_result(test_name: str, result_value: str, dob: datetime.date = None
             "is_abnormal": False
         }
 
-    unit, rules = _get_rules_from_db(test_name, db=db)
+    unit, rules = _get_rules_from_db(test_name, db=db, unit=unit)
 
     # Fallback to json configuration if no db rules found
     if not rules:
@@ -180,7 +198,8 @@ def evaluate_result(test_name: str, result_value: str, dob: datetime.date = None
             if alias_key:
                 test_config = FALLBACK_REFERENCE_RANGES.get(alias_key)
         if test_config:
-            unit = test_config.get("unit")
+            if not unit:
+                unit = test_config.get("unit")
             rules = test_config.get("rules", [])
 
     try:

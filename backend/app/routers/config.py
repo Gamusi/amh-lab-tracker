@@ -251,7 +251,7 @@ def delete_clinician(clinician_id: int, conn: sqlite3.Connection = Depends(get_d
 def get_reference_ranges(conn: sqlite3.Connection = Depends(get_db), current_user: dict = Depends(get_current_user)):
     cur = conn.cursor()
     cur.execute("""
-        SELECT id, test_id, parameter_name, age_min, age_max, sex, normal_min, normal_max, critical_min, critical_max, unit
+        SELECT id, test_id, parameter_name, age_min, age_max, sex, normal_min, normal_max, critical_min, critical_max, sanity_min, sanity_max, plausible_min, plausible_max, unit
         FROM reference_ranges
         ORDER BY parameter_name ASC, age_min ASC, id ASC
     """)
@@ -266,9 +266,9 @@ def create_reference_range(req: ReferenceRangeCreate, admin_user: dict = Depends
     
     cur = conn.cursor()
     cur.execute("""
-        INSERT INTO reference_ranges (test_id, parameter_name, age_min, age_max, sex, normal_min, normal_max, critical_min, critical_max, unit)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    """, (req.test_id, param_name, req.age_min if req.age_min is not None else 0, req.age_max if req.age_max is not None else 999, req.sex, req.normal_min, req.normal_max, req.critical_min, req.critical_max, req.unit))
+        INSERT INTO reference_ranges (test_id, parameter_name, age_min, age_max, sex, normal_min, normal_max, critical_min, critical_max, sanity_min, sanity_max, plausible_min, plausible_max, unit)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (req.test_id, param_name, req.age_min if req.age_min is not None else 0, req.age_max if req.age_max is not None else 999, req.sex, req.normal_min, req.normal_max, req.critical_min, req.critical_max, req.sanity_min, req.sanity_max, req.plausible_min, req.plausible_max, req.unit))
     rid = cur.lastrowid
     conn.commit()
 
@@ -280,14 +280,17 @@ def create_reference_range(req: ReferenceRangeCreate, admin_user: dict = Depends
         age_min=req.age_min if req.age_min is not None else 0,
         age_max=req.age_max if req.age_max is not None else 999,
         sex=req.sex, normal_min=req.normal_min, normal_max=req.normal_max,
-        critical_min=req.critical_min, critical_max=req.critical_max, unit=req.unit
+        critical_min=req.critical_min, critical_max=req.critical_max,
+        sanity_min=req.sanity_min, sanity_max=req.sanity_max,
+        plausible_min=req.plausible_min, plausible_max=req.plausible_max,
+        unit=req.unit
     )
 
 
 @router.put("/reference-ranges/{range_id}", response_model=ReferenceRangeResponse)
 def update_reference_range(range_id: int, req: ReferenceRangeUpdate, admin_user: dict = Depends(require_admin), conn: sqlite3.Connection = Depends(get_db)):
     cur = conn.cursor()
-    cur.execute("SELECT id, test_id, parameter_name, age_min, age_max, sex, normal_min, normal_max, critical_min, critical_max, unit FROM reference_ranges WHERE id = ?", (range_id,))
+    cur.execute("SELECT id, test_id, parameter_name, age_min, age_max, sex, normal_min, normal_max, critical_min, critical_max, sanity_min, sanity_max, plausible_min, plausible_max, unit FROM reference_ranges WHERE id = ?", (range_id,))
     existing = cur.fetchone()
     if not existing:
         raise HTTPException(status_code=404, detail="Reference range not found")
@@ -301,13 +304,17 @@ def update_reference_range(range_id: int, req: ReferenceRangeUpdate, admin_user:
     new_norm_max = req.normal_max if req.normal_max is not None else existing["normal_max"]
     new_crit_min = req.critical_min if req.critical_min is not None else existing["critical_min"]
     new_crit_max = req.critical_max if req.critical_max is not None else existing["critical_max"]
+    new_sanity_min = req.sanity_min if req.sanity_min is not None else existing["sanity_min"]
+    new_sanity_max = req.sanity_max if req.sanity_max is not None else existing["sanity_max"]
+    new_plausible_min = req.plausible_min if req.plausible_min is not None else existing["plausible_min"]
+    new_plausible_max = req.plausible_max if req.plausible_max is not None else existing["plausible_max"]
     new_unit = req.unit if req.unit is not None else existing["unit"]
 
     cur.execute("""
         UPDATE reference_ranges
-        SET test_id = ?, parameter_name = ?, age_min = ?, age_max = ?, sex = ?, normal_min = ?, normal_max = ?, critical_min = ?, critical_max = ?, unit = ?
+        SET test_id = ?, parameter_name = ?, age_min = ?, age_max = ?, sex = ?, normal_min = ?, normal_max = ?, critical_min = ?, critical_max = ?, sanity_min = ?, sanity_max = ?, plausible_min = ?, plausible_max = ?, unit = ?
         WHERE id = ?
-    """, (new_test_id, new_param, new_age_min, new_age_max, new_sex, new_norm_min, new_norm_max, new_crit_min, new_crit_max, new_unit, range_id))
+    """, (new_test_id, new_param, new_age_min, new_age_max, new_sex, new_norm_min, new_norm_max, new_crit_min, new_crit_max, new_sanity_min, new_sanity_max, new_plausible_min, new_plausible_max, new_unit, range_id))
     conn.commit()
 
     conn.execute("INSERT INTO audit_log (user_id, action, detail) VALUES (?, ?, ?)", (admin_user["id"], "update_reference_range", f"Updated reference range rule ID {range_id} for '{new_param}'"))
@@ -317,7 +324,10 @@ def update_reference_range(range_id: int, req: ReferenceRangeUpdate, admin_user:
         id=range_id, test_id=new_test_id, parameter_name=new_param,
         age_min=new_age_min, age_max=new_age_max, sex=new_sex,
         normal_min=new_norm_min, normal_max=new_norm_max,
-        critical_min=new_crit_min, critical_max=new_crit_max, unit=new_unit
+        critical_min=new_crit_min, critical_max=new_crit_max,
+        sanity_min=new_sanity_min, sanity_max=new_sanity_max,
+        plausible_min=new_plausible_min, plausible_max=new_plausible_max,
+        unit=new_unit
     )
 
 

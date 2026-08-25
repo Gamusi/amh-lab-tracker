@@ -913,6 +913,42 @@ def test_admin_reference_range_crud(mock_db):
     assert del_res.status_code == 200
     assert del_res.json()["status"] == "deleted"
 
+def test_staff_can_edit_test_results_with_reason(mock_db):
+    conn = mock_db["conn"]
+    cur = conn.cursor()
+    cur.execute("INSERT INTO clients (client_number, full_name, sex) VALUES ('AMH-ED-1', 'Sarah K', 'Female')")
+    cid = cur.lastrowid
+    cur.execute("INSERT INTO visits (client_id, ward_of_origin) VALUES (?, 'GOPD')", (cid,))
+    vid = cur.lastrowid
+    cur.execute("INSERT INTO test_orders (visit_id, test_id, status) VALUES (?, ?, 'pending')", (vid, mock_db["mps_id"]))
+    oid = cur.lastrowid
+    conn.commit()
+
+    # Initial entry by staff
+    app.dependency_overrides[get_current_user] = lambda: {"id": 2, "username": "staff1", "full_name": "Staff One", "role": "staff"}
+    res1 = client.post("/api/clients/results", json={"order_id": oid, "result_value": "Negative"})
+    assert res1.status_code == 200
+
+    # Staff edits result without reason -> 400
+    res_no_reason = client.post("/api/clients/results", json={"order_id": oid, "result_value": "Positive", "edit_reason": ""})
+    assert res_no_reason.status_code == 400
+    assert "reason" in res_no_reason.json()["detail"].lower()
+
+    # Staff edits result with valid reason -> 200
+    res_edit = client.post("/api/clients/results", json={"order_id": oid, "result_value": "Positive", "edit_reason": "Corrected slide re-read"})
+    assert res_edit.status_code == 200
+
+    # Verify result updated and order remains/resets to 'entered' (unverified)
+    cur.execute("SELECT status FROM test_orders WHERE id = ?", (oid,))
+    assert cur.fetchone()["status"] == "entered"
+
+    cur.execute("SELECT result_value, edit_reason, edited_by_user_id FROM test_results WHERE order_id = ?", (oid,))
+    row = cur.fetchone()
+    assert row["result_value"] == "Positive"
+    assert row["edit_reason"] == "Corrected slide re-read"
+    assert row["edited_by_user_id"] == 2
+
+
 
 
 

@@ -58,6 +58,7 @@ SCHEMA_SQL = """
         test_id INTEGER NOT NULL REFERENCES tests(id),
         parameter_name TEXT NOT NULL,
         unit TEXT,
+        secondary_unit TEXT,
         ref_range TEXT,
         sort_order INTEGER DEFAULT 0,
         options TEXT
@@ -165,6 +166,10 @@ SCHEMA_SQL = """
         normal_max REAL,
         critical_min REAL,
         critical_max REAL,
+        sanity_min REAL,
+        sanity_max REAL,
+        plausible_min REAL,
+        plausible_max REAL,
         unit TEXT
     );
 """
@@ -225,7 +230,12 @@ def init_db():
         ("test_results", "edited_at", "DATETIME"),
         ("visits", "order_category", "TEXT DEFAULT 'in-house'"),
         ("visits", "is_deleted", "BOOLEAN NOT NULL DEFAULT 0"),
-        ("test_parameters", "options", "TEXT")
+        ("test_parameters", "options", "TEXT"),
+        ("test_parameters", "secondary_unit", "TEXT"),
+        ("reference_ranges", "sanity_min", "REAL"),
+        ("reference_ranges", "sanity_max", "REAL"),
+        ("reference_ranges", "plausible_min", "REAL"),
+        ("reference_ranges", "plausible_max", "REAL")
     ]
     for table, col, col_def in migrations:
         try:

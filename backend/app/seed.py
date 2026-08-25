@@ -5,7 +5,49 @@ from .database import get_connection, init_db
 # Auto-generated from amh-comprehensive-test-reporting-specifications.md
 SECTIONS = ['Hematology', 'Serology & Clinical Immunology', 'Clinical Biochemistry', 'Urinalysis Profile', 'Parasitology & Stool Diagnostics', 'Microbiology & Tuberculosis', 'Blood Transfusion & Immunohematology']
 
-PANELS = {'Complete Blood Count (CBC)': ['Total WBC Count (White Blood Cells)', 'Red Blood Cells (RBC)', 'Hemoglobin (Hb)', 'Hematocrit (HCT)', 'Mean Cell Volume (MCV)', 'Mean Cell Hb (MCH)', 'Mean Cell Hb Conc (MCHC)', 'Platelets Count (PLT)', 'Neutrophils (%) [Relative Count]', 'Lymphocytes (%) [Relative Count]', 'Monocytes (%) [Relative Count]', 'Eosinophils (%) [Relative Count]', 'Basophils (%) [Relative Count]', 'Neutrophils (Absolute Count)', 'Lymphocytes (Absolute Count)', 'Monocytes (Absolute Count)', 'Eosinophils (Absolute Count)', 'Basophils (Absolute Count)', 'RBC Distribution Width (RDW)', 'Thrombocrit (PCT)', 'Mean Platelet Volume (MPV)', 'PLT Distribution Width (PDW)'], 'LFTS': ['ALT / SGPT (Alanine Aminotransferase)', 'AST / SGOT (Aspartate Aminotransferase)', 'Alkaline Phosphatase (ALP)', 'Total Bilirubin', 'Direct Bilirubin', 'Total Protein', 'Serum Albumin', 'Gamma-Glutamyl Transferase (GGT)', 'Total Cholesterol'], 'RFTS': ['Serum Urea', 'Serum Creatinine', 'Serum Uric Acid'], 'CARDIAC': ['Troponin I (cTnI)', 'Troponin T (cTnT)', 'CK-MB (Creatine Kinase-MB)', 'BNP / NT-proBNP', 'D-Dimer', 'LDH (Lactate Dehydrogenase)'], 'ELECTROLYTES': ['Serum Potassium (K+)', 'Serum Sodium (Na+)', 'Serum Chloride (Cl-)', 'Bicarbonate (HCO3-)'], 'URINALYSIS': ['Color', 'Turbidity', 'Pus Cells (WBCs)', 'Red Blood Cells (RBCs)', 'Epithelial Cells', 'Casts', 'Crystals', 'Specific Gravity (S.G)', 'PH', 'Proteins (Albuminuria Screening)', 'Glucose (Glucosuria Screening)', 'Bilirubin (Bilirubinuria)', 'Urobilinogen', 'Ketones (Ketonuria)', 'Blood (Hematuria/Hemoglobinuria)', 'Nitrates (Nitrite Screening)', 'Leukocytes (Leukocyte Esterase)'], 'STOOL ANALYSIS': ['Stool Analysis (Macroscopy)', 'Stool Analysis (Microscopy)', 'Stool Occult Blood'], 'HIV Testing Service': ['Determine', 'Stat-Pak', 'SD Bioline']}
+PANELS = {
+    'Complete Blood Count (CBC)': [
+        'Total WBC Count (White Blood Cells)', 'Red Blood Cells (RBC)', 'Hemoglobin (Hb)', 'Hematocrit (HCT)',
+        'Mean Cell Volume (MCV)', 'Mean Cell Hb (MCH)', 'Mean Cell Hb Conc (MCHC)', 'Platelets Count (PLT)',
+        'Neutrophils (%) [Relative Count]', 'Lymphocytes (%) [Relative Count]', 'Monocytes (%) [Relative Count]',
+        'Eosinophils (%) [Relative Count]', 'Basophils (%) [Relative Count]', 'Neutrophils (Absolute Count)',
+        'Lymphocytes (Absolute Count)', 'Monocytes (Absolute Count)', 'Eosinophils (Absolute Count)',
+        'Basophils (Absolute Count)', 'RBC Distribution Width (RDW)', 'Thrombocrit (PCT)',
+        'Mean Platelet Volume (MPV)', 'PLT Distribution Width (PDW)'
+    ],
+    'LFTS': [
+        'ALT / SGPT (Alanine Aminotransferase)', 'AST / SGOT (Aspartate Aminotransferase)',
+        'Alkaline Phosphatase (ALP)', 'Total Bilirubin', 'Direct Bilirubin',
+        'Total Protein', 'Serum Albumin', 'Gamma-Glutamyl Transferase (GGT)', 'Total Cholesterol'
+    ],
+    'RFTS': [
+        'Serum Urea', 'Serum Creatinine', 'Serum Uric Acid'
+    ],
+    'CARDIAC': [
+        'Total CK (Creatine Kinase)', 'CK-MB (Creatine Kinase-MB)', 'Troponin I (cTnI)',
+        'Troponin T (cTnT)', 'Myoglobin', 'BNP / NT-proBNP', 'D-Dimer', 'LDH (Lactate Dehydrogenase)'
+    ],
+    'ELECTROLYTES': [
+        'Serum Potassium (K+)', 'Serum Sodium (Na+)', 'Serum Chloride (Cl-)',
+        'Bicarbonate (HCO3-)', 'Total Calcium (Ca2+)', 'Magnesium (Mg2+)', 'Phosphate (PO4)'
+    ],
+    'LIPID PROFILE': [
+        'Total Cholesterol', 'Triglycerides', 'HDL Cholesterol', 'LDL Cholesterol'
+    ],
+    'URINALYSIS': [
+        'Color', 'Turbidity', 'Pus Cells (WBCs)', 'Red Blood Cells (RBCs)', 'Epithelial Cells', 'Casts',
+        'Crystals', 'Specific Gravity (S.G)', 'PH', 'Proteins (Albuminuria Screening)',
+        'Glucose (Glucosuria Screening)', 'Bilirubin (Bilirubinuria)', 'Urobilinogen',
+        'Ketones (Ketonuria)', 'Blood (Hematuria/Hemoglobinuria)', 'Nitrates (Nitrite Screening)',
+        'Leukocytes (Leukocyte Esterase)'
+    ],
+    'STOOL ANALYSIS': [
+        'Stool Analysis (Macroscopy)', 'Stool Analysis (Microscopy)', 'Stool Occult Blood'
+    ],
+    'HIV Testing Service': [
+        'Determine', 'Stat-Pak', 'SD Bioline'
+    ]
+}
 
 TESTS = [
     {'name': 'Complete Blood Count (CBC)', 'section': 'Hematology', 'is_tracked': 1, 'result_type': 'panel', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': None, 'parent_name': None, 'sort_order': 0},
@@ -13,6 +55,7 @@ TESTS = [
     {'name': 'RFTS', 'section': 'Clinical Biochemistry', 'is_tracked': 0, 'result_type': 'panel', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': None, 'parent_name': None, 'sort_order': 0},
     {'name': 'CARDIAC', 'section': 'Clinical Biochemistry', 'is_tracked': 0, 'result_type': 'panel', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': None, 'parent_name': None, 'sort_order': 0},
     {'name': 'ELECTROLYTES', 'section': 'Clinical Biochemistry', 'is_tracked': 0, 'result_type': 'panel', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': None, 'parent_name': None, 'sort_order': 0},
+    {'name': 'LIPID PROFILE', 'section': 'Clinical Biochemistry', 'is_tracked': 0, 'result_type': 'panel', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': None, 'parent_name': None, 'sort_order': 0},
     {'name': 'URINALYSIS', 'section': 'Urinalysis Profile', 'is_tracked': 1, 'result_type': 'panel', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': None, 'parent_name': None, 'sort_order': 0},
     {'name': 'STOOL ANALYSIS', 'section': 'Parasitology & Stool Diagnostics', 'is_tracked': 1, 'result_type': 'panel', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': None, 'parent_name': None, 'sort_order': 0},
     {'name': 'HIV Testing Service', 'section': 'Serology & Clinical Immunology', 'is_tracked': 1, 'result_type': 'panel', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': None, 'parent_name': None, 'sort_order': 0},
@@ -41,8 +84,8 @@ TESTS = [
     {'name': 'HCV Ab (Hepatitis C)', 'section': 'Serology & Clinical Immunology', 'is_tracked': 1, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['Positive', 'Negative'], 'parent_name': None, 'sort_order': 0},
     {'name': 'TPHA (Confirmatory Syphilis Test)', 'section': 'Serology & Clinical Immunology', 'is_tracked': 1, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['Reactive', 'Non-Reactive'], 'parent_name': None, 'sort_order': 0},
     {'name': 'ASO Titer (Anti-Streptolysin O)', 'section': 'Serology & Clinical Immunology', 'is_tracked': 0, 'result_type': 'quantitative', 'default_unit': 'IU/mL', 'secondary_unit': None, 'ref_range': None, 'options': None, 'parent_name': None, 'sort_order': 0},
-    {'name': 'FBS (Fasting Blood Sugar)', 'section': 'Clinical Biochemistry', 'is_tracked': 1, 'result_type': 'quantitative', 'default_unit': 'mmol/L', 'secondary_unit': None, 'ref_range': None, 'options': None, 'parent_name': None, 'sort_order': 0},
-    {'name': 'RBS (Random Blood Sugar)', 'section': 'Clinical Biochemistry', 'is_tracked': 1, 'result_type': 'quantitative', 'default_unit': 'mmol/L', 'secondary_unit': None, 'ref_range': None, 'options': None, 'parent_name': None, 'sort_order': 0},
+    {'name': 'FBS (Fasting Blood Sugar)', 'section': 'Clinical Biochemistry', 'is_tracked': 1, 'result_type': 'quantitative', 'default_unit': 'mmol/L', 'secondary_unit': 'mg/dL', 'ref_range': '3.9 - 5.5 mmol/L (70 - 100 mg/dL)', 'options': None, 'parent_name': None, 'sort_order': 0},
+    {'name': 'RBS (Random Blood Sugar)', 'section': 'Clinical Biochemistry', 'is_tracked': 1, 'result_type': 'quantitative', 'default_unit': 'mmol/L', 'secondary_unit': 'mg/dL', 'ref_range': '4.0 - 7.8 mmol/L (72 - 140 mg/dL)', 'options': None, 'parent_name': None, 'sort_order': 0},
     {'name': 'Blood smear Mps (Malaria Microscopy)', 'section': 'Parasitology & Stool Diagnostics', 'is_tracked': 1, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['No malaria parasites seen', '1+', '2+', '3+', '4+'], 'parent_name': None, 'sort_order': 0},
     {'name': 'ZN FOR AFBs (Tuberculosis Sputum Smear)', 'section': 'Microbiology & Tuberculosis', 'is_tracked': 1, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['AFB Negative', 'Scanty', '1+', '2+', '3+'], 'parent_name': None, 'sort_order': 0},
     {'name': 'Gram Stain', 'section': 'Microbiology & Tuberculosis', 'is_tracked': 1, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['No bacteria seen', 'Gram-positive cocci in pairs/chains', 'Gram-positive cocci in clusters', 'Gram-negative rods', 'Gram-negative intracellular diplococci', 'Gram-positive rods'], 'parent_name': None, 'sort_order': 0},
@@ -73,28 +116,37 @@ TESTS = [
     {'name': 'Thrombocrit (PCT)', 'section': 'Hematology', 'is_tracked': 0, 'result_type': 'quantitative', 'default_unit': '%', 'secondary_unit': None, 'ref_range': None, 'options': None, 'parent_name': 'Complete Blood Count (CBC)', 'sort_order': 20},
     {'name': 'Mean Platelet Volume (MPV)', 'section': 'Hematology', 'is_tracked': 0, 'result_type': 'quantitative', 'default_unit': 'fL', 'secondary_unit': None, 'ref_range': None, 'options': None, 'parent_name': 'Complete Blood Count (CBC)', 'sort_order': 21},
     {'name': 'PLT Distribution Width (PDW)', 'section': 'Hematology', 'is_tracked': 0, 'result_type': 'quantitative', 'default_unit': '%', 'secondary_unit': None, 'ref_range': None, 'options': None, 'parent_name': 'Complete Blood Count (CBC)', 'sort_order': 22},
-    {'name': 'ALT / SGPT (Alanine Aminotransferase)', 'section': 'Clinical Biochemistry', 'is_tracked': 0, 'result_type': 'quantitative', 'default_unit': 'U/L', 'secondary_unit': None, 'ref_range': None, 'options': None, 'parent_name': 'LFTS', 'sort_order': 1},
-    {'name': 'AST / SGOT (Aspartate Aminotransferase)', 'section': 'Clinical Biochemistry', 'is_tracked': 0, 'result_type': 'quantitative', 'default_unit': 'U/L', 'secondary_unit': None, 'ref_range': None, 'options': None, 'parent_name': 'LFTS', 'sort_order': 2},
-    {'name': 'Alkaline Phosphatase (ALP)', 'section': 'Clinical Biochemistry', 'is_tracked': 0, 'result_type': 'quantitative', 'default_unit': 'U/L', 'secondary_unit': None, 'ref_range': None, 'options': None, 'parent_name': 'LFTS', 'sort_order': 3},
-    {'name': 'Total Bilirubin', 'section': 'Clinical Biochemistry', 'is_tracked': 0, 'result_type': 'quantitative', 'default_unit': 'µmol/L', 'secondary_unit': None, 'ref_range': None, 'options': None, 'parent_name': 'LFTS', 'sort_order': 4},
-    {'name': 'Direct Bilirubin', 'section': 'Clinical Biochemistry', 'is_tracked': 0, 'result_type': 'quantitative', 'default_unit': 'µmol/L', 'secondary_unit': None, 'ref_range': None, 'options': None, 'parent_name': 'LFTS', 'sort_order': 5},
-    {'name': 'Total Protein', 'section': 'Clinical Biochemistry', 'is_tracked': 0, 'result_type': 'quantitative', 'default_unit': 'g/dL', 'secondary_unit': 'g/L', 'ref_range': None, 'options': None, 'parent_name': 'LFTS', 'sort_order': 6},
-    {'name': 'Serum Albumin', 'section': 'Clinical Biochemistry', 'is_tracked': 0, 'result_type': 'quantitative', 'default_unit': 'g/dL', 'secondary_unit': 'g/L', 'ref_range': None, 'options': None, 'parent_name': 'LFTS', 'sort_order': 7},
-    {'name': 'Gamma-Glutamyl Transferase (GGT)', 'section': 'Clinical Biochemistry', 'is_tracked': 0, 'result_type': 'quantitative', 'default_unit': 'U/L', 'secondary_unit': None, 'ref_range': None, 'options': None, 'parent_name': 'LFTS', 'sort_order': 8},
-    {'name': 'Total Cholesterol', 'section': 'Clinical Biochemistry', 'is_tracked': 0, 'result_type': 'quantitative', 'default_unit': 'mmol/L', 'secondary_unit': None, 'ref_range': None, 'options': None, 'parent_name': 'LFTS', 'sort_order': 9},
-    {'name': 'Serum Urea', 'section': 'Clinical Biochemistry', 'is_tracked': 0, 'result_type': 'quantitative', 'default_unit': 'mmol/L', 'secondary_unit': None, 'ref_range': None, 'options': None, 'parent_name': 'RFTS', 'sort_order': 1},
-    {'name': 'Serum Creatinine', 'section': 'Clinical Biochemistry', 'is_tracked': 0, 'result_type': 'quantitative', 'default_unit': 'µmol/L', 'secondary_unit': None, 'ref_range': None, 'options': None, 'parent_name': 'RFTS', 'sort_order': 2},
-    {'name': 'Serum Uric Acid', 'section': 'Clinical Biochemistry', 'is_tracked': 0, 'result_type': 'quantitative', 'default_unit': 'µmol/L', 'secondary_unit': None, 'ref_range': None, 'options': None, 'parent_name': 'RFTS', 'sort_order': 3},
-    {'name': 'Troponin I (cTnI)', 'section': 'Clinical Biochemistry', 'is_tracked': 0, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['Negative', 'Positive'], 'parent_name': 'CARDIAC', 'sort_order': 1},
-    {'name': 'Troponin T (cTnT)', 'section': 'Clinical Biochemistry', 'is_tracked': 0, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['Negative', 'Positive'], 'parent_name': 'CARDIAC', 'sort_order': 2},
-    {'name': 'CK-MB (Creatine Kinase-MB)', 'section': 'Clinical Biochemistry', 'is_tracked': 0, 'result_type': 'quantitative', 'default_unit': 'U/L', 'secondary_unit': None, 'ref_range': None, 'options': None, 'parent_name': 'CARDIAC', 'sort_order': 3},
-    {'name': 'BNP / NT-proBNP', 'section': 'Clinical Biochemistry', 'is_tracked': 0, 'result_type': 'quantitative', 'default_unit': 'pg/mL', 'secondary_unit': None, 'ref_range': None, 'options': None, 'parent_name': 'CARDIAC', 'sort_order': 4},
-    {'name': 'D-Dimer', 'section': 'Clinical Biochemistry', 'is_tracked': 0, 'result_type': 'quantitative', 'default_unit': 'µg/mL', 'secondary_unit': None, 'ref_range': None, 'options': None, 'parent_name': 'CARDIAC', 'sort_order': 5},
-    {'name': 'LDH (Lactate Dehydrogenase)', 'section': 'Clinical Biochemistry', 'is_tracked': 0, 'result_type': 'quantitative', 'default_unit': 'U/L', 'secondary_unit': None, 'ref_range': None, 'options': None, 'parent_name': 'CARDIAC', 'sort_order': 6},
-    {'name': 'Serum Potassium (K+)', 'section': 'Clinical Biochemistry', 'is_tracked': 0, 'result_type': 'quantitative', 'default_unit': 'mmol/L', 'secondary_unit': None, 'ref_range': None, 'options': None, 'parent_name': 'ELECTROLYTES', 'sort_order': 1},
-    {'name': 'Serum Sodium (Na+)', 'section': 'Clinical Biochemistry', 'is_tracked': 0, 'result_type': 'quantitative', 'default_unit': 'mmol/L', 'secondary_unit': None, 'ref_range': None, 'options': None, 'parent_name': 'ELECTROLYTES', 'sort_order': 2},
-    {'name': 'Serum Chloride (Cl-)', 'section': 'Clinical Biochemistry', 'is_tracked': 0, 'result_type': 'quantitative', 'default_unit': 'mmol/L', 'secondary_unit': None, 'ref_range': None, 'options': None, 'parent_name': 'ELECTROLYTES', 'sort_order': 3},
-    {'name': 'Bicarbonate (HCO3-)', 'section': 'Clinical Biochemistry', 'is_tracked': 0, 'result_type': 'quantitative', 'default_unit': 'mmol/L', 'secondary_unit': None, 'ref_range': None, 'options': None, 'parent_name': 'ELECTROLYTES', 'sort_order': 4},
+    {'name': 'ALT / SGPT (Alanine Aminotransferase)', 'section': 'Clinical Biochemistry', 'is_tracked': 0, 'result_type': 'quantitative', 'default_unit': 'U/L', 'secondary_unit': 'µkat/L', 'ref_range': None, 'options': None, 'parent_name': 'LFTS', 'sort_order': 1},
+    {'name': 'AST / SGOT (Aspartate Aminotransferase)', 'section': 'Clinical Biochemistry', 'is_tracked': 0, 'result_type': 'quantitative', 'default_unit': 'U/L', 'secondary_unit': 'µkat/L', 'ref_range': None, 'options': None, 'parent_name': 'LFTS', 'sort_order': 2},
+    {'name': 'Alkaline Phosphatase (ALP)', 'section': 'Clinical Biochemistry', 'is_tracked': 0, 'result_type': 'quantitative', 'default_unit': 'U/L', 'secondary_unit': 'µkat/L', 'ref_range': None, 'options': None, 'parent_name': 'LFTS', 'sort_order': 3},
+    {'name': 'Total Bilirubin', 'section': 'Clinical Biochemistry', 'is_tracked': 0, 'result_type': 'quantitative', 'default_unit': 'µmol/L', 'secondary_unit': 'mg/dL', 'ref_range': None, 'options': None, 'parent_name': 'LFTS', 'sort_order': 4},
+    {'name': 'Direct Bilirubin', 'section': 'Clinical Biochemistry', 'is_tracked': 0, 'result_type': 'quantitative', 'default_unit': 'µmol/L', 'secondary_unit': 'mg/dL', 'ref_range': None, 'options': None, 'parent_name': 'LFTS', 'sort_order': 5},
+    {'name': 'Total Protein', 'section': 'Clinical Biochemistry', 'is_tracked': 0, 'result_type': 'quantitative', 'default_unit': 'g/L', 'secondary_unit': 'g/dL', 'ref_range': None, 'options': None, 'parent_name': 'LFTS', 'sort_order': 6},
+    {'name': 'Serum Albumin', 'section': 'Clinical Biochemistry', 'is_tracked': 0, 'result_type': 'quantitative', 'default_unit': 'g/L', 'secondary_unit': 'g/dL', 'ref_range': None, 'options': None, 'parent_name': 'LFTS', 'sort_order': 7},
+    {'name': 'Gamma-Glutamyl Transferase (GGT)', 'section': 'Clinical Biochemistry', 'is_tracked': 0, 'result_type': 'quantitative', 'default_unit': 'U/L', 'secondary_unit': 'µkat/L', 'ref_range': None, 'options': None, 'parent_name': 'LFTS', 'sort_order': 8},
+    {'name': 'Total Cholesterol', 'section': 'Clinical Biochemistry', 'is_tracked': 0, 'result_type': 'quantitative', 'default_unit': 'mmol/L', 'secondary_unit': 'mg/dL', 'ref_range': None, 'options': None, 'parent_name': 'LFTS', 'sort_order': 9},
+    {'name': 'Serum Urea', 'section': 'Clinical Biochemistry', 'is_tracked': 0, 'result_type': 'quantitative', 'default_unit': 'mmol/L', 'secondary_unit': 'mg/dL', 'ref_range': None, 'options': None, 'parent_name': 'RFTS', 'sort_order': 1},
+    {'name': 'Serum Creatinine', 'section': 'Clinical Biochemistry', 'is_tracked': 0, 'result_type': 'quantitative', 'default_unit': 'µmol/L', 'secondary_unit': 'mg/dL', 'ref_range': None, 'options': None, 'parent_name': 'RFTS', 'sort_order': 2},
+    {'name': 'Serum Uric Acid', 'section': 'Clinical Biochemistry', 'is_tracked': 0, 'result_type': 'quantitative', 'default_unit': 'µmol/L', 'secondary_unit': 'mg/dL', 'ref_range': None, 'options': None, 'parent_name': 'RFTS', 'sort_order': 3},
+    {'name': 'Total CK (Creatine Kinase)', 'section': 'Clinical Biochemistry', 'is_tracked': 0, 'result_type': 'quantitative', 'default_unit': 'U/L', 'secondary_unit': 'µkat/L', 'ref_range': None, 'options': None, 'parent_name': 'CARDIAC', 'sort_order': 1},
+    {'name': 'CK-MB (Creatine Kinase-MB)', 'section': 'Clinical Biochemistry', 'is_tracked': 0, 'result_type': 'quantitative', 'default_unit': 'U/L', 'secondary_unit': 'µkat/L', 'ref_range': None, 'options': None, 'parent_name': 'CARDIAC', 'sort_order': 2},
+    {'name': 'Troponin I (cTnI)', 'section': 'Clinical Biochemistry', 'is_tracked': 0, 'result_type': 'quantitative', 'default_unit': 'ng/mL', 'secondary_unit': 'µg/L', 'ref_range': None, 'options': None, 'parent_name': 'CARDIAC', 'sort_order': 3},
+    {'name': 'Troponin T (cTnT)', 'section': 'Clinical Biochemistry', 'is_tracked': 0, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['Negative', 'Positive'], 'parent_name': 'CARDIAC', 'sort_order': 4},
+    {'name': 'Myoglobin', 'section': 'Clinical Biochemistry', 'is_tracked': 0, 'result_type': 'quantitative', 'default_unit': 'ng/mL', 'secondary_unit': 'µg/L', 'ref_range': None, 'options': None, 'parent_name': 'CARDIAC', 'sort_order': 5},
+    {'name': 'BNP / NT-proBNP', 'section': 'Clinical Biochemistry', 'is_tracked': 0, 'result_type': 'quantitative', 'default_unit': 'pg/mL', 'secondary_unit': None, 'ref_range': None, 'options': None, 'parent_name': 'CARDIAC', 'sort_order': 6},
+    {'name': 'D-Dimer', 'section': 'Clinical Biochemistry', 'is_tracked': 0, 'result_type': 'quantitative', 'default_unit': 'µg/mL', 'secondary_unit': None, 'ref_range': None, 'options': None, 'parent_name': 'CARDIAC', 'sort_order': 7},
+    {'name': 'LDH (Lactate Dehydrogenase)', 'section': 'Clinical Biochemistry', 'is_tracked': 0, 'result_type': 'quantitative', 'default_unit': 'U/L', 'secondary_unit': None, 'ref_range': None, 'options': None, 'parent_name': 'CARDIAC', 'sort_order': 8},
+    {'name': 'Serum Potassium (K+)', 'section': 'Clinical Biochemistry', 'is_tracked': 0, 'result_type': 'quantitative', 'default_unit': 'mmol/L', 'secondary_unit': 'mEq/L', 'ref_range': None, 'options': None, 'parent_name': 'ELECTROLYTES', 'sort_order': 1},
+    {'name': 'Serum Sodium (Na+)', 'section': 'Clinical Biochemistry', 'is_tracked': 0, 'result_type': 'quantitative', 'default_unit': 'mmol/L', 'secondary_unit': 'mEq/L', 'ref_range': None, 'options': None, 'parent_name': 'ELECTROLYTES', 'sort_order': 2},
+    {'name': 'Serum Chloride (Cl-)', 'section': 'Clinical Biochemistry', 'is_tracked': 0, 'result_type': 'quantitative', 'default_unit': 'mmol/L', 'secondary_unit': 'mEq/L', 'ref_range': None, 'options': None, 'parent_name': 'ELECTROLYTES', 'sort_order': 3},
+    {'name': 'Bicarbonate (HCO3-)', 'section': 'Clinical Biochemistry', 'is_tracked': 0, 'result_type': 'quantitative', 'default_unit': 'mmol/L', 'secondary_unit': 'mEq/L', 'ref_range': None, 'options': None, 'parent_name': 'ELECTROLYTES', 'sort_order': 4},
+    {'name': 'Total Calcium (Ca2+)', 'section': 'Clinical Biochemistry', 'is_tracked': 0, 'result_type': 'quantitative', 'default_unit': 'mmol/L', 'secondary_unit': 'mg/dL', 'ref_range': None, 'options': None, 'parent_name': 'ELECTROLYTES', 'sort_order': 5},
+    {'name': 'Magnesium (Mg2+)', 'section': 'Clinical Biochemistry', 'is_tracked': 0, 'result_type': 'quantitative', 'default_unit': 'mmol/L', 'secondary_unit': 'mg/dL', 'ref_range': None, 'options': None, 'parent_name': 'ELECTROLYTES', 'sort_order': 6},
+    {'name': 'Phosphate (PO4)', 'section': 'Clinical Biochemistry', 'is_tracked': 0, 'result_type': 'quantitative', 'default_unit': 'mmol/L', 'secondary_unit': 'mg/dL', 'ref_range': None, 'options': None, 'parent_name': 'ELECTROLYTES', 'sort_order': 7},
+    {'name': 'Total Cholesterol', 'section': 'Clinical Biochemistry', 'is_tracked': 0, 'result_type': 'quantitative', 'default_unit': 'mmol/L', 'secondary_unit': 'mg/dL', 'ref_range': None, 'options': None, 'parent_name': 'LIPID PROFILE', 'sort_order': 1},
+    {'name': 'Triglycerides', 'section': 'Clinical Biochemistry', 'is_tracked': 0, 'result_type': 'quantitative', 'default_unit': 'mmol/L', 'secondary_unit': 'mg/dL', 'ref_range': None, 'options': None, 'parent_name': 'LIPID PROFILE', 'sort_order': 2},
+    {'name': 'HDL Cholesterol', 'section': 'Clinical Biochemistry', 'is_tracked': 0, 'result_type': 'quantitative', 'default_unit': 'mmol/L', 'secondary_unit': 'mg/dL', 'ref_range': None, 'options': None, 'parent_name': 'LIPID PROFILE', 'sort_order': 3},
+    {'name': 'LDL Cholesterol', 'section': 'Clinical Biochemistry', 'is_tracked': 0, 'result_type': 'quantitative', 'default_unit': 'mmol/L', 'secondary_unit': 'mg/dL', 'ref_range': None, 'options': None, 'parent_name': 'LIPID PROFILE', 'sort_order': 4},
     # --- URINALYSIS: Macroscopy (sort_order 1-2) ---
     {'name': 'Color', 'section': 'Urinalysis Profile', 'is_tracked': 0, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['Straw', 'Yellow', 'Amber', 'Red', 'Brown'], 'parent_name': 'URINALYSIS', 'sort_order': 1},
     {'name': 'Turbidity', 'section': 'Urinalysis Profile', 'is_tracked': 0, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['Clear', 'Slightly Turbid', 'Turbid'], 'parent_name': 'URINALYSIS', 'sort_order': 2},
@@ -107,8 +159,8 @@ TESTS = [
     # --- URINALYSIS: Dry Chemistry Dipstick — Siemens Multistix (sort_order 8-17) ---
     {'name': 'Specific Gravity (S.G)', 'section': 'Urinalysis Profile', 'is_tracked': 0, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['1.000', '1.005', '1.010', '1.015', '1.020', '1.025', '1.030'], 'parent_name': 'URINALYSIS', 'sort_order': 8},
     {'name': 'PH', 'section': 'Urinalysis Profile', 'is_tracked': 0, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['5.0', '6.0', '6.5', '7.0', '7.5', '8.0', '8.5'], 'parent_name': 'URINALYSIS', 'sort_order': 9},
-    {'name': 'Proteins', 'section': 'Urinalysis Profile', 'is_tracked': 0, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['Nil', 'Trace (15 mg/dL)', '1+ (30 mg/dL)', '2+ (100 mg/dL)', '3+ (300 mg/dL)', '4+ (\u22652000 mg/dL)'], 'parent_name': 'URINALYSIS', 'sort_order': 10},
-    {'name': 'Glucose', 'section': 'Urinalysis Profile', 'is_tracked': 0, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['Nil', 'Trace (100 mg/dL)', '1+ (250 mg/dL)', '2+ (500 mg/dL)', '3+ (1000 mg/dL)', '4+ (\u22652000 mg/dL)'], 'parent_name': 'URINALYSIS', 'sort_order': 11},
+    {'name': 'Proteins', 'section': 'Urinalysis Profile', 'is_tracked': 0, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['Nil', 'Trace (15 mg/dL)', '1+ (30 mg/dL)', '2+ (100 mg/dL)', '3+ (300 mg/dL)', '4+ (≥2000 mg/dL)'], 'parent_name': 'URINALYSIS', 'sort_order': 10},
+    {'name': 'Glucose', 'section': 'Urinalysis Profile', 'is_tracked': 0, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['Nil', 'Trace (100 mg/dL)', '1+ (250 mg/dL)', '2+ (500 mg/dL)', '3+ (1000 mg/dL)', '4+ (≥2000 mg/dL)'], 'parent_name': 'URINALYSIS', 'sort_order': 11},
     {'name': 'Bilirubin', 'section': 'Urinalysis Profile', 'is_tracked': 0, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['Nil', 'Small (+)', 'Moderate (++)', 'Large (+++)'], 'parent_name': 'URINALYSIS', 'sort_order': 12},
     {'name': 'Urobilinogen', 'section': 'Urinalysis Profile', 'is_tracked': 0, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['Normal (1.0 EU/dL)', '2.0 EU/dL', '4.0 EU/dL', '8.0 EU/dL'], 'parent_name': 'URINALYSIS', 'sort_order': 13},
     {'name': 'Ketones', 'section': 'Urinalysis Profile', 'is_tracked': 0, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['Nil', 'Trace (5 mg/dL)', '1+ (15 mg/dL)', '2+ (40 mg/dL)', '3+ (80 mg/dL)', '4+ (160 mg/dL)'], 'parent_name': 'URINALYSIS', 'sort_order': 14},
@@ -123,71 +175,148 @@ TESTS = [
     {'name': 'SD Bioline', 'section': 'Serology & Clinical Immunology', 'is_tracked': 0, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['Non-Reactive', 'Reactive'], 'parent_name': 'HIV Testing Service', 'sort_order': 3}
 ]
 
-
 DEFAULT_REFERENCE_RANGES = [
     # CBC / Hematology
-    ("Total WBC Count (White Blood Cells)", 0, 11, None, 6.0, 14.0, 2.0, 30.0, "10³/µL"),
-    ("Total WBC Count (White Blood Cells)", 12, 999, None, 4.0, 10.0, 2.0, 30.0, "10³/µL"),
-    ("WBC", 0, 11, None, 6.0, 14.0, 2.0, 30.0, "10³/µL"),
-    ("WBC", 12, 999, None, 4.0, 11.0, 2.0, 30.0, "10³/µL"),
-    ("Hemoglobin (Hb)", 0, 11, None, 11.5, 15.5, 8.0, 20.0, "g/dL"),
-    ("Hemoglobin (Hb)", 12, 999, "Male", 13.5, 17.5, 8.0, 20.0, "g/dL"),
-    ("Hemoglobin (Hb)", 12, 999, "Female", 12.0, 15.5, 8.0, 20.0, "g/dL"),
-    ("Hemoglobin", 0, 11, None, 11.5, 15.5, 8.0, 20.0, "g/dL"),
-    ("Hemoglobin", 12, 999, "Male", 13.5, 17.5, 8.0, 20.0, "g/dL"),
-    ("Hemoglobin", 12, 999, "Female", 12.0, 15.5, 8.0, 20.0, "g/dL"),
-    ("Red Blood Cells (RBC)", 0, 11, None, 3.8, 5.5, None, None, "10⁶/µL"),
-    ("Red Blood Cells (RBC)", 12, 999, "Male", 4.5, 5.9, None, None, "10⁶/µL"),
-    ("Red Blood Cells (RBC)", 12, 999, "Female", 4.0, 5.2, None, None, "10⁶/µL"),
-    ("Hematocrit (HCT)", 0, 11, None, 34.0, 44.0, None, None, "%"),
-    ("Hematocrit (HCT)", 12, 999, "Male", 40.0, 52.0, None, None, "%"),
-    ("Hematocrit (HCT)", 12, 999, "Female", 36.0, 46.0, None, None, "%"),
-    ("Mean Cell Volume (MCV)", 0, 999, None, 80.0, 100.0, None, None, "fL"),
-    ("Mean Cell Hb (MCH)", 0, 999, None, 27.0, 33.0, None, None, "pg"),
-    ("Mean Cell Hb Conc (MCHC)", 0, 999, None, 32.0, 36.0, None, None, "g/dL"),
-    ("Platelets Count (PLT)", 0, 999, None, 150.0, 450.0, 50.0, 1000.0, "10³/µL"),
-    ("Neutrophils (%) [Relative Count]", 0, 999, None, 40.0, 75.0, None, None, "%"),
-    ("Lymphocytes (%) [Relative Count]", 0, 999, None, 20.0, 45.0, None, None, "%"),
-    ("Monocytes (%) [Relative Count]", 0, 999, None, 2.0, 10.0, None, None, "%"),
-    ("Eosinophils (%) [Relative Count]", 0, 999, None, 1.0, 6.0, None, None, "%"),
-    ("Basophils (%) [Relative Count]", 0, 999, None, 0.0, 2.0, None, None, "%"),
-    ("RBC Distribution Width (RDW)", 0, 999, None, 11.5, 14.5, None, None, "%"),
+    ("Total WBC Count (White Blood Cells)", 0, 11, None, 6.0, 14.0, 2.0, 30.0, 0.5, 150.0, 2.0, 50.0, "10³/µL"),
+    ("Total WBC Count (White Blood Cells)", 12, 999, None, 4.0, 10.0, 2.0, 30.0, 0.5, 150.0, 2.0, 50.0, "10³/µL"),
+    ("WBC", 0, 11, None, 6.0, 14.0, 2.0, 30.0, 0.5, 150.0, 2.0, 50.0, "10³/µL"),
+    ("WBC", 12, 999, None, 4.0, 11.0, 2.0, 30.0, 0.5, 150.0, 2.0, 50.0, "10³/µL"),
+    ("Hemoglobin (Hb)", 0, 11, None, 11.5, 15.5, 8.0, 20.0, 2.0, 26.0, 5.0, 22.0, "g/dL"),
+    ("Hemoglobin (Hb)", 12, 999, "Male", 13.5, 17.5, 8.0, 20.0, 2.0, 26.0, 5.0, 22.0, "g/dL"),
+    ("Hemoglobin (Hb)", 12, 999, "Female", 12.0, 15.5, 8.0, 20.0, 2.0, 26.0, 5.0, 22.0, "g/dL"),
+    ("Hemoglobin", 0, 11, None, 11.5, 15.5, 8.0, 20.0, 2.0, 26.0, 5.0, 22.0, "g/dL"),
+    ("Hemoglobin", 12, 999, "Male", 13.5, 17.5, 8.0, 20.0, 2.0, 26.0, 5.0, 22.0, "g/dL"),
+    ("Hemoglobin", 12, 999, "Female", 12.0, 15.5, 8.0, 20.0, 2.0, 26.0, 5.0, 22.0, "g/dL"),
+    ("Red Blood Cells (RBC)", 0, 11, None, 3.8, 5.5, None, None, 1.0, 10.0, 1.5, 8.5, "10⁶/µL"),
+    ("Red Blood Cells (RBC)", 12, 999, "Male", 4.5, 5.9, None, None, 1.0, 10.0, 1.5, 8.5, "10⁶/µL"),
+    ("Red Blood Cells (RBC)", 12, 999, "Female", 4.0, 5.2, None, None, 1.0, 10.0, 1.5, 8.5, "10⁶/µL"),
+    ("Hematocrit (HCT)", 0, 11, None, 34.0, 44.0, None, None, 10.0, 75.0, 15.0, 65.0, "%"),
+    ("Hematocrit (HCT)", 12, 999, "Male", 40.0, 52.0, None, None, 10.0, 75.0, 15.0, 65.0, "%"),
+    ("Hematocrit (HCT)", 12, 999, "Female", 36.0, 46.0, None, None, 10.0, 75.0, 15.0, 65.0, "%"),
+    ("Mean Cell Volume (MCV)", 0, 999, None, 80.0, 100.0, None, None, 40.0, 150.0, 50.0, 130.0, "fL"),
+    ("Mean Cell Hb (MCH)", 0, 999, None, 27.0, 33.0, None, None, 10.0, 60.0, 15.0, 50.0, "pg"),
+    ("Mean Cell Hb Conc (MCHC)", 0, 999, None, 32.0, 36.0, None, None, 15.0, 50.0, 20.0, 42.0, "g/dL"),
+    ("Platelets Count (PLT)", 0, 999, None, 150.0, 450.0, 50.0, 1000.0, 5.0, 3000.0, 20.0, 2000.0, "10³/µL"),
+    ("Neutrophils (%) [Relative Count]", 0, 999, None, 40.0, 75.0, None, None, 0.0, 100.0, 0.0, 100.0, "%"),
+    ("Lymphocytes (%) [Relative Count]", 0, 999, None, 20.0, 45.0, None, None, 0.0, 100.0, 0.0, 100.0, "%"),
+    ("Monocytes (%) [Relative Count]", 0, 999, None, 2.0, 10.0, None, None, 0.0, 100.0, 0.0, 100.0, "%"),
+    ("Eosinophils (%) [Relative Count]", 0, 999, None, 1.0, 6.0, None, None, 0.0, 100.0, 0.0, 100.0, "%"),
+    ("Basophils (%) [Relative Count]", 0, 999, None, 0.0, 2.0, None, None, 0.0, 100.0, 0.0, 100.0, "%"),
+    ("RBC Distribution Width (RDW)", 0, 999, None, 11.5, 14.5, None, None, 5.0, 35.0, 8.0, 30.0, "%"),
 
-    # Blood Sugars
-    ("Fasting Blood Sugar (FBS)", 0, 999, None, 3.9, 5.5, 2.8, 25.0, "mmol/L"),
-    ("FBS (Fasting Blood Sugar)", 0, 999, None, 3.9, 5.5, 2.8, 25.0, "mmol/L"),
-    ("RBS (Random Blood Sugar)", 0, 999, None, 3.9, 7.8, 2.8, 25.0, "mmol/L"),
+    # Blood Sugars (Dual Units)
+    ("Fasting Blood Sugar (FBS)", 0, 999, None, 3.9, 5.5, 2.8, 25.0, 1.0, 50.0, 1.5, 35.0, "mmol/L"),
+    ("Fasting Blood Sugar (FBS)", 0, 999, None, 70.0, 100.0, 50.0, 450.0, 18.0, 900.0, 27.0, 630.0, "mg/dL"),
+    ("FBS (Fasting Blood Sugar)", 0, 999, None, 3.9, 5.5, 2.8, 25.0, 1.0, 50.0, 1.5, 35.0, "mmol/L"),
+    ("FBS (Fasting Blood Sugar)", 0, 999, None, 70.0, 100.0, 50.0, 450.0, 18.0, 900.0, 27.0, 630.0, "mg/dL"),
+    ("RBS (Random Blood Sugar)", 0, 999, None, 4.0, 7.8, 2.8, 25.0, 1.0, 55.0, 2.0, 45.0, "mmol/L"),
+    ("RBS (Random Blood Sugar)", 0, 999, None, 72.0, 140.0, 50.0, 450.0, 18.0, 1000.0, 36.0, 810.0, "mg/dL"),
 
-    # LFTs
-    ("ALT / SGPT (Alanine Aminotransferase)", 0, 999, "Male", 0.0, 45.0, None, None, "U/L"),
-    ("ALT / SGPT (Alanine Aminotransferase)", 0, 999, "Female", 0.0, 34.0, None, None, "U/L"),
-    ("AST / SGOT (Aspartate Aminotransferase)", 0, 999, "Male", 0.0, 40.0, None, None, "U/L"),
-    ("AST / SGOT (Aspartate Aminotransferase)", 0, 999, "Female", 0.0, 35.0, None, None, "U/L"),
-    ("Alkaline Phosphatase (ALP)", 0, 999, None, 44.0, 147.0, None, None, "U/L"),
-    ("Total Bilirubin", 0, 999, None, 3.4, 20.5, None, None, "µmol/L"),
-    ("Direct Bilirubin", 0, 999, None, 0.0, 8.6, None, None, "µmol/L"),
-    ("Total Protein", 0, 999, None, 6.4, 8.3, None, None, "g/dL"),
-    ("Serum Albumin", 0, 999, None, 3.5, 5.0, None, None, "g/dL"),
-    ("Gamma-Glutamyl Transferase (GGT)", 0, 999, "Male", 0.0, 55.0, None, None, "U/L"),
-    ("Gamma-Glutamyl Transferase (GGT)", 0, 999, "Female", 0.0, 38.0, None, None, "U/L"),
-    ("Total Cholesterol", 0, 999, None, 0.0, 5.2, None, None, "mmol/L"),
+    # RFTs - Serum Creatinine
+    ("Serum Creatinine", 12, 999, "Male", 62.0, 106.0, 30.0, 350.0, 15.0, 2500.0, 61.0, 1200.0, "µmol/L"),
+    ("Serum Creatinine", 12, 999, "Male", 0.70, 1.20, 0.34, 3.96, 0.17, 28.28, 0.69, 13.57, "mg/dL"),
+    ("Serum Creatinine", 12, 999, "Female", 44.0, 80.0, 25.0, 300.0, 15.0, 2500.0, 43.0, 1000.0, "µmol/L"),
+    ("Serum Creatinine", 12, 999, "Female", 0.50, 0.90, 0.28, 3.39, 0.17, 28.28, 0.49, 11.31, "mg/dL"),
+    ("Serum Creatinine", 0, 11, None, 20.0, 60.0, 15.0, 200.0, 15.0, 2500.0, 20.0, 400.0, "µmol/L"),
+    ("Serum Creatinine", 0, 11, None, 0.23, 0.68, 0.17, 2.26, 0.17, 28.28, 0.23, 4.52, "mg/dL"),
 
-    # RFTs
-    ("Serum Urea", 0, 999, None, 2.5, 7.8, None, None, "mmol/L"),
-    ("Serum Creatinine", 0, 999, "Male", 62.0, 106.0, 40.0, 350.0, "µmol/L"),
-    ("Serum Creatinine", 0, 999, "Female", 44.0, 80.0, 30.0, 300.0, "µmol/L"),
-    ("Serum Uric Acid", 0, 999, "Male", 200.0, 420.0, None, None, "µmol/L"),
-    ("Serum Uric Acid", 0, 999, "Female", 140.0, 340.0, None, None, "µmol/L"),
+    # RFTs - Serum Urea
+    ("Serum Urea", 0, 65, None, 0.0, 8.3, 1.0, 40.0, 0.5, 150.0, 8.3, 60.0, "mmol/L"),
+    ("Serum Urea", 0, 65, None, 0.0, 23.2, 2.8, 112.0, 1.4, 420.0, 23.2, 168.0, "mg/dL"),
+    ("Serum Urea", 66, 999, None, 0.0, 11.9, 1.0, 50.0, 0.5, 150.0, 11.9, 80.0, "mmol/L"),
+    ("Serum Urea", 66, 999, None, 0.0, 33.3, 2.8, 140.0, 1.4, 420.0, 33.3, 224.1, "mg/dL"),
+
+    # RFTs - Serum Uric Acid
+    ("Serum Uric Acid", 0, 65, "Male", 0.0, 420.0, None, None, 50.0, 2000.0, 341.0, 1200.0, "µmol/L"),
+    ("Serum Uric Acid", 0, 65, "Male", 0.0, 7.06, None, None, 0.84, 33.60, 5.72, 20.16, "mg/dL"),
+    ("Serum Uric Acid", 66, 999, "Male", 0.0, 500.0, None, None, 50.0, 2000.0, 341.0, 1400.0, "µmol/L"),
+    ("Serum Uric Acid", 66, 999, "Male", 0.0, 8.40, None, None, 0.84, 33.60, 5.72, 23.52, "mg/dL"),
+    ("Serum Uric Acid", 0, 999, "Female", 0.0, 340.0, None, None, 50.0, 2000.0, 341.0, 1000.0, "µmol/L"),
+    ("Serum Uric Acid", 0, 999, "Female", 0.0, 5.71, None, None, 0.84, 33.60, 5.72, 16.80, "mg/dL"),
 
     # Electrolytes
-    ("Serum Potassium (K+)", 0, 999, None, 3.5, 5.1, 2.8, 6.2, "mmol/L"),
-    ("Serum Sodium (Na+)", 0, 999, None, 135.0, 145.0, 120.0, 160.0, "mmol/L"),
-    ("Serum Chloride (Cl-)", 0, 999, None, 98.0, 107.0, None, None, "mmol/L"),
-    ("Bicarbonate (HCO3-)", 0, 999, None, 22.0, 29.0, None, None, "mmol/L")
+    ("Serum Potassium (K+)", 0, 999, None, 4.5, 5.5, 2.8, 6.2, 1.0, 12.0, 1.5, 8.5, "mmol/L"),
+    ("Serum Potassium (K+)", 0, 999, None, 4.5, 5.5, 2.8, 6.2, 1.0, 12.0, 1.5, 8.5, "mEq/L"),
+    ("Serum Sodium (Na+)", 0, 999, None, 135.0, 145.0, 120.0, 160.0, 95.0, 180.0, 110.0, 165.0, "mmol/L"),
+    ("Serum Sodium (Na+)", 0, 999, None, 135.0, 145.0, 120.0, 160.0, 95.0, 180.0, 110.0, 165.0, "mEq/L"),
+    ("Serum Chloride (Cl-)", 0, 999, None, 98.0, 107.0, 70.0, 130.0, 60.0, 150.0, 70.0, 130.0, "mmol/L"),
+    ("Serum Chloride (Cl-)", 0, 999, None, 98.0, 107.0, 70.0, 130.0, 60.0, 150.0, 70.0, 130.0, "mEq/L"),
+    ("Bicarbonate (HCO3-)", 0, 999, None, 22.0, 29.0, 10.0, 40.0, 5.0, 50.0, 10.0, 45.0, "mmol/L"),
+    ("Bicarbonate (HCO3-)", 0, 999, None, 22.0, 29.0, 10.0, 40.0, 5.0, 50.0, 10.0, 45.0, "mEq/L"),
+    ("Total Calcium (Ca2+)", 0, 49, None, 3.20, 3.60, 1.50, 4.00, 0.5, 6.5, 1.20, 4.50, "mmol/L"),
+    ("Total Calcium (Ca2+)", 0, 49, None, 12.80, 14.40, 6.00, 16.00, 2.0, 26.0, 4.80, 18.00, "mg/dL"),
+    ("Total Calcium (Ca2+)", 50, 999, None, 3.00, 3.42, 1.50, 4.00, 0.5, 6.5, 1.20, 4.20, "mmol/L"),
+    ("Total Calcium (Ca2+)", 50, 999, None, 12.00, 13.68, 6.00, 16.00, 2.0, 26.0, 4.80, 16.80, "mg/dL"),
+    ("Calcium (Ca2+)", 0, 49, None, 3.20, 3.60, 1.50, 4.00, 0.5, 6.5, 1.20, 4.50, "mmol/L"),
+    ("Calcium (Ca2+)", 0, 49, None, 12.80, 14.40, 6.00, 16.00, 2.0, 26.0, 4.80, 18.00, "mg/dL"),
+    ("Calcium (Ca2+)", 50, 999, None, 3.00, 3.42, 1.50, 4.00, 0.5, 6.5, 1.20, 4.20, "mmol/L"),
+    ("Calcium (Ca2+)", 50, 999, None, 12.00, 13.68, 6.00, 16.00, 2.0, 26.0, 4.80, 16.80, "mg/dL"),
+    ("Magnesium (Mg2+)", 0, 999, None, 0.70, 1.05, 0.40, 2.00, 0.1, 5.5, 0.20, 3.50, "mmol/L"),
+    ("Magnesium (Mg2+)", 0, 999, None, 1.70, 2.55, 0.97, 4.86, 0.24, 13.37, 0.49, 8.51, "mg/dL"),
+    ("Phosphate (PO4)", 0, 999, None, 0.87, 1.45, 0.30, 3.00, 0.1, 6.0, 0.30, 4.50, "mmol/L"),
+    ("Phosphate (PO4)", 0, 999, None, 2.70, 4.50, 0.93, 9.30, 0.31, 18.60, 0.93, 13.95, "mg/dL"),
+
+    # LFTs
+    ("Total Bilirubin", 0, 999, None, 0.0, 17.0, None, None, 0.0, 1000.0, 18.0, 600.0, "µmol/L"),
+    ("Total Bilirubin", 0, 999, None, 0.0, 1.0, None, None, 0.0, 58.5, 1.05, 35.1, "mg/dL"),
+    ("Direct Bilirubin", 0, 999, None, 0.0, 4.4, None, None, 0.0, 1000.0, 4.5, 400.0, "µmol/L"),
+    ("Direct Bilirubin", 0, 999, None, 0.0, 0.26, None, None, 0.0, 58.5, 0.26, 23.40, "mg/dL"),
+    ("Total Protein", 0, 999, None, 64.0, 83.0, 30.0, 120.0, 15.0, 200.0, 30.0, 150.0, "g/L"),
+    ("Total Protein", 0, 999, None, 6.4, 8.3, 3.0, 12.0, 1.5, 20.0, 3.0, 15.0, "g/dL"),
+    ("Serum Albumin", 0, 999, None, 35.0, 50.0, 15.0, 60.0, 5.0, 80.0, 10.0, 65.0, "g/L"),
+    ("Serum Albumin", 0, 999, None, 3.5, 5.0, 1.5, 6.0, 0.5, 8.0, 1.0, 6.5, "g/dL"),
+    ("ALT / SGPT (Alanine Aminotransferase)", 12, 999, "Male", 0.0, 41.0, None, None, 0.0, 12000.0, 42.0, 5000.0, "U/L"),
+    ("ALT / SGPT (Alanine Aminotransferase)", 12, 999, "Male", 0.0, 0.68, None, None, 0.0, 200.0, 0.70, 83.50, "µkat/L"),
+    ("ALT / SGPT (Alanine Aminotransferase)", 12, 999, "Female", 0.0, 31.0, None, None, 0.0, 12000.0, 32.0, 4000.0, "U/L"),
+    ("ALT / SGPT (Alanine Aminotransferase)", 12, 999, "Female", 0.0, 0.52, None, None, 0.0, 200.0, 0.53, 66.80, "µkat/L"),
+    ("ALT / SGPT (Alanine Aminotransferase)", 0, 11, None, 0.0, 35.0, None, None, 0.0, 12000.0, 36.0, 3000.0, "U/L"),
+    ("ALT / SGPT (Alanine Aminotransferase)", 0, 11, None, 0.0, 0.58, None, None, 0.0, 200.0, 0.60, 50.10, "µkat/L"),
+    ("AST / SGOT (Aspartate Aminotransferase)", 12, 999, "Male", 0.0, 38.0, None, None, 0.0, 15000.0, 39.0, 8000.0, "U/L"),
+    ("AST / SGOT (Aspartate Aminotransferase)", 12, 999, "Male", 0.0, 0.63, None, None, 0.0, 250.0, 0.65, 133.60, "µkat/L"),
+    ("AST / SGOT (Aspartate Aminotransferase)", 12, 999, "Female", 0.0, 32.0, None, None, 0.0, 15000.0, 33.0, 6000.0, "U/L"),
+    ("AST / SGOT (Aspartate Aminotransferase)", 12, 999, "Female", 0.0, 0.53, None, None, 0.0, 250.0, 0.55, 100.20, "µkat/L"),
+    ("AST / SGOT (Aspartate Aminotransferase)", 0, 11, None, 0.0, 40.0, None, None, 0.0, 15000.0, 41.0, 4000.0, "U/L"),
+    ("AST / SGOT (Aspartate Aminotransferase)", 0, 11, None, 0.0, 0.67, None, None, 0.0, 250.0, 0.68, 66.80, "µkat/L"),
+    ("Alkaline Phosphatase (ALP)", 12, 999, "Male", 40.0, 129.0, None, None, 10.0, 5000.0, 130.0, 2000.0, "U/L"),
+    ("Alkaline Phosphatase (ALP)", 12, 999, "Male", 0.67, 2.15, None, None, 0.17, 83.50, 2.17, 33.40, "µkat/L"),
+    ("Alkaline Phosphatase (ALP)", 12, 999, "Female", 35.0, 104.0, None, None, 10.0, 5000.0, 105.0, 1800.0, "U/L"),
+    ("Alkaline Phosphatase (ALP)", 12, 999, "Female", 0.58, 1.74, None, None, 0.17, 83.50, 1.75, 30.06, "µkat/L"),
+    ("Alkaline Phosphatase (ALP)", 0, 11, None, 0.0, 350.0, None, None, 10.0, 5000.0, 351.0, 1200.0, "U/L"),
+    ("Alkaline Phosphatase (ALP)", 0, 11, None, 0.0, 5.85, None, None, 0.17, 83.50, 5.87, 20.04, "µkat/L"),
+    ("Gamma-Glutamyl Transferase (GGT)", 0, 999, "Male", 10.0, 66.0, None, None, 0.0, 4000.0, 67.0, 1500.0, "U/L"),
+    ("Gamma-Glutamyl Transferase (GGT)", 0, 999, "Male", 0.17, 1.10, None, None, 0.0, 66.80, 1.12, 25.05, "µkat/L"),
+    ("Gamma-Glutamyl Transferase (GGT)", 0, 999, "Female", 9.0, 35.0, None, None, 0.0, 4000.0, 36.0, 1000.0, "U/L"),
+    ("Gamma-Glutamyl Transferase (GGT)", 0, 999, "Female", 0.15, 0.58, None, None, 0.0, 66.80, 0.60, 16.70, "µkat/L"),
+
+    # Lipids
+    ("Total Cholesterol", 0, 999, None, 0.0, 5.2, 6.2, None, 1.0, 25.0, 1.0, 20.0, "mmol/L"),
+    ("Total Cholesterol", 0, 999, None, 0.0, 201.0, 240.0, None, 38.6, 965.3, 38.6, 772.0, "mg/dL"),
+    ("Triglycerides", 0, 999, None, 0.0, 3.3, 4.52, None, 0.1, 45.0, 3.4, 45.0, "mmol/L"),
+    ("Triglycerides", 0, 999, None, 0.0, 292.0, 400.0, None, 8.8, 3982.5, 301.0, 3982.0, "mg/dL"),
+    ("HDL Cholesterol", 0, 999, "Male", 1.45, 5.0, 0.90, None, 0.1, 5.0, 0.5, 3.0, "mmol/L"),
+    ("HDL Cholesterol", 0, 999, "Male", 56.0, 193.1, 35.0, None, 3.9, 193.1, 19.3, 115.8, "mg/dL"),
+    ("HDL Cholesterol", 0, 999, "Female", 1.68, 5.0, 0.90, None, 0.1, 5.0, 0.5, 3.0, "mmol/L"),
+    ("HDL Cholesterol", 0, 999, "Female", 65.0, 193.1, 35.0, None, 3.9, 193.1, 19.3, 115.8, "mg/dL"),
+    ("LDL Cholesterol", 0, 999, None, 0.0, 3.59, 4.14, None, 0.2, 20.0, 3.59, 15.0, "mmol/L"),
+    ("LDL Cholesterol", 0, 999, None, 0.0, 139.0, 160.0, None, 7.7, 772.2, 139.0, 579.0, "mg/dL"),
+
+    # Cardiac
+    ("Total CK (Creatine Kinase)", 0, 999, "Male", 39.0, 308.0, None, None, 10.0, 250000.0, 309.0, 100000.0, "U/L"),
+    ("Total CK (Creatine Kinase)", 0, 999, "Male", 0.65, 5.14, None, None, 0.17, 4175.0, 5.16, 1670.0, "µkat/L"),
+    ("Total CK (Creatine Kinase)", 0, 999, "Female", 26.0, 140.0, None, None, 10.0, 250000.0, 141.0, 80000.0, "U/L"),
+    ("Total CK (Creatine Kinase)", 0, 999, "Female", 0.43, 2.34, None, None, 0.17, 4175.0, 2.36, 1336.0, "µkat/L"),
+    ("CK-MB (Creatine Kinase-MB)", 0, 999, None, 7.0, 25.0, None, None, 0.0, 250000.0, 26.0, 1500.0, "U/L"),
+    ("CK-MB (Creatine Kinase-MB)", 0, 999, None, 0.12, 0.42, None, None, 0.0, 4175.0, 0.43, 25.05, "µkat/L"),
+    ("Troponin I (cTnI)", 0, 999, None, 0.0, 0.1, 0.1, None, 0.0, 150.0, 0.1, 150.0, "ng/mL"),
+    ("Troponin I (cTnI)", 0, 999, None, 0.0, 0.1, 0.1, None, 0.0, 150.0, 0.1, 150.0, "µg/L"),
+    ("Myoglobin", 0, 999, "Male", 16.0, 76.0, None, None, 2.0, 5000.0, 65.0, 3000.0, "ng/mL"),
+    ("Myoglobin", 0, 999, "Male", 16.0, 76.0, None, None, 2.0, 5000.0, 65.0, 3000.0, "µg/L"),
+    ("Myoglobin", 0, 999, "Female", 7.0, 64.0, None, None, 2.0, 5000.0, 65.0, 3000.0, "ng/mL"),
+    ("Myoglobin", 0, 999, "Female", 7.0, 64.0, None, None, 2.0, 5000.0, 65.0, 3000.0, "µg/L"),
 ]
 
 def seed_reference_ranges(cur):
-    for pname, age_min, age_max, sex, n_min, n_max, c_min, c_max, unit in DEFAULT_REFERENCE_RANGES:
+    for pname, age_min, age_max, sex, n_min, n_max, c_min, c_max, s_min, s_max, p_min, p_max, unit in DEFAULT_REFERENCE_RANGES:
         cur.execute("SELECT id FROM tests WHERE name = ?", (pname,))
         t_row = cur.fetchone()
         test_id = t_row["id"] if t_row else None
@@ -195,20 +324,22 @@ def seed_reference_ranges(cur):
         # Check existing rule
         cur.execute("""
             SELECT id FROM reference_ranges
-            WHERE parameter_name = ? AND age_min = ? AND age_max = ? AND (sex = ? OR (sex IS NULL AND ? IS NULL))
-        """, (pname, age_min, age_max, sex, sex))
+            WHERE parameter_name = ? AND age_min = ? AND age_max = ? 
+              AND (sex = ? OR (sex IS NULL AND ? IS NULL))
+              AND (unit = ? OR (unit IS NULL AND ? IS NULL))
+        """, (pname, age_min, age_max, sex, sex, unit, unit))
         existing = cur.fetchone()
         if not existing:
             cur.execute("""
-                INSERT INTO reference_ranges (test_id, parameter_name, age_min, age_max, sex, normal_min, normal_max, critical_min, critical_max, unit)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (test_id, pname, age_min, age_max, sex, n_min, n_max, c_min, c_max, unit))
+                INSERT INTO reference_ranges (test_id, parameter_name, age_min, age_max, sex, normal_min, normal_max, critical_min, critical_max, sanity_min, sanity_max, plausible_min, plausible_max, unit)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (test_id, pname, age_min, age_max, sex, n_min, n_max, c_min, c_max, s_min, s_max, p_min, p_max, unit))
         else:
             cur.execute("""
                 UPDATE reference_ranges
-                SET test_id = ?, normal_min = ?, normal_max = ?, critical_min = ?, critical_max = ?, unit = ?
+                SET test_id = ?, normal_min = ?, normal_max = ?, critical_min = ?, critical_max = ?, sanity_min = ?, sanity_max = ?, plausible_min = ?, plausible_max = ?, unit = ?
                 WHERE id = ?
-            """, (test_id, n_min, n_max, c_min, c_max, unit, existing["id"]))
+            """, (test_id, n_min, n_max, c_min, c_max, s_min, s_max, p_min, p_max, unit, existing["id"]))
 
 
 def seed_database():
@@ -338,14 +469,14 @@ def seed_database():
         tp_row = cur.fetchone()
         if not tp_row:
             cur.execute("""
-                INSERT INTO test_parameters (test_id, parameter_name, unit, ref_range, sort_order, options)
-                VALUES (?, ?, ?, ?, ?, ?)
-            """, (parent_id, t["name"], t["default_unit"], t["ref_range"], t["sort_order"], opts))
+                INSERT INTO test_parameters (test_id, parameter_name, unit, secondary_unit, ref_range, sort_order, options)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            """, (parent_id, t["name"], t["default_unit"], t.get("secondary_unit"), t["ref_range"], t["sort_order"], opts))
         else:
             cur.execute("""
-                UPDATE test_parameters SET unit = ?, ref_range = ?, sort_order = ?, options = ?
+                UPDATE test_parameters SET unit = ?, secondary_unit = ?, ref_range = ?, sort_order = ?, options = ?
                 WHERE id = ?
-            """, (t["default_unit"], t["ref_range"], t["sort_order"], opts, tp_row["id"]))
+            """, (t["default_unit"], t.get("secondary_unit"), t["ref_range"], t["sort_order"], opts, tp_row["id"]))
 
     seed_reference_ranges(cur)
     conn.commit()
