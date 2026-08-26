@@ -144,12 +144,29 @@ class ResultEdit(BaseModel):
     result_unit: Optional[str] = None
     edit_reason: str
 
+class SpecimenTypeBase(BaseModel):
+    name: str
+    container: Optional[str] = None
+    min_volume: Optional[str] = None
+    sort_order: int = 0
+
+class SpecimenTypeCreate(SpecimenTypeBase):
+    pass
+
+class SpecimenTypeResponse(SpecimenTypeBase):
+    id: int
+    is_active: bool = True
+
+    class Config:
+        from_attributes = True
+
 class VisitCreate(BaseModel):
     client_id: int
     clinician_id: Optional[int] = None
     ward_of_origin: Optional[str] = None
     test_ids: List[int]
     sample_id: Optional[str] = None
+    specimen_type_id: Optional[int] = None
     order_category: Optional[str] = 'in-house' 
 
 class VisitResponse(BaseModel):
@@ -158,6 +175,7 @@ class VisitResponse(BaseModel):
     clinician_id: Optional[int] = None
     ward_of_origin: Optional[str] = None
     lab_number: Optional[str] = None
+    specimen_type_id: Optional[int] = None
     created_at: Optional[datetime.datetime] = None
 
     class Config:

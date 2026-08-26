@@ -132,6 +132,15 @@ SCHEMA_SQL = """
         last_value INTEGER NOT NULL DEFAULT 0
     );
 
+    CREATE TABLE IF NOT EXISTS specimen_types (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT UNIQUE NOT NULL,
+        container TEXT,
+        min_volume TEXT,
+        is_active BOOLEAN NOT NULL DEFAULT 1,
+        sort_order INTEGER DEFAULT 0
+    );
+
     CREATE TABLE IF NOT EXISTS visits (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         client_id INTEGER NOT NULL REFERENCES clients(id),
@@ -139,6 +148,7 @@ SCHEMA_SQL = """
         ward_of_origin TEXT,
         lab_number TEXT UNIQUE,
         order_category TEXT DEFAULT 'in-house',
+        specimen_type_id INTEGER REFERENCES specimen_types(id),
         is_deleted BOOLEAN NOT NULL DEFAULT 0,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
@@ -148,6 +158,7 @@ SCHEMA_SQL = """
         visit_id INTEGER NOT NULL REFERENCES visits(id),
         test_id INTEGER NOT NULL REFERENCES tests(id),
         sample_id TEXT,
+        specimen_type_id INTEGER REFERENCES specimen_types(id),
         ordered_by_user_id INTEGER REFERENCES users(id),
         ordered_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         status TEXT DEFAULT 'pending',
@@ -297,7 +308,9 @@ def init_db():
         ("reference_ranges", "sanity_max", "REAL"),
         ("reference_ranges", "plausible_min", "REAL"),
         ("reference_ranges", "plausible_max", "REAL"),
-        ("diagnostic_kit_lots", "min_threshold", "INTEGER DEFAULT 25")
+        ("diagnostic_kit_lots", "min_threshold", "INTEGER DEFAULT 25"),
+        ("visits", "specimen_type_id", "INTEGER REFERENCES specimen_types(id)"),
+        ("test_orders", "specimen_type_id", "INTEGER REFERENCES specimen_types(id)")
     ]
     for table, col, col_def in migrations:
         try:
@@ -448,6 +461,30 @@ def init_db():
                     INSERT INTO test_parameters (test_id, parameter_name, unit, ref_range, sort_order, options)
                     VALUES (?, ?, ?, ?, ?, ?)
                 """, (widal_id, pname, punit, pref, porder, popts))
+            else:
+                cursor.execute("""
+                    UPDATE test_parameters
+                    SET unit = ?, ref_range = ?, sort_order = ?, options = ?
+                    WHERE id = ?
+                """, (punit, pref, porder, popts, existing_p[0]))
+
+    # Pre-seed Malaria Microscopy test parameters
+    MALARIA_PARAMS = [
+        ("Examination Method / Film Done", None, None, 1, '["Thick Film", "Thin Film", "Both (Thick & Thin Film)"]'),
+        ("Parasite Density (Thick Film)", None, None, 2, '["No malaria parasites seen", "1+ (1-10 parasites per 100 thick-film fields)", "2+ (11-100 parasites per 100 thick-film fields)", "3+ (1-10 parasites per single thick-film field)", "4+ (>10 parasites per single thick-film field)", "Not Done"]'),
+        ("Species Identification (Thin Smear)", None, None, 3, '["Not Seen (No Parasites)", "Plasmodium falciparum", "Plasmodium vivax", "Plasmodium malariae", "Plasmodium ovale", "Mixed infection (P. falciparum + P. malariae)", "Mixed infection (P. falciparum + P. vivax)", "Not Done"]'),
+    ]
+    cursor.execute("SELECT id FROM tests WHERE LOWER(name) LIKE '%blood smear mps%' OR LOWER(name) LIKE '%malaria microscopy%'")
+    for mal_row in cursor.fetchall():
+        mal_id = mal_row[0]
+        for pname, punit, pref, porder, popts in MALARIA_PARAMS:
+            cursor.execute("SELECT id FROM test_parameters WHERE test_id = ? AND parameter_name = ?", (mal_id, pname))
+            existing_p = cursor.fetchone()
+            if not existing_p:
+                cursor.execute("""
+                    INSERT INTO test_parameters (test_id, parameter_name, unit, ref_range, sort_order, options)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                """, (mal_id, pname, punit, pref, porder, popts))
             else:
                 cursor.execute("""
                     UPDATE test_parameters

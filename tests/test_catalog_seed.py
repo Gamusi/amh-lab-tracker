@@ -142,3 +142,47 @@ def test_widal_structured_antigen_parameters(db_connection):
     assert any("1:80" in o for o in opts)
     assert any("1:160" in o for o in opts)
 
+def test_specimen_types_seeding(db_connection):
+    from backend.app.seed import seed_database, SPECIMEN_TYPES
+    seed_database(conn=db_connection)
+    cur = db_connection.cursor()
+
+    cur.execute("SELECT id, name, container, min_volume FROM specimen_types ORDER BY sort_order")
+    rows = cur.fetchall()
+    assert len(rows) == len(SPECIMEN_TYPES)
+    names = [r["name"] for r in rows]
+    assert "EDTA Whole Blood" in names
+    assert "Blood (for Culture)" in names
+    assert "Serum (Red Top)" in names
+    assert "Clean-Catch Midstream Urine" in names
+    assert "Random Stool / Feces" in names
+    assert "Cerebrospinal Fluid (CSF)" in names
+
+def test_malaria_microscopy_parameters_seeding(db_connection):
+    import json
+    from backend.app.seed import seed_database
+    seed_database(conn=db_connection)
+    cur = db_connection.cursor()
+
+    cur.execute("SELECT id FROM tests WHERE name LIKE '%Blood smear Mps%' OR name LIKE '%Malaria Microscopy%'")
+    mal_row = cur.fetchone()
+    assert mal_row is not None
+    mal_id = mal_row["id"]
+
+    cur.execute("SELECT parameter_name, options FROM test_parameters WHERE test_id = ? ORDER BY sort_order", (mal_id,))
+    params = cur.fetchall()
+    assert len(params) == 3
+    names = [p["parameter_name"] for p in params]
+    assert "Examination Method / Film Done" in names
+    assert "Parasite Density (Thick Film)" in names
+    assert "Species Identification (Thin Smear)" in names
+
+    density_opts = json.loads(params[1]["options"])
+    assert "No malaria parasites seen" in density_opts
+    assert "1+ (1-10 parasites per 100 thick-film fields)" in density_opts
+    assert "4+ (>10 parasites per single thick-film field)" in density_opts
+
+    species_opts = json.loads(params[2]["options"])
+    assert "Plasmodium falciparum" in species_opts
+    assert "Plasmodium vivax" in species_opts
+

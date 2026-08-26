@@ -202,6 +202,12 @@ def create_visit(req: VisitCreate, conn: sqlite3.Connection = Depends(get_db), c
         if not cur.fetchone():
             logger.warning(f"Visit creation failed: clinician ID {req.clinician_id} not found")
             raise HTTPException(status_code=400, detail="Clinician not found")
+
+    if req.specimen_type_id:
+        cur.execute("SELECT id FROM specimen_types WHERE id = ?", (req.specimen_type_id,))
+        if not cur.fetchone():
+            logger.warning(f"Visit creation failed: specimen_type_id {req.specimen_type_id} not found")
+            raise HTTPException(status_code=400, detail="Specimen type not found")
             
     if not req.test_ids:
         raise HTTPException(status_code=400, detail="At least one test ID must be provided")
@@ -213,16 +219,16 @@ def create_visit(req: VisitCreate, conn: sqlite3.Connection = Depends(get_db), c
             raise HTTPException(status_code=404, detail=f"Test ID {tid} not found")
             
     cur.execute("""
-        INSERT INTO visits (client_id, clinician_id, ward_of_origin)
-        VALUES (?, ?, ?)
-    """, (req.client_id, req.clinician_id, req.ward_of_origin))
+        INSERT INTO visits (client_id, clinician_id, ward_of_origin, specimen_type_id)
+        VALUES (?, ?, ?, ?)
+    """, (req.client_id, req.clinician_id, req.ward_of_origin, req.specimen_type_id))
     visit_id = cur.lastrowid
     
     for tid in req.test_ids:
         cur.execute("""
-            INSERT INTO test_orders (visit_id, test_id, sample_id, ordered_by_user_id, status, order_category)
-            VALUES (?, ?, ?, ?, 'pending', ?)
-        """, (visit_id, tid, req.sample_id, current_user["id"], req.order_category))
+            INSERT INTO test_orders (visit_id, test_id, sample_id, specimen_type_id, ordered_by_user_id, status, order_category)
+            VALUES (?, ?, ?, ?, ?, 'pending', ?)
+        """, (visit_id, tid, req.sample_id, req.specimen_type_id, current_user["id"], req.order_category))
         
     conn.commit()
     logger.info(f"Visit created successfully: visit_id={visit_id}")

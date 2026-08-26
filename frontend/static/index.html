@@ -315,6 +315,15 @@
           </select>
         </div>
       </div>
+      <!-- Selected Tests Summary Bar -->
+      <div id="add-test-selected-summary-bar" style="display: none; padding: 8px 12px; background: #EFF6FF; border: 1px solid #93C5FD; border-radius: 4px; margin-bottom: 12px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+          <span style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); font-weight: 600;">Selected Tests (<span id="add-test-selected-count">0</span>)</span>
+          <button type="button" onclick="app.clearAllAddModalSelectedTests()" style="font-size: 0.75rem; color: var(--danger-color); background: none; border: none; cursor: pointer; padding: 0; text-decoration: underline;">Clear All</button>
+        </div>
+        <div id="add-test-selected-chips-container" style="display: flex; flex-wrap: wrap; gap: 6px;"></div>
+      </div>
+
       <input type="text" id="add-test-search" placeholder="Search tests..." onkeyup="app.filterAddTests()" style="width: 100%; padding: 8px; margin-bottom: 12px; box-sizing: border-box;">
       <div id="add-tests-container" style="max-height: 200px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 4px; padding: 8px; background: #fff; margin-bottom: 16px;">
         Loading...

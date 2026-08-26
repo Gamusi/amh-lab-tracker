@@ -5,6 +5,99 @@ from .database import get_connection, init_db
 # Auto-generated from amh-comprehensive-test-reporting-specifications.md
 SECTIONS = ['Hematology', 'Serology & Clinical Immunology', 'Clinical Biochemistry', 'Urinalysis Profile', 'Parasitology & Stool Diagnostics', 'Microbiology & Tuberculosis', 'Blood Transfusion & Immunohematology']
 
+SPECIMEN_TYPES = [
+    {
+        'name': 'EDTA Whole Blood',
+        'container': 'Lavender / Purple Top (K2/K3 EDTA)',
+        'min_volume': '2.0 mL',
+        'sort_order': 1
+    },
+    {
+        'name': 'Sodium Citrate Whole Blood',
+        'container': 'Light Blue Top (3.2% Citrate, 9:1 ratio)',
+        'min_volume': '1.8 - 2.7 mL',
+        'sort_order': 2
+    },
+    {
+        'name': 'Blood (for Culture)',
+        'container': 'SPS Culture Bottles (Adult/Pediatric Broth)',
+        'min_volume': '8.0 - 10.0 mL',
+        'sort_order': 3
+    },
+    {
+        'name': 'Capillary / Fingerstick Blood',
+        'container': 'Capillary Lancet / Microtainer',
+        'min_volume': '10 - 50 µL',
+        'sort_order': 4
+    },
+    {
+        'name': 'Serum (Red Top)',
+        'container': 'Plain Red Top Silica Clot Activator',
+        'min_volume': '4.0 - 5.0 mL',
+        'sort_order': 5
+    },
+    {
+        'name': 'Serum (SST / Gel Separator)',
+        'container': 'Gold SST Tube (Gel Barrier)',
+        'min_volume': '4.0 - 5.0 mL',
+        'sort_order': 6
+    },
+    {
+        'name': 'Plasma (Lithium Heparin)',
+        'container': 'Green Top (Lithium Heparin)',
+        'min_volume': '4.0 - 5.0 mL',
+        'sort_order': 7
+    },
+    {
+        'name': 'Plasma (Fluoride / Oxalate)',
+        'container': 'Grey Top (Sodium Fluoride / Potassium Oxalate)',
+        'min_volume': '2.0 mL',
+        'sort_order': 8
+    },
+    {
+        'name': 'Clean-Catch Midstream Urine',
+        'container': 'Sterile Wide-Mouth Container',
+        'min_volume': '10.0 - 20.0 mL',
+        'sort_order': 9
+    },
+    {
+        'name': 'Random Stool / Feces',
+        'container': 'Clean Dry Stool Container with Scoop Cap',
+        'min_volume': '5.0 - 10.0 g',
+        'sort_order': 10
+    },
+    {
+        'name': 'Cerebrospinal Fluid (CSF)',
+        'container': '3x Sterile Plain Screw-Cap Tubes (No Additives)',
+        'min_volume': '1.0 - 2.0 mL / tube',
+        'sort_order': 11
+    },
+    {
+        'name': 'Sputum',
+        'container': 'Sterile Wide-Mouth Screw-Cap Container',
+        'min_volume': '3.0 - 5.0 mL',
+        'sort_order': 12
+    },
+    {
+        'name': 'Swab (Wound / Throat / Pus / Urogenital)',
+        'container': 'Sterile Swab in Amies / Stuart Transport Medium',
+        'min_volume': 'Swab tip coated',
+        'sort_order': 13
+    },
+    {
+        'name': 'Oral Fluid / Saliva',
+        'container': 'Collection Spatula / Developer Vial',
+        'min_volume': '1 oral swab',
+        'sort_order': 14
+    },
+    {
+        'name': 'Fine Needle Aspirate (FNA) / Tissue Biopsy',
+        'container': '95% Ethanol Smears / 10% Neutral Formalin Jar',
+        'min_volume': 'Varies',
+        'sort_order': 15
+    }
+]
+
 PANELS = {
     'Complete Blood Count (CBC)': [
         'Total WBC Count (White Blood Cells)', 'Red Blood Cells (RBC)', 'Hemoglobin (Hb)', 'Hematocrit (HCT)',
@@ -89,7 +182,7 @@ TESTS = [
     {'name': 'ASO Titer (Anti-Streptolysin O)', 'section': 'Serology & Clinical Immunology', 'is_tracked': 0, 'result_type': 'quantitative', 'default_unit': 'IU/mL', 'secondary_unit': None, 'ref_range': None, 'options': None, 'parent_name': None, 'sort_order': 0},
     {'name': 'FBS (Fasting Blood Sugar)', 'section': 'Clinical Biochemistry', 'is_tracked': 1, 'result_type': 'quantitative', 'default_unit': 'mmol/L', 'secondary_unit': 'mg/dL', 'ref_range': '3.9 - 5.5 mmol/L (70 - 100 mg/dL)', 'options': None, 'parent_name': None, 'sort_order': 0},
     {'name': 'RBS (Random Blood Sugar)', 'section': 'Clinical Biochemistry', 'is_tracked': 1, 'result_type': 'quantitative', 'default_unit': 'mmol/L', 'secondary_unit': 'mg/dL', 'ref_range': '4.0 - 7.8 mmol/L (72 - 140 mg/dL)', 'options': None, 'parent_name': None, 'sort_order': 0},
-    {'name': 'Blood smear Mps (Malaria Microscopy)', 'section': 'Parasitology & Stool Diagnostics', 'is_tracked': 1, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['No malaria parasites seen', '1+', '2+', '3+', '4+'], 'parent_name': None, 'sort_order': 0},
+    {'name': 'Blood smear Mps (Malaria Microscopy)', 'section': 'Parasitology & Stool Diagnostics', 'is_tracked': 1, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['No malaria parasites seen', '1+ (1-10 parasites per 100 thick-film fields)', '2+ (11-100 parasites per 100 thick-film fields)', '3+ (1-10 parasites per single thick-film field)', '4+ (>10 parasites per single thick-film field)'], 'parent_name': None, 'sort_order': 0},
     {'name': 'ZN FOR AFBs (Tuberculosis Sputum Smear)', 'section': 'Microbiology & Tuberculosis', 'is_tracked': 1, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['AFB Negative', 'Scanty', '1+', '2+', '3+'], 'parent_name': None, 'sort_order': 0},
     {'name': 'Gram Stain', 'section': 'Microbiology & Tuberculosis', 'is_tracked': 1, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['No bacteria seen', 'Gram-positive cocci in pairs/chains', 'Gram-positive cocci in clusters', 'Gram-negative rods', 'Gram-negative intracellular diplococci', 'Gram-positive rods'], 'parent_name': None, 'sort_order': 0},
     {'name': 'Urine Culture & Sensitivity (C&S)', 'section': 'Microbiology & Tuberculosis', 'is_tracked': 1, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['No growth after 48 hours', 'Significant growth of E. coli', 'Significant growth of Klebsiella spp', 'Significant growth of S. aureus', 'Significant growth of Proteus spp'], 'parent_name': None, 'sort_order': 0},
@@ -350,6 +443,23 @@ def seed_reference_ranges(cur):
                 WHERE id = ?
             """, (test_id, n_min, n_max, c_min, c_max, s_min, s_max, p_min, p_max, unit, existing["id"]))
 
+def seed_specimens(cur):
+    for s in SPECIMEN_TYPES:
+        cur.execute("SELECT id FROM specimen_types WHERE name = ?", (s["name"],))
+        row = cur.fetchone()
+        if not row:
+            cur.execute("""
+                INSERT INTO specimen_types (name, container, min_volume, sort_order)
+                VALUES (?, ?, ?, ?)
+            """, (s["name"], s.get("container"), s.get("min_volume"), s.get("sort_order", 0)))
+        else:
+            row_id = row["id"] if isinstance(row, dict) or hasattr(row, '__getitem__') else row[0]
+            cur.execute("""
+                UPDATE specimen_types
+                SET container = ?, min_volume = ?, sort_order = ?
+                WHERE id = ?
+            """, (s.get("container"), s.get("min_volume"), s.get("sort_order", 0), row_id))
+
 
 def seed_database(conn=None):
     should_close = False
@@ -522,11 +632,36 @@ def seed_database(conn=None):
                     WHERE id = ?
                 """, (punit, pref, porder, popts, tp_r["id"]))
 
+    # Seed Malaria Microscopy parameters under Blood smear Mps
+    cur.execute("SELECT id FROM tests WHERE name LIKE '%Malaria Microscopy%' OR name LIKE '%Blood smear Mps%'")
+    mal_row = cur.fetchone()
+    if mal_row:
+        mal_id = mal_row["id"]
+        MALARIA_PARAMS = [
+            ("Examination Method / Film Done", None, None, 1, '["Thick Film", "Thin Film", "Both (Thick & Thin Film)"]'),
+            ("Parasite Density (Thick Film)", None, None, 2, '["No malaria parasites seen", "1+ (1-10 parasites per 100 thick-film fields)", "2+ (11-100 parasites per 100 thick-film fields)", "3+ (1-10 parasites per single thick-film field)", "4+ (>10 parasites per single thick-film field)", "Not Done"]'),
+            ("Species Identification (Thin Smear)", None, None, 3, '["Not Seen (No Parasites)", "Plasmodium falciparum", "Plasmodium vivax", "Plasmodium malariae", "Plasmodium ovale", "Mixed infection (P. falciparum + P. malariae)", "Mixed infection (P. falciparum + P. vivax)", "Not Done"]'),
+        ]
+        for pname, punit, pref, porder, popts in MALARIA_PARAMS:
+            cur.execute("SELECT id FROM test_parameters WHERE test_id = ? AND parameter_name = ?", (mal_id, pname))
+            tp_r = cur.fetchone()
+            if not tp_r:
+                cur.execute("""
+                    INSERT INTO test_parameters (test_id, parameter_name, unit, ref_range, sort_order, options)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                """, (mal_id, pname, punit, pref, porder, popts))
+            else:
+                cur.execute("""
+                    UPDATE test_parameters SET unit = ?, ref_range = ?, sort_order = ?, options = ?
+                    WHERE id = ?
+                """, (punit, pref, porder, popts, tp_r["id"]))
+
     seed_reference_ranges(cur)
+    seed_specimens(cur)
     conn.commit()
     if should_close:
         conn.close()
-    print(f"Seeding done: {len(sec_map)} sections, {len(TESTS)} tests.")
+    print(f"Seeding done: {len(sec_map)} sections, {len(TESTS)} tests, {len(SPECIMEN_TYPES)} specimen types.")
 
 
 if __name__ == "__main__":

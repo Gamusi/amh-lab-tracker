@@ -99,3 +99,15 @@ def test_create_test_with_parent_sets_parent_rollup_id(config_db):
     assert res.status_code == 200
     data = res.json()
     assert data["parent_rollup_id"] == parent_id
+
+def test_get_specimens(config_db):
+    conn = config_db["conn"]
+    cur = conn.cursor()
+    cur.execute("INSERT INTO specimen_types (name, container, min_volume, sort_order) VALUES ('EDTA Whole Blood', 'Lavender Top', '2.0 mL', 1)")
+    conn.commit()
+
+    res = client.get("/api/config/specimens")
+    assert res.status_code == 200
+    data = res.json()
+    assert len(data) >= 1
+    assert any(s["name"] == "EDTA Whole Blood" for s in data)

@@ -6,11 +6,18 @@ from ..schemas import (
     TestCreate, TestResponse, WardCreate, WardUpdate, WardResponse, 
     ClinicianCreate, ClinicianUpdate, ClinicianResponse,
     ReferenceRangeCreate, ReferenceRangeUpdate, ReferenceRangeResponse,
-    FacilitySettingsUpdate, FacilitySettingsResponse
+    FacilitySettingsUpdate, FacilitySettingsResponse,
+    SpecimenTypeResponse
 )
 from ..auth import get_current_user, require_admin
 
 router = APIRouter(prefix="/api/config", tags=["Configuration"])
+
+@router.get("/specimens", response_model=List[SpecimenTypeResponse])
+def get_specimens(conn: sqlite3.Connection = Depends(get_db), current_user: dict = Depends(get_current_user)):
+    cur = conn.cursor()
+    cur.execute("SELECT id, name, container, min_volume, is_active, sort_order FROM specimen_types WHERE is_active = 1 ORDER BY sort_order, id")
+    return [dict(r) for r in cur.fetchall()]
 
 @router.get("/sections")
 def get_sections(conn: sqlite3.Connection = Depends(get_db), current_user: dict = Depends(get_current_user)):

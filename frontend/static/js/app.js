@@ -556,6 +556,23 @@ const app = {
     this._modalStack = this._modalStack.filter(function(m) { return m !== el; });
   },
 
+  saveOrderPref: function(key, val) {
+    try {
+      if (val !== undefined && val !== null) {
+        localStorage.setItem('mlis_pref_' + key, val);
+      }
+    } catch (e) {}
+  },
+
+  getOrderPref: function(key, fallback) {
+    try {
+      const val = localStorage.getItem('mlis_pref_' + key);
+      return val !== null ? val : fallback;
+    } catch (e) {
+      return fallback;
+    }
+  },
+
   showNotificationModal: function(title, message, isError = false) {
     const modal = document.getElementById('notification-modal');
     if (!modal) return;
@@ -1593,6 +1610,7 @@ const app = {
   selectClient: __async(function*(pid, pnum, pname, psex) {
     this.currentClientId = pid;
     this.currentClientData = { id: pid, client_number: pnum, full_name: pname, sex: psex };
+    const savedCat = this.getOrderPref('category', 'in-house');
     const box = document.getElementById('client-detail-box');
     box.innerHTML = `
       <div>
@@ -1604,39 +1622,57 @@ const app = {
         <!-- Section A: Create Visit -->
         <div class="no-print" style="margin-bottom: 20px; background: #EFF6FF; padding: 16px; border-radius: 6px; border: 1px solid #BFDBFE;">
           <h4 style="font-size: 0.95rem; color: var(--primary-color); margin-bottom: 12px;">Create Visit & Order Tests</h4>
-          <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 12px;">
             <div class="form-group">
               <label>Ward of Origin:</label>
-              <select id="visit-ward">
+              <select id="visit-ward" onchange="app.saveOrderPref('ward', this.value)">
                 <option value="">Loading wards...</option>
               </select>
             </div>
             <div class="form-group">
               <label>Requested By (Clinician):</label>
-              <select id="visit-clinician">
+              <select id="visit-clinician" onchange="app.saveOrderPref('clinician', this.value)">
                 <option value="">Loading...</option>
               </select>
             </div>
             <div class="form-group">
+              <label>Specimen:</label>
+              <select id="visit-specimen" onchange="app.saveOrderPref('specimen', this.value)" style="width: 100%; padding: 8px;">
+                <option value="">Loading specimens...</option>
+              </select>
+            </div>
+            <div class="form-group">
               <label>Test Category:</label>
-              <select id="visit-order-category" style="width: 100%; padding: 8px;">
-                <option value="in-house" selected>In-house</option>
-                <option value="referral">Referral</option>
-                <option value="outreach">Outreach</option>
+              <select id="visit-order-category" onchange="app.saveOrderPref('category', this.value)" style="width: 100%; padding: 8px;">
+                <option value="in-house" ${savedCat === 'in-house' ? 'selected' : ''}>In-house</option>
+                <option value="referral" ${savedCat === 'referral' ? 'selected' : ''}>Referral</option>
+                <option value="outreach" ${savedCat === 'outreach' ? 'selected' : ''}>Outreach</option>
               </select>
             </div>
             <div class="form-group">
               <label>Lab Section:</label>
-              <select id="visit-test-section" onchange="app.filterVisitTests()" style="width: 100%; padding: 8px;">
+              <select id="visit-test-section" onchange="app.saveOrderPref('section', this.value); app.filterVisitTests()" style="width: 100%; padding: 8px;">
                 <option value="all">All Sections</option>
               </select>
             </div>
           </div>
           <div class="form-group" style="margin-bottom: 12px;">
-            <label>Select Test(s):</label>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+              <label style="margin: 0; font-weight: 600;">Select Test(s):</label>
+              <span id="visit-selected-count" style="font-size: 0.8rem; font-weight: 600; color: var(--primary-color);">0 tests selected</span>
+            </div>
+            
+            <!-- Selected Tests Summary Bar -->
+            <div id="visit-selected-summary-bar" style="display: none; padding: 8px 12px; background: #fff; border: 1px solid #93C5FD; border-radius: 4px; margin-bottom: 8px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                <span style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); font-weight: 600;">Currently Selected Tests</span>
+                <button type="button" onclick="app.clearAllSelectedTests()" style="font-size: 0.75rem; color: var(--danger-color); background: none; border: none; cursor: pointer; padding: 0; text-decoration: underline;">Clear All</button>
+              </div>
+              <div id="visit-selected-chips-container" style="display: flex; flex-wrap: wrap; gap: 6px;"></div>
+            </div>
+
             <input type="text" id="visit-test-search" placeholder="Search tests..." onkeyup="app.filterVisitTests()" style="width: 100%; padding: 8px; margin-bottom: 8px; box-sizing: border-box;">
             <div id="visit-tests-container">Loading tests...</div>
-          </div>
           </div>
           <button class="btn btn-success" style="width: 100%; padding: 10px;" onclick="app.createVisit(${pid})">${this.icon('plus')} Create Visit & Orders</button>
         </div>
@@ -1664,6 +1700,7 @@ const app = {
 
     yield this.loadWards();
     yield this.loadClinicians();
+    yield this.loadSpecimens();
     yield this.loadTestOptionsMulti();
     yield this.loadPendingTests(pid);
     yield this.loadHistoricalVisits(pid);
@@ -1774,6 +1811,10 @@ const app = {
           sel.innerHTML += `<option value="${this.escape(w.name)}">${this.escape(w.name)}</option>`;
         });
       }
+      const savedWard = this.getOrderPref('ward', '');
+      if (savedWard && Array.from(sel.options).some(o => o.value === savedWard)) {
+        sel.value = savedWard;
+      }
     } catch (e) {
       console.error('Error loading wards', e);
     }
@@ -1790,8 +1831,33 @@ const app = {
       clinicians.forEach(c => {
         sel.innerHTML += `<option value="${c.id}">${this.escape(c.name)}</option>`;
       });
+      const savedClinician = this.getOrderPref('clinician', '');
+      if (savedClinician && Array.from(sel.options).some(o => o.value === savedClinician)) {
+        sel.value = savedClinician;
+      }
     } catch (e) {
       console.error('Error loading clinicians', e);
+    }
+  }),
+
+  loadSpecimens: __async(function*() {
+    try {
+      const res = yield fetch('/api/config/specimens');
+      if (!res.ok) throw new Error('API returned ' + res.status);
+      const specimens = yield res.json();
+      const sel = document.getElementById('visit-specimen');
+      if (!sel) return;
+      sel.innerHTML = '<option value="">(None / Unspecified)</option>';
+      for (let i = 0; i < specimens.length; i++) {
+        const s = specimens[i];
+        sel.innerHTML += '<option value="' + s.id + '">' + this.escape(s.name) + '</option>';
+      }
+      const savedSpecimen = this.getOrderPref('specimen', '');
+      if (savedSpecimen && Array.from(sel.options).some(o => o.value === savedSpecimen)) {
+        sel.value = savedSpecimen;
+      }
+    } catch (e) {
+      console.error('Error loading specimens', e);
     }
   }),
 
@@ -1822,13 +1888,17 @@ const app = {
           catHtml += `<option value="${s.id}">${this.escape(s.name)}</option>`;
         });
         catSelect.innerHTML = catHtml;
+        const savedSection = this.getOrderPref('section', 'all');
+        if (savedSection && Array.from(catSelect.options).some(o => o.value === savedSection)) {
+          catSelect.value = savedSection;
+        }
       }
       
       tests.forEach(t => {
         if (!t.parent_rollup_id) {
           html += `
             <label class="visit-test-row" data-name="${this.escape(t.name).toLowerCase()}" data-category="${t.section_id}" style="display: block; margin-bottom: 4px; cursor: pointer;">
-              <input type="checkbox" name="visit-test-cb" value="${t.id}">
+              <input type="checkbox" name="visit-test-cb" value="${t.id}" data-test-name="${this.escape(t.name)}" onchange="app.updateSelectedTestsSummary()">
               ${this.escape(t.name)}
             </label>
           `;
@@ -1837,13 +1907,64 @@ const app = {
       html += '</div>';
 
       container.innerHTML = html;
+      this.filterVisitTests();
+      this.updateSelectedTestsSummary();
     } catch (e) {
       console.error('Error loading tests', e);
     }
   }),
 
+  updateSelectedTestsSummary: function() {
+    const checkboxes = document.querySelectorAll('input[name="visit-test-cb"]:checked');
+    const countEl = document.getElementById('visit-selected-count');
+    const barEl = document.getElementById('visit-selected-summary-bar');
+    const chipsEl = document.getElementById('visit-selected-chips-container');
+    
+    if (countEl) {
+      countEl.textContent = checkboxes.length + (checkboxes.length === 1 ? ' test selected' : ' tests selected');
+    }
+    
+    if (!barEl || !chipsEl) return;
+    
+    if (checkboxes.length === 0) {
+      barEl.style.display = 'none';
+      chipsEl.innerHTML = '';
+      return;
+    }
+    
+    barEl.style.display = 'block';
+    let chipsHtml = '';
+    checkboxes.forEach(cb => {
+      const testId = cb.value;
+      const testName = cb.getAttribute('data-test-name') || (cb.parentElement ? cb.parentElement.textContent.trim() : 'Test #' + testId);
+      chipsHtml += `
+        <span style="display: inline-flex; align-items: center; gap: 4px; background: #DBEAFE; color: #1E40AF; border: 1px solid #BFDBFE; border-radius: 4px; padding: 2px 8px; font-size: 0.8rem; font-weight: 500;">
+          ${this.escape(testName)}
+          <button type="button" onclick="app.deselectTest(${testId})" style="background: none; border: none; color: #1E40AF; font-weight: bold; cursor: pointer; padding: 0 2px; font-size: 1rem; line-height: 1;" title="Remove">&times;</button>
+        </span>
+      `;
+    });
+    chipsEl.innerHTML = chipsHtml;
+  },
+
+  deselectTest: function(testId) {
+    const cb = document.querySelector('input[name="visit-test-cb"][value="' + testId + '"]');
+    if (cb) {
+      cb.checked = false;
+    }
+    this.updateSelectedTestsSummary();
+  },
+
+  clearAllSelectedTests: function() {
+    document.querySelectorAll('input[name="visit-test-cb"]').forEach(cb => {
+      cb.checked = false;
+    });
+    this.updateSelectedTestsSummary();
+  },
+
   filterVisitTests: function() {
-    const query = document.getElementById('visit-test-search').value.toLowerCase();
+    const searchInput = document.getElementById('visit-test-search');
+    const query = searchInput ? searchInput.value.toLowerCase() : '';
     const cat = document.getElementById('visit-test-section') ? document.getElementById('visit-test-section').value : 'all';
     const rows = document.querySelectorAll('.visit-test-row');
     rows.forEach(row => {
@@ -1859,6 +1980,8 @@ const app = {
   createVisit: __async(function*(pid) {
     const ward = document.getElementById('visit-ward').value;
     const clinician = document.getElementById('visit-clinician').value;
+    const specimenEl = document.getElementById('visit-specimen');
+    const specimenId = (specimenEl && specimenEl.value) ? parseInt(specimenEl.value, 10) : null;
     const orderCat = document.getElementById('visit-order-category') ? document.getElementById('visit-order-category').value : 'in-house';
     const checkboxes = document.querySelectorAll('input[name="visit-test-cb"]:checked');
     const selectedTests = Array.from(checkboxes).map(cb => parseInt(cb.value, 10));
@@ -1876,6 +1999,7 @@ const app = {
         order_category: orderCat
       };
       if (clinician) payload.clinician_id = parseInt(clinician, 10);
+      if (specimenId) payload.specimen_type_id = specimenId;
       
       const res = yield fetch('/api/visits', {
         method: 'POST',
@@ -1883,9 +2007,13 @@ const app = {
         body: JSON.stringify(payload)
       });
       if (res.ok) {
+        this.saveOrderPref('ward', ward);
+        this.saveOrderPref('clinician', clinician);
+        if (specimenId) this.saveOrderPref('specimen', specimenId.toString());
+        this.saveOrderPref('category', orderCat);
+
         this.showNotificationModal("Success", 'Visit and orders created successfully!', false);
-        // Uncheck all
-        document.querySelectorAll('input[name="visit-test-cb"]').forEach(cb => cb.checked = false);
+        this.clearAllSelectedTests();
         yield this.loadPendingTests(pid);
         yield this.loadHistoricalVisits(pid);
       } else {
@@ -2528,18 +2656,68 @@ const app = {
         if (!t.parent_rollup_id) {
           html += `
             <label class="add-test-row" data-name="${this.escape(t.name).toLowerCase()}" data-category="${t.section_id}" style="display: block; margin-bottom: 4px; cursor: pointer;">
-              <input type="checkbox" name="add-test-cb" value="${t.id}">
+              <input type="checkbox" name="add-test-cb" value="${t.id}" data-test-name="${this.escape(t.name)}" onchange="app.updateAddModalSelectedTestsSummary()">
               ${this.escape(t.name)}
             </label>
           `;
         }
       });
       container.innerHTML = html;
+      this.updateAddModalSelectedTestsSummary();
     }
   }),
 
+  updateAddModalSelectedTestsSummary: function() {
+    const checkboxes = document.querySelectorAll('input[name="add-test-cb"]:checked');
+    const countEl = document.getElementById('add-test-selected-count');
+    const barEl = document.getElementById('add-test-selected-summary-bar');
+    const chipsEl = document.getElementById('add-test-selected-chips-container');
+    
+    if (countEl) {
+      countEl.textContent = checkboxes.length.toString();
+    }
+    
+    if (!barEl || !chipsEl) return;
+    
+    if (checkboxes.length === 0) {
+      barEl.style.display = 'none';
+      chipsEl.innerHTML = '';
+      return;
+    }
+    
+    barEl.style.display = 'block';
+    let chipsHtml = '';
+    checkboxes.forEach(cb => {
+      const testId = cb.value;
+      const testName = cb.getAttribute('data-test-name') || (cb.parentElement ? cb.parentElement.textContent.trim() : 'Test #' + testId);
+      chipsHtml += `
+        <span style="display: inline-flex; align-items: center; gap: 4px; background: #DBEAFE; color: #1E40AF; border: 1px solid #BFDBFE; border-radius: 4px; padding: 2px 8px; font-size: 0.8rem; font-weight: 500;">
+          ${this.escape(testName)}
+          <button type="button" onclick="app.deselectAddModalTest(${testId})" style="background: none; border: none; color: #1E40AF; font-weight: bold; cursor: pointer; padding: 0 2px; font-size: 1rem; line-height: 1;" title="Remove">&times;</button>
+        </span>
+      `;
+    });
+    chipsEl.innerHTML = chipsHtml;
+  },
+
+  deselectAddModalTest: function(testId) {
+    const cb = document.querySelector('input[name="add-test-cb"][value="' + testId + '"]');
+    if (cb) {
+      cb.checked = false;
+    }
+    this.updateAddModalSelectedTestsSummary();
+  },
+
+  clearAllAddModalSelectedTests: function() {
+    document.querySelectorAll('input[name="add-test-cb"]').forEach(cb => {
+      cb.checked = false;
+    });
+    this.updateAddModalSelectedTestsSummary();
+  },
+
   filterAddTests: function() {
-    const query = document.getElementById('add-test-search').value.toLowerCase();
+    const searchInput = document.getElementById('add-test-search');
+    const query = searchInput ? searchInput.value.toLowerCase() : '';
     const cat = document.getElementById('add-test-section') ? document.getElementById('add-test-section').value : 'all';
     const rows = document.querySelectorAll('.add-test-row');
     rows.forEach(row => {
@@ -2571,16 +2749,19 @@ const app = {
         body: JSON.stringify({ test_ids: selectedTests, order_category: orderCat })
       });
       if (res.ok) {
+        this.clearAllAddModalSelectedTests();
         this.showNotificationModal("Success", "Tests added to visit successfully.", false);
         this.closeModal('add-test-modal');
+        yield this.openEditVisitModal(visitId);
         if (this.currentClientId) {
-           yield this.loadPendingTests(this.currentClientId);
+          yield this.loadPendingTests(this.currentClientId);
+          yield this.loadHistoricalVisits(this.currentClientId);
         }
       } else {
         const err = yield res.json();
         this.showNotificationModal("Error", err.detail || "Failed to add tests.", true);
       }
-    } catch(e) {
+    } catch(err) {
       this.showNotificationModal("Error", "Connection error.", true);
     }
   }),
@@ -2876,7 +3057,13 @@ const app = {
           if (paramsList && paramsList.length > 0) {
             singleContainer.style.display = 'none';
             paramsContainer.style.display = 'block';
-            let html = '<h5 style="color: var(--primary-color); margin-bottom: 8px;">' + (nameLower.indexOf('hiv') !== -1 ? 'HIV Diagnostic Kits & Protocols:' : 'Panel Parameters:') + '</h5>';
+            let titleText = 'Panel Parameters:';
+            if (nameLower.indexOf('hiv') !== -1) {
+              titleText = 'HIV Diagnostic Kits & Protocols:';
+            } else if (nameLower.indexOf('malaria') !== -1 && nameLower.indexOf('rdt') === -1) {
+              titleText = 'Malaria Microscopy (Thick & Thin Film):';
+            }
+            let html = '<h5 style="color: var(--primary-color); margin-bottom: 8px;">' + titleText + '</h5>';
             const isHiv = nameLower.indexOf('hiv') !== -1;
             paramsList.forEach(p => {
               let unitDisplay = '';
@@ -2966,6 +3153,36 @@ const app = {
 
          if (nameLower.indexOf('hiv') !== -1) {
            finalVal = anyReactive ? 'Reactive' : (anyTested ? 'Non-Reactive' : 'Completed');
+         } else if (nameLower.indexOf('malaria') !== -1 && nameLower.indexOf('rdt') === -1) {
+           let methodVal = '';
+           let densityVal = 'No malaria parasites seen';
+           let speciesVal = '';
+
+           rows.forEach(r => {
+             const pname = (r.getAttribute('data-param-name') || '').toLowerCase();
+             const pval = r.querySelector('.modal-param-val').value.trim();
+             if (pname.indexOf('method') !== -1 || pname.indexOf('film done') !== -1) methodVal = pval;
+             if (pname.indexOf('density') !== -1 || pname.indexOf('thick') !== -1) densityVal = pval;
+             if (pname.indexOf('species') !== -1 || pname.indexOf('thin') !== -1) speciesVal = pval;
+           });
+
+           if (densityVal.indexOf('No malaria parasites seen') !== -1) {
+             if (speciesVal && speciesVal.indexOf('Not Seen') === -1 && speciesVal.indexOf('Not Done') === -1) {
+               finalVal = 'Parasites seen: ' + speciesVal;
+             } else {
+               finalVal = 'No malaria parasites seen';
+             }
+           } else if (densityVal && densityVal !== 'Not Done') {
+             if (speciesVal && speciesVal.indexOf('Not Seen') === -1 && speciesVal.indexOf('Not Done') === -1) {
+               finalVal = densityVal + ' (' + speciesVal + ')';
+             } else {
+               finalVal = densityVal;
+             }
+           } else if (speciesVal && speciesVal.indexOf('Not Seen') === -1 && speciesVal.indexOf('Not Done') === -1) {
+             finalVal = 'Parasites seen: ' + speciesVal;
+           } else {
+             finalVal = 'No malaria parasites seen';
+           }
          } else {
            finalVal = 'Completed';
          }

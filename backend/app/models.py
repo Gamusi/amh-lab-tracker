@@ -84,6 +84,15 @@ class Clinician:
     created_at: Optional[datetime.datetime] = None
 
 @dataclass
+class SpecimenType:
+    id: int
+    name: str
+    container: Optional[str] = None
+    min_volume: Optional[str] = None
+    is_active: bool = True
+    sort_order: int = 0
+
+@dataclass
 class SequenceTracker:
     id: int
     seq_name: str
@@ -96,6 +105,7 @@ class Visit:
     clinician_id: Optional[int] = None
     ward_of_origin: Optional[str] = None
     lab_number: Optional[str] = None
+    specimen_type_id: Optional[int] = None
     created_at: Optional[datetime.datetime] = None
 
 @dataclass
@@ -104,6 +114,7 @@ class TestOrder:
     visit_id: int
     test_id: int
     sample_id: Optional[str] = None
+    specimen_type_id: Optional[int] = None
     ordered_by_user_id: Optional[int] = None
     ordered_at: Optional[datetime.datetime] = None
     status: str = "pending"  # pending, completed, cancelled
