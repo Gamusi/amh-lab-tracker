@@ -2,7 +2,7 @@
 
 ## 1. Executive Summary & Context
 
-Clinical laboratory medicine relies heavily on composite diagnostic panels where a single clinical order encompasses multiple discrete biochemical, hematological, or microbiological parameters. Key panels in the AMH Lab Tracker include:
+Clinical laboratory medicine relies heavily on composite diagnostic panels where a single clinical order encompasses multiple discrete biochemical, hematological, or microbiological parameters. Key panels in the M-LIS include:
 - **Complete Blood Count (CBC)**: 22 distinct quantitative parameters spanning red cell, white cell, differential, and platelet indices. While automated hematology analyzers measure and derive these parameters as a single unified analytical process, it is critical to identify and track each parameter independently; in clinical pathology, deviations from normal are rarely uniform across all analytes—specific parameters deviate under disease states (e.g., isolated erythrocytosis, selective neutropenia, thrombocytopenia) while others remain entirely normal.
 - **Urinalysis**: 10 chemical strip analytes (pH, Protein, Glucose, Leukocytes, Nitrites, Ketones, Urobilinogen, Bilirubin, Blood, Specific Gravity) combined with macroscopic and microscopic examination findings. Reported as one composite test with multiple separately measured parameters, each providing distinct clinical insight into renal function, systemic metabolism, hepatic clearance, and urinary tract infections.
 - **Renal Function Tests (RFTs)**: Urea, Creatinine (with optional estimated Glomerular Filtration Rate).
@@ -11,7 +11,7 @@ Clinical laboratory medicine relies heavily on composite diagnostic panels where
 - **Lipid Profile**: Total Cholesterol, Triglycerides, HDL Cholesterol, LDL Cholesterol.
 - **HIV Testing Service (HTS)**: Multi-step algorithm consisting of Screening Assay (Determine), Confirmatory Assay (Stat-Pak), and Tie-Breaker (SD Bioline).
 
-This document details the architectural design, database modeling, business logic, verification strategy, and maintenance non-negotiables for grouping, ordering, entering, and reporting multi-parameter tests within the AMH Lab Tracker LIMS.
+This document details the architectural design, database modeling, business logic, verification strategy, and maintenance non-negotiables for grouping, ordering, entering, and reporting multi-parameter tests within the M-LIS LIMS.
 
 ---
 

@@ -8,8 +8,8 @@ The Complete Blood Count (CBC) is the highest-volume multi-parameter diagnostic 
 In the current hospital laboratory configuration:
 1. **Instrument & Interfacing Host**: The Nihon Kohden MEK-7222 / Celltac series (and MEK-7300 series) hematology analyzer is connected via an RS-232 serial cable to a dedicated laboratory workstation running the supplier's proprietary Windows interfacing software (e.g., `NIHON KOHDEN 7300.exe` / `Interfacing.mdb`).
 2. **Data Capture**: When the analyzer completes a blood sample run, the supplier interfacing application receives and displays the raw transmission log containing the sample ID, timestamp, and results.
-3. **AMH Lab Tracker Import**: Rather than relying on fragile direct database hooks or proprietary ODBC drivers, the technologist simply copies the raw transmission text from the supplier interfacing window, clicks `[ Paste from Analyzer ]` inside the CBC result entry modal in AMH Lab Tracker, and pastes the content.
-4. **Automated Population**: AMH Lab Tracker instantly parses the text, extracts the Sample ID and all 22 parameter values along with their machine-calibrated flags, and populates the editable result entry form for technologist inspection before saving.
+3. **M-LIS Import**: Rather than relying on fragile direct database hooks or proprietary ODBC drivers, the technologist simply copies the raw transmission text from the supplier interfacing window, clicks `[ Paste from Analyzer ]` inside the CBC result entry modal in M-LIS, and pastes the content.
+4. **Automated Population**: M-LIS instantly parses the text, extracts the Sample ID and all 22 parameter values along with their machine-calibrated flags, and populates the editable result entry form for technologist inspection before saving.
 
 ---
 
@@ -49,7 +49,7 @@ Each sample transmission consists of two distinct records separated by a newline
 ```
 
 #### Clinical Principle: Capturing Machine Calibration & Calibrated Intervals
-The hematology analyzer is calibrated to operate with verified reference intervals, and the instrument's hardware flags (`*`, `H`, `L`) are directly derived from these preset intervals in the `EXP` record. Rather than discarding the `EXP` record, AMH Lab Tracker parses the `EXP` transmission to extract the exact low-high reference intervals for all 22 parameters and attaches them directly as `reference_range` metadata (e.g. `4.0 - 9.0`, `12.0 - 18.0`).
+The hematology analyzer is calibrated to operate with verified reference intervals, and the instrument's hardware flags (`*`, `H`, `L`) are directly derived from these preset intervals in the `EXP` record. Rather than discarding the `EXP` record, M-LIS parses the `EXP` transmission to extract the exact low-high reference intervals for all 22 parameters and attaches them directly as `reference_range` metadata (e.g. `4.0 - 9.0`, `12.0 - 18.0`).
 
 The parser cleanly separates patient test values from reference limit thresholds, preventing token contamination while dynamically supplying the calibrated reference ranges to result reviews and PDF generation.
 

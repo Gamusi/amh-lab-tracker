@@ -175,8 +175,12 @@ def get_hmis105_report(
             "positivity_rate": rate
         })
 
+    cur.execute("SELECT facility_name FROM facility_settings WHERE id = 1")
+    fac_row = cur.fetchone()
+    facility_name = fac_row["facility_name"] if fac_row and fac_row["facility_name"] else "Clinical Diagnostic Laboratory"
+
     return {
-        "facility": "Ahmadiyya Muslim Hospital, Mbale",
+        "facility": facility_name,
         "moh_form": "HMIS 105 Section 6 — Laboratory Surveillance",
         "month": ref_date.strftime("%B %Y"),
         "start_date": s_str,

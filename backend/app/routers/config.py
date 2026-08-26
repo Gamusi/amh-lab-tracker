@@ -5,7 +5,8 @@ from ..database import get_db
 from ..schemas import (
     TestCreate, TestResponse, WardCreate, WardUpdate, WardResponse, 
     ClinicianCreate, ClinicianUpdate, ClinicianResponse,
-    ReferenceRangeCreate, ReferenceRangeUpdate, ReferenceRangeResponse
+    ReferenceRangeCreate, ReferenceRangeUpdate, ReferenceRangeResponse,
+    FacilitySettingsUpdate, FacilitySettingsResponse
 )
 from ..auth import get_current_user, require_admin
 
@@ -349,5 +350,79 @@ def delete_reference_range(range_id: int, admin_user: dict = Depends(require_adm
     conn.execute("INSERT INTO audit_log (user_id, action, detail) VALUES (?, ?, ?)", (admin_user["id"], "delete_reference_range", f"Deleted reference range rule ID {range_id} ('{existing['parameter_name']}')"))
     conn.commit()
     return {"status": "deleted"}
+
+
+@router.get("/facility", response_model=FacilitySettingsResponse)
+def get_facility_settings(conn: sqlite3.Connection = Depends(get_db)):
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM facility_settings WHERE id = 1")
+    row = cur.fetchone()
+    if not row:
+        return {
+            "id": 1,
+            "facility_name": "Ahmadiyya Muslim Hospital",
+            "facility_acronym": "AMH",
+            "facility_code": "AMH",
+            "address": "P.O. Box 2309, Mbale, Uganda",
+            "phone": "+256 700 000 000",
+            "email": "lab@hospital.org",
+            "letterhead_path": None,
+            "logo_path": None,
+            "updated_at": None
+        }
+    return dict(row)
+
+
+@router.put("/facility", response_model=FacilitySettingsResponse)
+def update_facility_settings(req: FacilitySettingsUpdate, admin_user: dict = Depends(require_admin), conn: sqlite3.Connection = Depends(get_db)):
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM facility_settings WHERE id = 1")
+    existing = cur.fetchone()
+    if not existing:
+        cur.execute("""
+            INSERT INTO facility_settings (id, facility_name, facility_acronym, facility_code, address, phone, email, letterhead_path, logo_path)
+            VALUES (1, 'Ahmadiyya Muslim Hospital', 'AMH', 'AMH', 'P.O. Box 2309, Mbale, Uganda', '+256 700 000 000', 'lab@hospital.org', NULL, NULL)
+        """)
+        conn.commit()
+
+    updates = []
+    params = []
+    if req.facility_name is not None:
+        updates.append("facility_name = ?")
+        params.append(req.facility_name.strip())
+    if req.facility_acronym is not None:
+        updates.append("facility_acronym = ?")
+        params.append(req.facility_acronym.strip().upper())
+    if req.facility_code is not None:
+        updates.append("facility_code = ?")
+        params.append(req.facility_code.strip().upper())
+    if req.address is not None:
+        updates.append("address = ?")
+        params.append(req.address.strip())
+    if req.phone is not None:
+        updates.append("phone = ?")
+        params.append(req.phone.strip())
+    if req.email is not None:
+        updates.append("email = ?")
+        params.append(req.email.strip())
+    if req.letterhead_path is not None:
+        updates.append("letterhead_path = ?")
+        params.append(req.letterhead_path.strip())
+    if req.logo_path is not None:
+        updates.append("logo_path = ?")
+        params.append(req.logo_path.strip())
+
+    if updates:
+        updates.append("updated_at = CURRENT_TIMESTAMP")
+        cur.execute(f"UPDATE facility_settings SET {', '.join(updates)} WHERE id = 1", tuple(params))
+        conn.commit()
+
+        conn.execute("INSERT INTO audit_log (user_id, action, detail) VALUES (?, ?, ?)",
+                     (admin_user["id"], "update_facility_settings", f"Updated facility settings: {req.model_dump(exclude_unset=True)}"))
+        conn.commit()
+
+    cur.execute("SELECT * FROM facility_settings WHERE id = 1")
+    return dict(cur.fetchone())
+
 
 

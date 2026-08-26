@@ -1132,7 +1132,7 @@ def test_health_check_endpoint():
     assert res.status_code == 200
     data = res.json()
     assert data["status"] == "ok"
-    assert data["app"] == "AMH Lab Tracker"
+    assert data["app"] == "M-LIS"
 
 
 

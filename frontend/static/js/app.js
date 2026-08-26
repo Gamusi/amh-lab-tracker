@@ -155,15 +155,34 @@ const app = {
 
   loadTheme: __async(function*() {
     try {
+      let facData = null;
+      try {
+        const facRes = yield fetch('/api/config/facility');
+        if (facRes.ok) {
+          facData = yield facRes.json();
+        }
+      } catch (err) {
+        // Fallback gracefully if API not ready
+      }
+
       const res = yield fetch('/assets/branding/theme.json');
       if (res.ok) {
         this.theme = yield res.json();
-        document.getElementById('app-title').textContent = this.theme.app_title || 'AMH Lab Tracker';
-        document.getElementById('facility-name').textContent = this.theme.facility_name || '';
-        document.getElementById('footer-text').textContent = this.theme.footer_text || '';
-        if (this.theme.logo_path) {
-          document.getElementById('header-logo').src = this.theme.logo_path;
-        }
+      } else {
+        this.theme = {};
+      }
+
+      if (facData) {
+        this.theme.facility_name = facData.facility_name || this.theme.facility_name;
+        this.theme.facility_acronym = facData.facility_acronym || this.theme.facility_acronym;
+        this.facilitySettings = facData;
+      }
+
+      document.getElementById('app-title').textContent = this.theme.app_title || 'M-LIS';
+      document.getElementById('facility-name').textContent = this.theme.facility_name || 'Diagnostic Laboratory';
+      document.getElementById('footer-text').textContent = this.theme.footer_text || 'M-LIS — Laboratory Information System';
+      if (this.theme.logo_path) {
+        document.getElementById('header-logo').src = this.theme.logo_path;
       }
     } catch (e) {
       console.warn('Theme loading warning:', e);
@@ -1092,7 +1111,7 @@ const app = {
     var demand = data.demand_dynamics || {};
     var appTests = data.appendix_menu_activity || [];
 
-    var csv = "AMH Laboratory Operations & Performance Report\n";
+    var csv = "Laboratory Operations & Performance Report\n";
     csv += "Reporting Period," + (p.formatted_period || p.period_type || '') + "\n";
     csv += "Date Range,Start: " + (p.start_date || '') + " to End: " + (p.end_date || '') + "\n\n";
 
@@ -1146,7 +1165,7 @@ const app = {
     var blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     var link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
-    link.setAttribute('download', 'AMH_Operations_Report_' + (p.period_type || 'Period') + '_' + (p.reference_date || 'date') + '.csv');
+    link.setAttribute('download', 'MLIS_Operations_Report_' + (p.period_type || 'Period') + '_' + (p.reference_date || 'date') + '.csv');
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -1340,7 +1359,7 @@ const app = {
     var s = data.summary || {};
     var p = data.period || {};
 
-    var csv = "AMH Laboratory Epidemiological Surveillance Report\n";
+    var csv = "Laboratory Epidemiological Surveillance Report\n";
     csv += "Reporting Period," + (p.formatted_period || p.period_type || '') + "\n";
     csv += "Date Range,Start: " + (p.start_date || '') + " to End: " + (p.end_date || '') + "\n\n";
 
@@ -1372,7 +1391,7 @@ const app = {
     var blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     var link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
-    link.setAttribute('download', 'AMH_Surveillance_Report_' + (p.period_type || 'Period') + '_' + (p.reference_date || 'date') + '.csv');
+    link.setAttribute('download', 'MLIS_Surveillance_Report_' + (p.period_type || 'Period') + '_' + (p.reference_date || 'date') + '.csv');
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -1419,7 +1438,7 @@ const app = {
     const table = document.querySelector('#trends-table-container table');
     if (!table) return;
 
-    let csvContent = `AMH Laboratory Monthly Trends (${fy} to ${ty})\n\n`;
+    let csvContent = `Laboratory Monthly Trends (${fy} to ${ty})\n\n`;
 
     table.querySelectorAll('tr').forEach(tr => {
       const cells = Array.from(tr.querySelectorAll('th, td')).map(c => `"${c.textContent.trim()}"`);
@@ -3970,7 +3989,7 @@ const app = {
   },
 
   promptResetPassword: __async(function*(userId, username, role, cadre) {
-    app.promptAction("Reset Password", `Enter a new temporary password for user '${username}' (leave empty for default 'AMH@1234'):`, __async(function*(tempPw) {
+    app.promptAction("Reset Password", `Enter a new temporary password for user '${username}' (leave empty for default 'MLIS@1234'):`, __async(function*(tempPw) {
       try {
         const payload = tempPw && tempPw.trim().length > 0 ? { temporary_password: tempPw.trim() } : {};
         const res = yield fetch(`/api/auth/users/${userId}/reset-password`, {

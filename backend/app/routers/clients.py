@@ -127,7 +127,12 @@ def create_client(req: ClientCreate, conn: sqlite3.Connection = Depends(get_db),
     cur.execute("SELECT last_value FROM sequence_tracker WHERE seq_name = ?", (seq_name,))
     seq_row = cur.fetchone()
     seq_val = seq_row["last_value"] if seq_row else 1
-    generated_client_number = f"AMH-C{yy_str}-{seq_val:04d}"
+
+    cur.execute("SELECT facility_acronym FROM facility_settings WHERE id = 1")
+    fac_row = cur.fetchone()
+    fac_acronym = fac_row["facility_acronym"] if fac_row and fac_row["facility_acronym"] else "AMH"
+
+    generated_client_number = f"{fac_acronym}-C{yy_str}-{seq_val:04d}"
     
     cur.execute("""
         INSERT INTO clients (client_number, full_name, age_years, age_category, sex, phone)
@@ -635,7 +640,12 @@ def enter_result(req: TestResultCreate, conn: sqlite3.Connection = Depends(get_d
                 cur.execute("SELECT last_value FROM sequence_tracker WHERE seq_name = ?", (seq_name,))
                 seq_row = cur.fetchone()
                 seq_val = seq_row["last_value"] if seq_row else 1
-                assigned_lab_number = f"AMH-{yy_str}-{m_str}-{seq_val:03d}"
+
+                cur.execute("SELECT facility_acronym FROM facility_settings WHERE id = 1")
+                fac_row = cur.fetchone()
+                fac_acronym = fac_row["facility_acronym"] if fac_row and fac_row["facility_acronym"] else "AMH"
+
+                assigned_lab_number = f"{fac_acronym}-{yy_str}-{m_str}-{seq_val:03d}"
                 cur.execute("UPDATE visits SET lab_number = ? WHERE id = ?", (assigned_lab_number, visit_id))
             else:
                 assigned_lab_number = v_row["lab_number"]

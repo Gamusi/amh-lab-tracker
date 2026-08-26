@@ -644,8 +644,8 @@ def generate_pdf(order_data: dict, results_data: list) -> bytes:
         topMargin=145,
         bottomMargin=65,
         title=f"Lab Report - {lab_no}",
-        author="Ahmadiyya Muslim Hospital, Mbale",
-        creator="AMH Lab Tracker",
+        author=order_data.get("facility_name") or "M-LIS Diagnostic Laboratory",
+        creator="M-LIS",
         subject=f"Clinical Diagnostic Report: {client_name} ({lab_no})"
     )
     

@@ -1,9 +1,8 @@
 ================================================================================
-  AMH LAB TRACKER — HOSPITAL LABORATORY SYSTEM
-  Ahmadiyya Muslim Hospital, Mbale, Uganda
+  M-LIS — LABORATORY INFORMATION SYSTEM
 ================================================================================
 
-This package contains the complete offline AMH Lab Tracker system.
+This package contains the complete offline M-LIS system.
 No internet connection is required.
 
 --------------------------------------------------------------------------------
@@ -21,10 +20,10 @@ Step 2: Double-click "setup.bat"
 --------------------------------------------------------------------------------
 2. DAILY OPERATION (STARTING THE SYSTEM)
 --------------------------------------------------------------------------------
-- Double-click the "AMH Lab Tracker" shortcut on your Desktop
+- Double-click the "M-LIS" shortcut on your Desktop
   OR double-click "run.bat" in this folder.
 - Your web browser will open automatically at: http://127.0.0.1:8756/
-- Keep the black server window open while using the system.
+- Keep the server window open while using the system.
 
 --------------------------------------------------------------------------------
 3. USER ACCOUNTS & FIRST-RUN SETUP

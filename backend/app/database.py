@@ -3,12 +3,26 @@ import os, sqlite3, logging
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 DATA_DIR = os.path.join(BASE_DIR, "data")
 
-DEFAULT_DB = os.path.join(DATA_DIR, "amh_lab.db")
-DB_PATH = os.environ.get("AMH_DB_PATH", DEFAULT_DB)
+DEFAULT_DB = os.path.join(DATA_DIR, "mlis.db")
+LEGACY_DB = os.path.join(DATA_DIR, "amh_lab.db")
+DB_PATH = os.environ.get("MLIS_DB_PATH", os.environ.get("AMH_DB_PATH", DEFAULT_DB))
 
-logger = logging.getLogger("amh_db")
+logger = logging.getLogger("mlis_db")
 
 SCHEMA_SQL = """
+    CREATE TABLE IF NOT EXISTS facility_settings (
+        id INTEGER PRIMARY KEY DEFAULT 1,
+        facility_name TEXT NOT NULL DEFAULT 'Ahmadiyya Muslim Hospital',
+        facility_acronym TEXT NOT NULL DEFAULT 'AMH',
+        facility_code TEXT DEFAULT 'AMH',
+        address TEXT DEFAULT 'P.O. Box 2309, Mbale, Uganda',
+        phone TEXT DEFAULT '+256 700 000 000',
+        email TEXT DEFAULT 'lab@hospital.org',
+        letterhead_path TEXT,
+        logo_path TEXT,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
     CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         full_name TEXT NOT NULL,
@@ -206,6 +220,14 @@ def get_connection():
     db_dir = os.path.dirname(os.path.abspath(DB_PATH))
     if db_dir:
         os.makedirs(db_dir, exist_ok=True)
+    # Automatic migration from legacy amh_lab.db if mlis.db does not exist yet
+    if DB_PATH == DEFAULT_DB and not os.path.exists(DEFAULT_DB) and os.path.exists(LEGACY_DB):
+        try:
+            import shutil
+            shutil.copy2(LEGACY_DB, DEFAULT_DB)
+            logger.info(f"Auto-migrated legacy database from {LEGACY_DB} to {DEFAULT_DB}")
+        except Exception as e:
+            logger.warning(f"Could not copy legacy database: {e}")
     conn = sqlite3.connect(DB_PATH, check_same_thread=False)
     conn.execute("PRAGMA foreign_keys = ON;")
     conn.execute("PRAGMA journal_mode = WAL;")
@@ -226,6 +248,15 @@ def init_db():
     conn = get_connection()
     cursor = conn.cursor()
     cursor.executescript(SCHEMA_SQL)
+
+    # Pre-seed facility_settings with id=1 if not exists
+    cursor.execute("SELECT id FROM facility_settings WHERE id = 1")
+    if not cursor.fetchone():
+        cursor.execute("""
+            INSERT INTO facility_settings (id, facility_name, facility_acronym, facility_code, address, phone, email)
+            VALUES (1, 'Ahmadiyya Muslim Hospital', 'AMH', 'AMH', 'P.O. Box 2309, Mbale, Uganda', '+256 700 000 000', 'lab@hospital.org')
+        """)
+        logger.info("Pre-seeded default facility settings")
     
     # Pre-seed clinicians with 'SELF REQUEST' if it doesn't exist
     cursor.execute("SELECT id FROM clinicians WHERE name = 'SELF REQUEST'")

@@ -6,8 +6,8 @@ import subprocess
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DIST_DIR = os.path.join(BASE_DIR, "dist")
-STAGE_DIR = os.path.join(DIST_DIR, "amh-lab-tracker")
-ZIP_OUTPUT = os.path.join(DIST_DIR, "amh-lab-tracker-release.zip")
+STAGE_DIR = os.path.join(DIST_DIR, "mlis")
+ZIP_OUTPUT = os.path.join(DIST_DIR, "mlis-release.zip")
 WHEELS_DIR = os.path.join(BASE_DIR, "offline_packages", "wheels")
 
 def run_cmd(cmd):
@@ -20,8 +20,8 @@ def run_cmd(cmd):
 
 def pack():
     print("=" * 60)
-    print("  AMH Lab Tracker — Release Packager (Zip Distribution)")
-    print("  Ahmadiyya Muslim Hospital, Mbale, Uganda")
+    print("  M-LIS — Release Packager (Zip Distribution)")
+    print("  Laboratory Information System")
     print("=" * 60)
 
     # 1. Ensure offline wheels are downloaded
@@ -93,10 +93,10 @@ def pack():
     print(f"  Package Size:     {zip_size_mb:.2f} MB")
     print(f"")
     print(f"  DEPLOYMENT ON TARGET MACHINE:")
-    print(f"  1. Transfer 'amh-lab-tracker-release.zip' to target PC.")
+    print(f"  1. Transfer 'mlis-release.zip' to target PC.")
     print(f"  2. Right-click -> 'Extract All...'.")
     print(f"  3. Open the extracted folder and double-click 'setup.bat'.")
-    print(f"  4. Double-click 'run.bat' (or Desktop shortcut) to launch.")
+    print(f"  4. Double-click 'M-LIS' shortcut on Desktop (or 'run.bat') to launch.")
     print("=" * 60)
 
 if __name__ == "__main__":

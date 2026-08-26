@@ -1,19 +1,19 @@
 @echo off
-title AMH Lab Tracker - System Setup
+title M-LIS - System Setup
 setlocal enabledelayedexpansion
 
 cd /d "%~dp0"
 set "LOG_FILE=%~dp0setup_debug.log"
 
 echo ============================================================ > "%LOG_FILE%"
-echo   AMH Lab Tracker - Setup Debug Log >> "%LOG_FILE%"
+echo   M-LIS - Setup Debug Log >> "%LOG_FILE%"
 echo   Date/Time: %DATE% %TIME% >> "%LOG_FILE%"
 echo   Directory: %~dp0 >> "%LOG_FILE%"
 echo ============================================================ >> "%LOG_FILE%"
 
 echo ============================================================
-echo   AMH Lab Tracker - Offline System Setup
-echo   Ahmadiyya Muslim Hospital, Mbale, Uganda
+echo   M-LIS - Offline System Setup
+echo   Laboratory Information System
 echo ============================================================
 echo.
 echo Setup log will be saved to: setup_debug.log
@@ -158,9 +158,9 @@ echo You can start the app at any time using the Desktop shortcut
 echo or by double-clicking run.bat in this folder.
 echo.
 
-set /p START_NOW="Do you want to launch AMH Lab Tracker now? (Y/N): "
+set /p START_NOW="Do you want to launch M-LIS now? (Y/N): "
 if /i "%START_NOW%"=="Y" (
-    echo Starting AMH Lab Tracker...
+    echo Starting M-LIS...
     call "%~dp0run.bat"
 ) else (
     echo.

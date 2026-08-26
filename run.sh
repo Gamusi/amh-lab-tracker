@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 echo "============================================================"
-echo "  Starting AMH Lab Tracker Server..."
-echo "  Ahmadiyya Muslim Hospital, Mbale, Uganda"
+echo "  Starting M-LIS Server..."
+echo "  Laboratory Information System"
 echo "============================================================"
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"

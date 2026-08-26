@@ -116,7 +116,7 @@ def admin_reset_password(
     if admin_user["role"] == "admin" and target_user["role"] in ["admin", "superadmin"] and target_user["id"] != admin_user["id"]:
         raise HTTPException(status_code=403, detail="Admins can only reset passwords for staff accounts.")
 
-    temp_pass = (req.temporary_password if req and req.temporary_password else "").strip() or "AMH@1234"
+    temp_pass = (req.temporary_password if req and req.temporary_password else "").strip() or "MLIS@1234"
     new_hash = hash_password(temp_pass)
 
     cur.execute(

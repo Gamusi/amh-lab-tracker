@@ -12,12 +12,12 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(levelname)s - %(name)s - %(message)s"
 )
-logger = logging.getLogger("amh_server")
+logger = logging.getLogger("mlis_server")
 
 # Initialize DB
 init_db()
 
-app = FastAPI(title="AMH Lab Tracker", version="1.0.0")
+app = FastAPI(title="M-LIS", version="1.0.0")
 
 # Request Logging Middleware
 @app.middleware("http")
@@ -55,14 +55,14 @@ if os.path.exists(ASSETS_DIR):
 
 @app.get("/api/health")
 def health_check():
-    return {"status": "ok", "app": "AMH Lab Tracker", "version": "1.0.0"}
+    return {"status": "ok", "app": "M-LIS", "version": "1.0.0"}
 
 @app.get("/")
 def serve_spa():
     index_path = os.path.join(FRONTEND_DIR, "index.html")
     if os.path.exists(index_path):
         return FileResponse(index_path)
-    return JSONResponse({"message": "AMH Lab Tracker API Running. Static frontend index.html not found."})
+    return JSONResponse({"message": "M-LIS API Running. Static frontend index.html not found."})
 
 @app.get("/{full_path:path}")
 def catch_all(full_path: str):

@@ -1,11 +1,11 @@
 <div align="center">
 
-<img src="assets/branding/logo.png" alt="AMH Lab Tracker Logo" width="120" />
+<img src="assets/branding/logo.png" alt="M-LIS Logo" width="120" />
 
 <br />
 
-# AMH Lab Tracker
-**Ahmadiyya Muslim Hospital, Mbale, Uganda**
+# M-LIS
+**Laboratory Information System**
 
 **A high-performance, air-gapped desktop laboratory information system engineered for extreme low-spec hardware.**
 
@@ -16,7 +16,7 @@
 [![Frontend](https://img.shields.io/badge/frontend-Vanilla%20JS%20%7C%20CSS-f7df1e.svg)]()
 [![Backend](https://img.shields.io/badge/backend-FastAPI%20%7C%20Python-009688.svg)]()
 
-[Overview](#overview) • [The Excel Problem](#the-legacy-excel-problem) • [Features](#features) • [Architecture](#architecture--tech-stack) • [Air-Gapped Deployment](#air-gapped-usb-deployment) • [Customization](#portability--branding)
+[Overview](#overview) • [The Excel Problem](#the-legacy-excel-problem) • [Features](#features) • [Architecture](#architecture--tech-stack) • [Air-Gapped Deployment](#air-gapped-offline-deployment--packaging) • [Customization](#portability--branding)
 
 </div>
 
@@ -24,7 +24,7 @@
 
 ## Overview
 
-**AMH Lab Tracker** is an offline-first laboratory management system built to digitize diagnostic reporting and client test workflows. Designed to comply with the Ugandan Ministry of Health **HMIS 105 Section 6 Laboratory Surveillance** guidelines, it completely replaces fragile legacy Excel macros with a robust, relational database-backed application.
+**M-LIS** is an offline-first laboratory management system built to digitize diagnostic reporting and client test workflows. Designed to comply with standard **HMIS 105 Section 6 Laboratory Surveillance** guidelines, it completely replaces fragile legacy Excel macros with a robust, relational database-backed application.
 
 It is specifically engineered to run flawlessly on legacy hospital workstations (Core 2 Duo / 2GB RAM) without requiring an internet connection, complex installations, or heavy browser frameworks.
 
@@ -114,34 +114,29 @@ The application supports completely offline 1-click deployment via a self-contai
 :: Builds the standalone release archive (downloads wheels, stages assets, creates ZIP)
 pack_usb.bat
 ```
-*(Outputs `dist/amh-lab-tracker-release.zip` and staged folder at `dist/amh-lab-tracker/`)*
+*(Outputs `dist/mlis-release.zip` and staged folder at `dist/mlis/`)*
 
-### 2. Install on Target Workstation (Air-Gapped Hospital PC):
-1. Transfer `dist/amh-lab-tracker-release.zip` (or the unpacked folder) to the target PC.
+### 2. Install on Target Workstation (Air-Gapped Client PC):
+1. Transfer `dist/mlis-release.zip` (or the unpacked folder) to the target PC.
 2. Extract the archive (Right-click -> **Extract All...**).
 3. Ensure Python 3.11+ is installed (with **"Add Python to PATH"** checked).
 4. Double-click **`setup.bat`**:
-   - Automatically installs all 18 pre-packaged dependency wheels offline from `offline_packages/wheels/`.
-   - Initializes the local SQLite database (`data/amh_lab.db`) and seeds standard MoH catalog data.
-   - Automatically creates the **AMH Lab Tracker** shortcut on your Desktop and Startup folder.
+   - Automatically installs pre-packaged dependency wheels offline from `offline_packages/wheels/`.
+   - Initializes the local SQLite database (`data/mlis.db`) and seeds standard clinical catalog data.
+   - Automatically creates the **M-LIS** shortcut on your Desktop.
 5. Double-click **`run.bat`** (or the Desktop shortcut) to launch the system.
 
 ### 3. Incremental Updates & Maintenance:
 To deploy bugfixes or new features to an existing target installation without full reinstallation:
 - Simply copy the updated file(s) (e.g., `backend/app/parsers/nihon_kohden.py` or `frontend/static/js/app.js`) to the target installation directory.
 - Restart the server via `run.bat`.
-- The database in `data/amh_lab.db` is strictly preserved and never overwritten.
+- The database in `data/mlis.db` is strictly preserved and never overwritten.
 
 ---
 
 ## Portability & Branding
 
-While currently branded for Ahmadiyya Muslim Hospital, the system is designed to be highly portable for any Ugandan regional hospital or health center.
-
-Admins can easily re-theme the entire application without touching code:
-
-1. Replace `assets/branding/logo.png` with a new facility logo.
-2. Edit `assets/branding/theme.json` to update the facility name and inject custom CSS variables (Primary `#0B5FA5`, Accent `#2E8B57`).
+The system features dynamic facility branding. Super Administrators can customize the facility name, acronym, letterhead, and contact details directly in the Admin Panel without touching code. Default facility settings can also be pre-configured in `assets/branding/theme.json`.
 
 ## Developer Guidelines
 

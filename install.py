@@ -5,8 +5,8 @@ sys.path.insert(0, BASE_DIR)
 
 def install():
     print("=" * 60)
-    print("  AMH Lab Tracker — One-Time System Installation & Setup")
-    print("  Ahmadiyya Muslim Hospital, Mbale, Uganda")
+    print("  M-LIS — One-Time System Installation & Setup")
+    print("  Laboratory Information System")
     print("=" * 60)
 
     # 1. Initialize DB & Seed Data
@@ -39,7 +39,7 @@ def install():
     print("  - Launch the app using 'run.bat' (or Desktop shortcut)")
     print("  - On first launch, navigate to http://127.0.0.1:8756/ and click 'Register'")
     print("  - The FIRST account registered automatically becomes the Super Administrator")
-    print("  - Database File: data/amh_lab.db")
+    print("  - Database File: data/mlis.db")
     print("=" * 60)
 
 if __name__ == "__main__":

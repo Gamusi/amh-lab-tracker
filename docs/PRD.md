@@ -1,23 +1,23 @@
 # Product Requirements Document (PRD)
-## AMH Lab Tracker — Desktop Laboratory System
-**Ahmadiyya Muslim Hospital (AMH) — Mbale, Uganda**
+## M-LIS — Laboratory Information System
+**Airgapped Clinical Laboratory Database & Reporting System**
 
 ---
 
 ### 1. Executive Summary & Product Vision
-The **AMH Lab Tracker** is a proprietary, offline-first clinical laboratory database system engineered specifically for the operational environment of Ahmadiyya Muslim Hospital in Mbale, Uganda.
+**M-LIS** is a proprietary, offline-first clinical laboratory information system engineered specifically for resource-constrained, airgapped healthcare and diagnostic facilities.
 
-The primary vision of the AMH Lab Tracker is to establish a secure, modern, and highly performant database-backed system that runs completely locally and offline. Designed to support 100% digital data capture, the system eliminates manual recording gaps by requiring all diagnostic tests to be logged in the application before results are printed.
+The primary vision of M-LIS is to establish a secure, modern, and highly performant database-backed system that runs completely locally and offline. Designed to support 100% digital data capture, the system eliminates manual recording gaps by requiring all diagnostic tests to be logged in the application before results are printed.
 
 The system delivers three core pillars of modern laboratory operations:
 1. **Uncompromising Data Integrity:** A robust relational SQLite database that replaces manual registries, ensuring all records are securely structured, search-indexed, and immune to accidental file deletions or database corruption.
 2. **Operational Accountability:** An automated background audit trail that logs every user login, client record creation, test configuration edit, and result update with precise time, date, and user stamps.
-3. **Clinical Compliance & Standards:** Features built directly to support clinical laboratory standards of practice, such as role-based user access controls mapping directly to Uganda Ministry of Health (MoH) cadres, automated verification, configurable critical value alerts, and individual technician attribution on all official printed report slips.
+3. **Clinical Compliance & Standards:** Features built directly to support clinical laboratory standards of practice, such as role-based user access controls mapping directly to national Ministry of Health (MoH) cadres, automated verification, configurable critical value alerts, and individual technician attribution on all official printed report slips.
 
 ---
 
 ### 2. Operating Environment & Technical Constraints
-To run effectively in Mbale, the AMH Lab Tracker is optimized for highly constrained infrastructure, strictly adhering to these operational boundaries:
+To run effectively in constrained clinical environments, M-LIS is optimized for highly constrained infrastructure, strictly adhering to these operational boundaries:
 * **Host Hardware Limitations:** The laboratory operates legacy workstation computers (typically Intel Core 2 Duo era processors with 2GB of RAM). The application must consume minimal system resources (prohibiting heavy modern shells like Electron) to prevent system freezes or slow-downs.
 * **Network Isolation (Air-Gap):** The laboratory is completely offline, with no reliable internet connectivity. The application must run **100% locally** on a single computer, with zero external dependencies, CDNs, or cloud-hosted services.
 * **Offline Deployment Strategy:** All software installations, upgrades, and library dependencies must be delivered on physical USB flash drives containing pre-compiled, offline Python wheel (`.whl`) files and local installation scripts (`install.py`, `pack_usb.bat`).
@@ -65,7 +65,7 @@ The lab menu is dynamic and must expand or contract with clinical offerings:
 * **Test Soft-Deletion:** If a test has historical logs attached, the system performs a soft-delete (marking it inactive) to preserve historical data integrity while removing it from the active menu.
 
 #### Epic 3: Complete Paperless Operations & Printing Integration
-The AMH Lab Tracker replaces the physical paper register entirely:
+M-LIS replaces the physical paper register entirely:
 * **100% Database Capture:** The database acts as the single source of truth.
 * **Result Printing Workflow:** The web frontend dynamically triggers the system print dialog. CSS `@media print` rules strip the UI to generate clean, formatted results in a standardized letterhead layout.
 

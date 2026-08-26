@@ -1,12 +1,12 @@
 # Software Requirements Specification (SRS)
-## AMH Lab Tracker — System Architecture, Data Models & Security
-**Ahmadiyya Muslim Hospital (AMH) — Mbale, Uganda**
+## M-LIS — System Architecture, Data Models & Security
+**Laboratory Information System**
 
 ---
 
 ### 1. System Tech Stack & Environment Constraints
 
-The **AMH Lab Tracker** is architected to perform seamlessly under stringent local hardware limitations while maintaining full portability and forward-compatibility with modern operating systems and potential future cloud/containerized deployments.
+**M-LIS** is architected to perform seamlessly under stringent local hardware limitations while maintaining full portability and forward-compatibility with modern operating systems and potential future cloud/containerized deployments.
 
 #### 1.1 Core Backend & Shell Runtime
 *   **Application Language:** Python 3.11+
@@ -17,7 +17,7 @@ The **AMH Lab Tracker** is architected to perform seamlessly under stringent loc
 *   **No-Cloud Isolation:** The app operates 100% offline, binding exclusively to the local loopback adapter (`127.0.0.1`) at port `8756`. This provides an impenetrable hardware-level firewall against cross-network eavesdropping over local Wi-Fi or LAN.
 
 #### 1.2 Target Hardware & Compatibility Tuning
-To accommodate Ahmadiyya Muslim Hospital Mbale's low-specification computers (Intel Core 2 Duo era, 2GB RAM), the application is tuned with the following constraints:
+To accommodate low-specification clinical workstations (Intel Core 2 Duo era, 2GB RAM), the application is tuned with the following constraints:
 *   **Process Isolation:** The Python FastAPI backend runs as a single-threaded local process with minimal active workers, consuming less than **50MB of RAM** at rest.
 *   **No Developer-Mode Overhead:** Development flags such as Uvicorn's `reload=True` are strictly disabled in production. This eliminates continuous file-system scanning and directory watching, which would saturate legacy hard drive I/O and freeze the system.
 *   **Offline Dependencies:** All application dependencies are packaged as pre-compiled Python wheel (`.whl`) files stored in `usb_drive/wheels/` to allow zero-network installations on air-gapped host machines.
@@ -173,8 +173,8 @@ COMMIT;
 
 ### 4. User Governance & Access Control
 #### 4.1 Data Ownership & Role-Based Access Control (RBAC)
-Data ownership belongs solely to Ahmadiyya Muslim Hospital. The system employs a 3-tier RBAC system:
-*   **Super Admin:** A strictly singular account generated upon bootstrap. The only account capable of approving Administrators and wiping audit tables if necessary.
+Data ownership belongs solely to the implementing medical facility. The system employs a 3-tier RBAC system:
+*   **Super Admin:** A strictly singular account generated upon bootstrap. The only account capable of approving Administrators, configuring facility identity, and managing audit tables if necessary.
 *   **Admin Profile:** Authorized to perform password overrides, reset security questions, add or delete test items, configure critical limits, and inspect the immutable audit logs.
 *   **Staff Profile (Technician):** Authorized to register client profiles, log orders, and input test values. Blocked from altering global settings, performing data deletions, or resetting other users' credentials.
 
@@ -185,7 +185,7 @@ Data ownership belongs solely to Ahmadiyya Muslim Hospital. The system employs a
 ---
 
 ### 5. Physical & Technical Session Security
-Because lab workstations at AMH are shared physically by multiple technicians, session security must prevent "walk-away" vulnerabilities.
+Because lab workstations are shared physically by multiple technicians, session security must prevent "walk-away" vulnerabilities.
 #### 5.1 The 15-Minute Inactivity Session Timeout
 *   **Frontend Activity Daemon:** The client application (`app.js`) operates a background activity listener. If no interaction is detected for exactly **15 minutes**, the frontend daemon immediately logs the user out.
 *   **Backend Token Expiration:** All user sessions are backed by short-lived tokens. The backend database `expires_at` timestamp is enforced.
@@ -197,10 +197,10 @@ Because lab workstations at AMH are shared physically by multiple technicians, s
 
 ### 6. Flexible Reference Range & Clinical Flagging Engine
 *Intended Final State:*
-A critical requirement of the AMH Lab Tracker is its dual-mode clinical flagging engine, which accommodates both vendor-calibrated hardware and manual test parameters. The system will be seeded with standard clinical reference ranges for common panels (CBC, LFTs, RFTs).
+A critical requirement of M-LIS is its dual-mode clinical flagging engine, which accommodates both vendor-calibrated hardware and manual test parameters. The system will be seeded with standard clinical reference ranges for common panels (CBC, LFTs, RFTs).
 
 #### 6.1 Device-Preset Mode (`DEVICE_PRESET`)
-*   **Protocol:** For parameters flagged as `DEVICE_PRESET` (e.g., from an analyzer integration), the AMH Lab Tracker bypasses internal validation rules and records the clinical values and alerts exactly as transmitted from the analyzer to preserve calibration fidelity.
+*   **Protocol:** For parameters flagged as `DEVICE_PRESET` (e.g., from an analyzer integration), M-LIS bypasses internal validation rules and records the clinical values and alerts exactly as transmitted from the analyzer to preserve calibration fidelity.
 
 #### 6.2 LIMS-Evaluated Mode (`LIMS_EVALUATED`)
 *   **Protocol:** The LIMS dynamically evaluates clinical ranges using the schema defined in `test_parameters`. If a value falls outside the defined range or breaches the `critical_low`/`critical_high` thresholds, it is dynamically stamped in the database with standard clinical codes (`H`, `L`, `CH`, `CL`).
@@ -231,7 +231,7 @@ No client files or diagnostic orders can be physically deleted.
 ---
 
 ### 9. Security & Performance Benchmarks
-To ensure the AMH Lab Tracker operates smoothly on Mbale's legacy computers, the following non-functional benchmarks are enforced:
+To ensure M-LIS operates smoothly on legacy computers, the following non-functional benchmarks are enforced:
 
 | Operational Metric | Target Benchmark | Verification Method |
 | :--- | :--- | :--- |

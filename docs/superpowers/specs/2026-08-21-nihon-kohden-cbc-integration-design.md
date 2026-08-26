@@ -8,7 +8,7 @@
 
 ## 1. Goal & Architectural Overview
 
-Provide an offline-first, non-intrusive integration mechanism for the **Nihon Kohden MEK-7222 Hematology Analyzer** to allow laboratory technicians to capture all 22 CBC parameters directly into the AMH Lab Tracker by pasting raw instrument output, while keeping manual per-parameter editing available.
+Provide an offline-first, non-intrusive integration mechanism for the **Nihon Kohden MEK-7222 Hematology Analyzer** to allow laboratory technicians to capture all 22 CBC parameters directly into the M-LIS by pasting raw instrument output, while keeping manual per-parameter editing available.
 
 In addition, render CBC results in their own dedicated, professionally styled page in ReportLab conforming to [`rptrchemcour.pdf`](file:///c:/Users/dell/Documents/amh-lab-tracker/docs/reference/rptrchemcour.pdf).
 

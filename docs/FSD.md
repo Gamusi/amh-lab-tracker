@@ -1,17 +1,17 @@
 # Functional Specification Document (FSD)
-## AMH Lab Tracker — Screens, Workflows & Edge Cases
-**Ahmadiyya Muslim Hospital (AMH) — Mbale, Uganda**
+## M-LIS — Screens, Workflows & Edge Cases
+**Laboratory Information System**
 
 ---
 
 ### 1. Navigation & Application Shell (Top Navigation Bar)
 
-To maximize vertical and horizontal screen real estate on legacy monitors and support the "simplicity that works" design philosophy, the **AMH Lab Tracker** utilizes a flat, persistent **Top Navigation Bar**.
+To maximize vertical and horizontal screen real estate on legacy monitors and support the "simplicity that works" design philosophy, **M-LIS** utilizes a flat, persistent **Top Navigation Bar**.
 
 #### 1.1 Layout & Behavior Rules
 *   **Header Section**: 
     *   **Fixed Height**: Persistent across all views to eliminate visual jumping.
-    *   **Brand Integrations**: Institutional logo on the far left.
+    *   **Brand Integrations**: Configurable facility logo and title on the far left.
     *   **Navigation Links**: Centered, high-contrast text tabs. Active tabs are marked clearly.
     *   **User & Session Status**: Positioned on the far right. Displays the logged-in user's full name, role, a countdown timer showing seconds remaining before auto-logout (15 minutes), and a Logout button.
 *   **Active Screen Container**: Takes up 100% of the remaining viewport height. Uses native browser scrolling.
@@ -25,7 +25,7 @@ The system utilizes Domain-Driven Design, referring to subjects as **"Clients"**
 
 #### 2.1 Sequential Lab Numbers & Monthly Lifecycle
 The system utilizes a highly structured, sequential **Lab Number** format instead of random database identifiers.
-*   **Syntax**: `[FACILITY]-[YY]-[MM]-[SEQUENTIAL_NUMBER]` (e.g., `AMH-26-8-001`).
+*   **Syntax**: `[FACILITY_ACRONYM]-[YY]-[MM]-[SEQUENTIAL_NUMBER]` (e.g., `AMH-26-8-001` or `MLIS-26-8-001`).
 *   **Monthly Reset**: The sequence automatically resets to `001` at `00:00:00` on the first day of each calendar month via a backend database trigger.
 *   **Intraday Reuse**: If a client receives multiple separate tests on the same calendar day, the system reuses the same Lab Number for consolidated reporting.
 

@@ -1,13 +1,13 @@
 @echo off
-title AMH Lab Tracker Server
+title M-LIS Server
 setlocal enabledelayedexpansion
 
 cd /d "%~dp0"
 set PYTHONPATH=%~dp0
 
 echo ============================================================
-echo   Starting AMH Lab Tracker Server...
-echo   Ahmadiyya Muslim Hospital, Mbale, Uganda
+echo   Starting M-LIS Server...
+echo   Laboratory Information System
 echo ============================================================
 echo.
 

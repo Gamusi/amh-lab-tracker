@@ -319,6 +319,29 @@ class StockReconciliationItem(BaseModel):
     wastage_recorded: int
     variance: int
 
+class FacilitySettingsBase(BaseModel):
+    facility_name: str
+    facility_acronym: str
+    facility_code: Optional[str] = None
+    address: Optional[str] = None
+    phone: Optional[str] = None
+    email: Optional[str] = None
+    letterhead_path: Optional[str] = None
+    logo_path: Optional[str] = None
 
+class FacilitySettingsUpdate(BaseModel):
+    facility_name: Optional[str] = None
+    facility_acronym: Optional[str] = None
+    facility_code: Optional[str] = None
+    address: Optional[str] = None
+    phone: Optional[str] = None
+    email: Optional[str] = None
+    letterhead_path: Optional[str] = None
+    logo_path: Optional[str] = None
 
+class FacilitySettingsResponse(FacilitySettingsBase):
+    id: int
+    updated_at: Optional[str] = None
 
+    class Config:
+        from_attributes = True

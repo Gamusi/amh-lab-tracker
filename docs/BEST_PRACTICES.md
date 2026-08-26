@@ -1,6 +1,6 @@
-# AMH Lab Tracker - Best Practices
+# M-LIS - Best Practices
 
-This document outlines the coding standards and design principles that all developers must adhere to when contributing to the AMH Lab Tracker.
+This document outlines the coding standards and design principles that all developers must adhere to when contributing to M-LIS (Laboratory Information System).
 
 ## A. UI & Design Rules
 
@@ -54,7 +54,7 @@ This document outlines the coding standards and design principles that all devel
 
 ## F. Offline Distribution & Deployment Policy
 
-AMH Lab Tracker is designed to run even on airgapped workstations in a hospital setting. The following rules govern how the project is packaged and distributed.
+M-LIS is designed to run even on airgapped workstations in a clinical laboratory setting. The following rules govern how the project is packaged and distributed.
 
 1. **Commit offline wheels and packages to git.** The `offline_packages/wheels/` directory contains pre-downloaded Python dependency wheels (targeting Python 3.11 & 3.14 Windows). These **must be committed to the repository** and must never be added to `.gitignore`. Pushing wheels to the remote makes it easy to clone the repo onto a USB drive or new workstation and run `setup.bat` without any internet access.
 

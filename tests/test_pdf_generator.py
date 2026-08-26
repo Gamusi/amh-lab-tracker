@@ -135,7 +135,7 @@ def test_pdf_contains_hospital_metadata():
     pdf_bytes = generate_pdf(order_data, results_data)
     
     # Verify PDF contains author and title strings in byte stream
-    assert b"Ahmadiyya Muslim Hospital" in pdf_bytes
+    assert b"M-LIS" in pdf_bytes
     assert b"AMH-26-8-123" in pdf_bytes
 
 def test_urinalysis_and_general_tests_fit_on_single_page():
