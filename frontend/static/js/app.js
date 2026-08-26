@@ -29,6 +29,118 @@ function __async(generatorFunc) {
   };
 }
 
+// NodeList & HTMLCollection .forEach polyfill for Edge 12-15
+if (typeof NodeList !== 'undefined' && !NodeList.prototype.forEach) {
+  NodeList.prototype.forEach = Array.prototype.forEach;
+}
+if (typeof HTMLCollection !== 'undefined' && !HTMLCollection.prototype.forEach) {
+  HTMLCollection.prototype.forEach = Array.prototype.forEach;
+}
+
+// Element.prototype.matches & closest & remove for Edge 12-14
+if (typeof Element !== 'undefined') {
+  if (!Element.prototype.matches) {
+    Element.prototype.matches = Element.prototype.msMatchesSelector || Element.prototype.webkitMatchesSelector || function(s) {
+      var matches = (this.document || this.ownerDocument).querySelectorAll(s), i = matches.length;
+      while (--i >= 0 && matches.item(i) !== this) {}
+      return i > -1;
+    };
+  }
+  if (!Element.prototype.closest) {
+    Element.prototype.closest = function(s) {
+      var el = this;
+      do {
+        if (el.matches(s)) return el;
+        el = el.parentElement || el.parentNode;
+      } while (el !== null && el.nodeType === 1);
+      return null;
+    };
+  }
+  if (!Element.prototype.remove) {
+    Element.prototype.remove = function() {
+      if (this.parentNode) {
+        this.parentNode.removeChild(this);
+      }
+    };
+  }
+}
+
+// fetch polyfill for Edge 12-13
+if (!window.fetch) {
+  window.fetch = function(url, options) {
+    options = options || {};
+    return new Promise(function(resolve, reject) {
+      var xhr = new XMLHttpRequest();
+      var method = (options.method || 'GET').toUpperCase();
+      xhr.open(method, url, true);
+
+      var headers = options.headers || {};
+      if (headers) {
+        if (typeof Headers !== 'undefined' && headers instanceof Headers) {
+          headers.forEach(function(val, key) { xhr.setRequestHeader(key, val); });
+        } else {
+          for (var key in headers) {
+            if (Object.prototype.hasOwnProperty.call(headers, key)) {
+              xhr.setRequestHeader(key, headers[key]);
+            }
+          }
+        }
+      }
+
+      xhr.onload = function() {
+        var responseHeaders = {};
+        var headerStr = xhr.getAllResponseHeaders() || '';
+        headerStr.trim().split(/[\r\n]+/).forEach(function(line) {
+          var parts = line.split(': ');
+          var header = parts.shift();
+          var value = parts.join(': ');
+          if (header) responseHeaders[header.toLowerCase()] = value;
+        });
+
+        var response = {
+          ok: xhr.status >= 200 && xhr.status < 300,
+          status: xhr.status,
+          statusText: xhr.statusText,
+          headers: {
+            get: function(name) {
+              return responseHeaders[name.toLowerCase()] || null;
+            }
+          },
+          url: xhr.responseURL || url,
+          text: function() {
+            return Promise.resolve(xhr.responseText);
+          },
+          json: function() {
+            try {
+              return Promise.resolve(JSON.parse(xhr.responseText));
+            } catch (e) {
+              return Promise.reject(e);
+            }
+          },
+          blob: function() {
+            return Promise.resolve(new Blob([xhr.response]));
+          }
+        };
+        resolve(response);
+      };
+
+      xhr.onerror = function() {
+        reject(new TypeError('Network request failed'));
+      };
+
+      xhr.ontimeout = function() {
+        reject(new TypeError('Network request timed out'));
+      };
+
+      if (options.body) {
+        xhr.send(options.body);
+      } else {
+        xhr.send();
+      }
+    });
+  };
+}
+
 // Array.prototype.includes (ES2016 polyfill for Edge 12-13)
 if (!Array.prototype.includes) {
   Array.prototype.includes = function(searchElement, fromIndex) {
@@ -95,6 +207,25 @@ if (!Array.prototype.find) {
       if (predicate.call(thisArg, value, i, list)) return value;
     }
     return undefined;
+  };
+}
+
+// Object.assign (ES6 polyfill)
+if (typeof Object.assign !== 'function') {
+  Object.assign = function(target) {
+    if (target == null) throw new TypeError('Cannot convert undefined or null to object');
+    var to = Object(target);
+    for (var index = 1; index < arguments.length; index++) {
+      var nextSource = arguments[index];
+      if (nextSource != null) {
+        for (var nextKey in nextSource) {
+          if (Object.prototype.hasOwnProperty.call(nextSource, nextKey)) {
+            to[nextKey] = nextSource[nextKey];
+          }
+        }
+      }
+    }
+    return to;
   };
 }
 
@@ -2874,7 +3005,10 @@ const app = {
     }
   }),
 
-  showEnterResultModal: __async(function*(orderId, testId, testName, existingVal = null, existingUnit = null, visitId = null) {
+  showEnterResultModal: __async(function*(orderId, testId, testName, existingVal, existingUnit, visitId) {
+    if (typeof existingVal === 'undefined') existingVal = null;
+    if (typeof existingUnit === 'undefined') existingUnit = null;
+    if (typeof visitId === 'undefined') visitId = null;
     document.getElementById('result-entry-order-id').value = orderId;
     document.getElementById('result-entry-test-id').value = testId;
     document.getElementById('result-entry-visit-id').value = visitId || '';
@@ -4399,7 +4533,8 @@ const app = {
     if (btn) btn.textContent = isHidden ? '-' : '+';
   },
 
-  openTestConfigModal: __async(function*(testId = null) {
+  openTestConfigModal: __async(function*(testId) {
+    if (typeof testId === 'undefined') testId = null;
     // If editing, look up the test object from testCatalog (already loaded) or fetch it
     let test = null;
     if (testId !== null) {
@@ -4757,7 +4892,8 @@ const app = {
     yield this.loadInventoryData('all');
   }),
 
-  loadInventoryData: __async(function*(category = 'all') {
+  loadInventoryData: __async(function*(category) {
+    if (typeof category === 'undefined') category = 'all';
     this.currentInventoryCategory = category;
     yield this.loadInventoryAlerts();
     yield this.loadInventorySummary(category);
@@ -4811,7 +4947,8 @@ const app = {
     }
   }),
 
-  loadInventorySummary: __async(function*(category = 'all') {
+  loadInventorySummary: __async(function*(category) {
+    if (typeof category === 'undefined') category = 'all';
     const container = document.getElementById('inventory-summary-container');
     if (!container) return;
     try {
@@ -4868,7 +5005,8 @@ const app = {
     }
   }),
 
-  loadInventoryLots: __async(function*(category = 'all') {
+  loadInventoryLots: __async(function*(category) {
+    if (typeof category === 'undefined') category = 'all';
     const container = document.getElementById('inventory-lots-container');
     if (!container) return;
     try {
@@ -5067,7 +5205,8 @@ const app = {
     }
   }),
 
-  openReceiveStockModal: __async(function*(kitName = '') {
+  openReceiveStockModal: __async(function*(kitName) {
+    if (typeof kitName === 'undefined') kitName = '';
     const form = document.getElementById('receive-stock-form');
     if (form) form.reset();
 
@@ -5397,6 +5536,10 @@ const app = {
 
 
 
-window.onload = () => {
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', function() {
+    app.init();
+  });
+} else {
   app.init();
-};
+}
