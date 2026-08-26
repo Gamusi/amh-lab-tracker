@@ -18,7 +18,7 @@ def launch():
 
     # 1. Start server subprocess if not already active
     if not is_server_running():
-        print(f"Starting AMH Lab Tracker backend on {SERVER_URL}...")
+        print(f"Starting M-LIS backend on {SERVER_URL}...")
         env = os.environ.copy()
         env["PYTHONPATH"] = BASE_DIR
         
@@ -42,7 +42,7 @@ def launch():
     gui_opened = False
     try:
         import webview
-        window = webview.create_window("AMH Lab Tracker — Ahmadiyya Muslim Hospital", SERVER_URL, width=1280, height=800)
+        window = webview.create_window("M-LIS — Laboratory Information System", SERVER_URL, width=1280, height=800)
         gui_opened = True
         webview.start()
     except Exception as e:

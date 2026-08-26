@@ -107,8 +107,10 @@ const app = {
   lastActivityTime: 0,
 
   icons: {
-      'building': `<svg class="lucide" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="16" height="20" x="4" y="2" rx="2" ry="2"></rect><path d="M9 22v-4h6v4"></path><path d="M8 6h.01"></path><path d="M16 6h.01"></path><path d="M12 6h.01"></path><path d="M12 10h.01"></path><path d="M12 14h.01"></path><path d="M16 10h.01"></path><path d="M16 14h.01"></path><path d="M8 10h.01"></path><path d="M8 14h.01"></path></svg>`,
-      'stethoscope': `<svg class="lucide" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 2v2"></path><path d="M5 2v2"></path><path d="M5 3H4a2 2 0 0 0-2 2v4a6 6 0 0 0 12 0V5a2 2 0 0 0-2-2h-1"></path><path d="M8 15a6 6 0 0 0 12 0v-3"></path><circle cx="20" cy="10" r="2"></circle></svg>`,
+    'landmark': `<svg class="lucide" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" x2="21" y1="22" y2="22"></line><line x1="6" x2="6" y1="18"></line><line x1="10" x2="10" y1="18"></line><line x1="14" x2="14" y1="18"></line><line x1="18" x2="18" y1="18"></line><polygon points="12 2 20 7 4 7"></polygon><line x1="2" x2="22" y1="7" y2="7"></line></svg>`,
+    'bed': `<svg class="lucide" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 4v16"></path><path d="M2 8h18a2 2 0 0 1 2 2v10"></path><path d="M2 17h20"></path><path d="M6 8v9"></path></svg>`,
+    'building': `<svg class="lucide" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="16" height="20" x="4" y="2" rx="2" ry="2"></rect><path d="M9 22v-4h6v4"></path><path d="M8 6h.01"></path><path d="M16 6h.01"></path><path d="M12 6h.01"></path><path d="M12 10h.01"></path><path d="M12 14h.01"></path><path d="M16 10h.01"></path><path d="M16 14h.01"></path><path d="M8 10h.01"></path><path d="M8 14h.01"></path></svg>`,
+    'stethoscope': `<svg class="lucide" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 2v2"></path><path d="M5 2v2"></path><path d="M5 3H4a2 2 0 0 0-2 2v4a6 6 0 0 0 12 0V5a2 2 0 0 0-2-2h-1"></path><path d="M8 15a6 6 0 0 0 12 0v-3"></path><circle cx="20" cy="10" r="2"></circle></svg>`,
 
     'clipboard-list': `<svg class="lucide" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="8" height="4" x="8" y="2" rx="1" ry="1"></rect><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><path d="M12 11h4"></path><path d="M12 16h4"></path><path d="M8 11h.01"></path><path d="M8 16h.01"></path></svg>`,
     'bar-chart-2': `<svg class="lucide" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" x2="18" y1="20" y2="10"></line><line x1="12" x2="12" y1="20" y2="4"></line><line x1="6" x2="6" y1="20" y2="14"></line></svg>`,
@@ -157,7 +159,7 @@ const app = {
     try {
       let facData = null;
       try {
-        const facRes = yield fetch('/api/config/facility');
+        const facRes = yield fetch('/api/config/facility?t=' + Date.now());
         if (facRes.ok) {
           facData = yield facRes.json();
         }
@@ -165,7 +167,7 @@ const app = {
         // Fallback gracefully if API not ready
       }
 
-      const res = yield fetch('/assets/branding/theme.json');
+      const res = yield fetch('/assets/branding/theme.json?t=' + Date.now());
       if (res.ok) {
         this.theme = yield res.json();
       } else {
@@ -178,12 +180,15 @@ const app = {
         this.facilitySettings = facData;
       }
 
-      document.getElementById('app-title').textContent = this.theme.app_title || 'M-LIS';
-      document.getElementById('facility-name').textContent = this.theme.facility_name || 'Diagnostic Laboratory';
-      document.getElementById('footer-text').textContent = this.theme.footer_text || 'M-LIS — Laboratory Information System';
-      if (this.theme.logo_path) {
-        document.getElementById('header-logo').src = this.theme.logo_path;
-      }
+      const appTitleEl = document.getElementById('app-title');
+      const facNameEl = document.getElementById('facility-name');
+      const footerEl = document.getElementById('footer-text');
+      const logoEl = document.getElementById('header-logo');
+
+      if (appTitleEl) appTitleEl.textContent = this.theme.app_title || 'M-LIS';
+      if (facNameEl) facNameEl.textContent = this.theme.facility_name || 'Ahmadiyya Muslim Hospital';
+      if (footerEl) footerEl.textContent = this.theme.footer_text || 'M-LIS — Laboratory Information System';
+      if (logoEl) logoEl.src = this.theme.logo_path || '/assets/branding/logo_white.png';
     } catch (e) {
       console.warn('Theme loading warning:', e);
     }
@@ -195,7 +200,7 @@ const app = {
       if (res.ok) {
         this.currentUser = yield res.json();
         this.renderUserNav();
-        document.getElementById('login-modal').style.display = 'none';
+        this.closeModal('login-modal');
         document.getElementById('app-nav').style.display = 'flex';
         this.startInactivityTimer();
 
@@ -218,7 +223,7 @@ const app = {
     this.cleanseDOM();
     document.getElementById('app-nav').style.display = 'none';
     document.getElementById('user-nav').innerHTML = '';
-    document.getElementById('login-modal').style.display = 'flex';
+    this.openModal('login-modal');
     this.showLoginForm();
   },
 
@@ -239,7 +244,7 @@ const app = {
       if (res.ok) {
         const data = yield res.json();
         this.currentUser = data.user;
-        document.getElementById('login-modal').style.display = 'none';
+        this.closeModal('login-modal');
         document.getElementById('app-nav').style.display = 'flex';
         this.renderUserNav();
         this.startInactivityTimer();
@@ -269,7 +274,7 @@ const app = {
   showResetPasswordModal: function() {
     const modal = document.getElementById('reset-password-modal');
     if (modal) {
-      modal.style.display = 'flex';
+      this.openModal(modal);
       const err = document.getElementById('reset-password-error');
       if (err) {
         err.textContent = '';
@@ -317,7 +322,7 @@ const app = {
         if (this.currentUser) {
           this.currentUser.password_reset_required = false;
         }
-        document.getElementById('reset-password-modal').style.display = 'none';
+        this.closeModal('reset-password-modal');
         document.getElementById('reset-password-form').reset();
         this.showNotificationModal("Success", 'Password changed successfully!', false);
         this.navigate('clients');
@@ -460,9 +465,11 @@ const app = {
     // Reset all forms in modal/app
     document.querySelectorAll('form').forEach(form => form.reset());
 
-    // Hide reset password modal
+    // Hide reset password modal and close all modals
     const resetModal = document.getElementById('reset-password-modal');
-    if (resetModal) resetModal.style.display = 'none';
+    if (resetModal) this.closeModal(resetModal);
+    (this._modalStack || []).forEach(function(m) { if (m) m.style.display = 'none'; });
+    this._modalStack = [];
 
     // Reset dynamic view container content to default placeholder
     const container = document.getElementById('view-container');
@@ -526,13 +533,36 @@ const app = {
     else if (viewName === 'audit') this.renderAuditLog(container);
   },
 
+  _modalStack: [],
+
+  openModal: function(modalIdOrElem) {
+    const el = typeof modalIdOrElem === 'string' ? document.getElementById(modalIdOrElem) : modalIdOrElem;
+    if (!el) return;
+    
+    this._modalStack = this._modalStack.filter(function(m) { return m !== el; });
+    this._modalStack.push(el);
+    
+    const isHighPriority = el.id === 'notification-modal' || el.id === 'confirm-modal' || el.id === 'prompt-modal';
+    const baseOffset = isHighPriority ? 10000 : 1000;
+    el.style.zIndex = (baseOffset + (this._modalStack.length * 10)).toString();
+    el.style.display = 'flex';
+  },
+
+  closeModal: function(modalIdOrElem) {
+    const el = typeof modalIdOrElem === 'string' ? document.getElementById(modalIdOrElem) : modalIdOrElem;
+    if (!el) return;
+    
+    el.style.display = 'none';
+    this._modalStack = this._modalStack.filter(function(m) { return m !== el; });
+  },
+
   showNotificationModal: function(title, message, isError = false) {
     const modal = document.getElementById('notification-modal');
     if (!modal) return;
     document.getElementById('notif-title').textContent = title;
     document.getElementById('notif-title').style.color = isError ? 'var(--danger-color)' : 'var(--primary-color)';
     document.getElementById('notif-message').textContent = message;
-    modal.style.display = 'flex';
+    this.openModal(modal);
   },
 
   confirmAction: function(title, message, callback) {
@@ -556,15 +586,15 @@ const app = {
     okBtn.parentNode.replaceChild(newOk, okBtn);
     
     newCancel.addEventListener('click', () => {
-      modal.style.display = 'none';
+      app.closeModal(modal);
     });
     
     newOk.addEventListener('click', () => {
-      modal.style.display = 'none';
+      app.closeModal(modal);
       if (typeof callback === 'function') callback.call(app);
     });
     
-    modal.style.display = 'flex';
+    this.openModal(modal);
   },
 
   shiftLogDate: function(offsetDays) {
@@ -2231,7 +2261,7 @@ const app = {
         ageInput.value = data.age_raw || '';
       }
       
-      document.getElementById('edit-client-modal').style.display = 'flex';
+      this.openModal('edit-client-modal');
     } catch(e) {
       console.error(e);
       this.showNotificationModal("Error", "Could not load client details.", true);
@@ -2261,7 +2291,7 @@ const app = {
       });
 
       if (res.ok) {
-        document.getElementById('edit-client-modal').style.display = 'none';
+        this.closeModal('edit-client-modal');
         this.showNotificationModal("Success", "Client details updated successfully.", false);
         yield this.loadClientDetails(id);
       } else {
@@ -2422,7 +2452,7 @@ const app = {
         }
       }
       
-      document.getElementById('edit-visit-modal').style.display = 'flex';
+      this.openModal('edit-visit-modal');
     } catch(e) {
       console.error(e);
       this.showNotificationModal("Error", "Could not load visit details.", true);
@@ -2448,7 +2478,7 @@ const app = {
       });
       if (res.ok) {
         this.showNotificationModal("Success", "Visit details updated successfully.", false);
-        document.getElementById('edit-visit-modal').style.display = 'none';
+        this.closeModal('edit-visit-modal');
         if (this.currentClientId) {
           yield this.loadHistoricalVisits(this.currentClientId);
         }
@@ -2466,7 +2496,7 @@ const app = {
     document.getElementById('add-test-search').value = '';
     const container = document.getElementById('add-tests-container');
     container.innerHTML = 'Loading...';
-    document.getElementById('add-test-modal').style.display = 'flex';
+    this.openModal('add-test-modal');
 
     if (!this.sections || this.sections.length === 0) {
       try {
@@ -2542,7 +2572,7 @@ const app = {
       });
       if (res.ok) {
         this.showNotificationModal("Success", "Tests added to visit successfully.", false);
-        document.getElementById('add-test-modal').style.display = 'none';
+        this.closeModal('add-test-modal');
         if (this.currentClientId) {
            yield this.loadPendingTests(this.currentClientId);
         }
@@ -2887,7 +2917,7 @@ const app = {
           }
         } catch(e) { console.error(e); }
     }
-    document.getElementById('result-entry-modal').style.display = 'flex';
+    this.openModal('result-entry-modal');
     
     // Add keyboard navigation
     const form = document.getElementById('result-entry-form');
@@ -3034,7 +3064,7 @@ const app = {
          }
          
          app.showNotificationModal("Success", "Result saved successfully!", false);
-         document.getElementById('result-entry-modal').style.display = 'none';
+         app.closeModal('result-entry-modal');
          if (app.currentClientId) {
             yield app.loadPendingTests(app.currentClientId);
             yield app.loadHistoricalVisits(app.currentClientId);
@@ -3129,12 +3159,12 @@ const app = {
 
   showNewClientModal: function() {
     document.getElementById('new-client-form').reset();
-    document.getElementById('new-client-modal').style.display = 'flex';
+    this.openModal('new-client-modal');
     document.getElementById('client-name').focus();
   },
 
   closeNewClientModal: function() {
-    document.getElementById('new-client-modal').style.display = 'none';
+    this.closeModal('new-client-modal');
   },
 
   updateAgePlaceholder: function() {
@@ -3226,6 +3256,42 @@ const app = {
     container.innerHTML = `
       <details class="card" style="margin-bottom: 16px;" open>
         <summary class="card-header" style="cursor: pointer; list-style: none;">
+          <span class="card-title">${this.icon('landmark')} Facility Identity & Branding Configuration</span>
+        </summary>
+        <div style="padding: 16px;">
+          <form id="facility-settings-form" onsubmit="app.saveFacilitySettings(event)">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;">
+              <div class="form-group">
+                <label for="fac-name">Facility / Hospital Name *</label>
+                <input type="text" id="fac-name" required placeholder="e.g. Ahmadiyya Muslim Hospital">
+              </div>
+              <div class="form-group">
+                <label for="fac-acronym">Facility Acronym / Lab Number Prefix *</label>
+                <input type="text" id="fac-acronym" required placeholder="e.g. AMH" style="text-transform: uppercase;">
+                <small style="color: var(--text-muted); font-size: 0.75rem;">Used for sequential Lab Numbers and Client IDs (e.g. AMH-26-8-001, AMH-C26-0001)</small>
+              </div>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;">
+              <div class="form-group">
+                <label for="fac-phone">Contact Phone</label>
+                <input type="text" id="fac-phone" placeholder="e.g. +256 700 000 000">
+              </div>
+              <div class="form-group">
+                <label for="fac-email">Contact Email</label>
+                <input type="email" id="fac-email" placeholder="e.g. lab@hospital.org">
+              </div>
+            </div>
+            <div class="form-group" style="margin-bottom: 16px;">
+              <label for="fac-address">Physical / Postal Address</label>
+              <input type="text" id="fac-address" placeholder="e.g. P.O. Box 2309, Mbale, Uganda">
+            </div>
+            <button type="submit" class="btn btn-primary">${this.icon('save')} Save Facility Settings</button>
+          </form>
+        </div>
+      </details>
+
+      <details class="card" style="margin-bottom: 16px;">
+        <summary class="card-header" style="cursor: pointer; list-style: none;">
           <span class="card-title">${this.icon('settings')} Test Catalog & Section Configuration</span>
         </summary>
         <div style="padding: 16px;">
@@ -3250,7 +3316,7 @@ const app = {
 
       <details class="card" style="margin-bottom: 16px;">
         <summary class="card-header" style="cursor: pointer; list-style: none;">
-          <span class="card-title">${this.icon('building')} Wards Configuration</span>
+          <span class="card-title">${this.icon('bed')} Wards Configuration</span>
         </summary>
         <div style="padding: 16px;">
           <button class="btn btn-primary" onclick="app.showAddWardModal()" style="margin-bottom: 12px;">${this.icon('plus')} Add Ward</button>
@@ -3292,10 +3358,69 @@ const app = {
       </details>
       ` : ''}
     `;
+    yield this.loadFacilityConfig();
     yield this.loadConfigData();
     yield this.loadReferenceRangesConfig();
     yield this.loadWardsConfig();
     yield this.loadCliniciansConfig();
+  }),
+
+  loadFacilityConfig: __async(function*() {
+    try {
+      const res = yield fetch('/api/config/facility');
+      if (!res.ok) return;
+      const data = yield res.json();
+      const nameEl = document.getElementById('fac-name');
+      const acrEl = document.getElementById('fac-acronym');
+      const phoneEl = document.getElementById('fac-phone');
+      const emailEl = document.getElementById('fac-email');
+      const addrEl = document.getElementById('fac-address');
+      if (nameEl) nameEl.value = data.facility_name || '';
+      if (acrEl) acrEl.value = data.facility_acronym || '';
+      if (phoneEl) phoneEl.value = data.phone || '';
+      if (emailEl) emailEl.value = data.email || '';
+      if (addrEl) addrEl.value = data.address || '';
+    } catch (e) {
+      console.warn('Facility config load error:', e);
+    }
+  }),
+
+  saveFacilitySettings: __async(function*(e) {
+    if (e) e.preventDefault();
+    const nameEl = document.getElementById('fac-name');
+    const acrEl = document.getElementById('fac-acronym');
+    const phoneEl = document.getElementById('fac-phone');
+    const emailEl = document.getElementById('fac-email');
+    const addrEl = document.getElementById('fac-address');
+    if (!nameEl || !acrEl) return;
+
+    const payload = {
+      facility_name: nameEl.value.trim(),
+      facility_acronym: acrEl.value.trim().toUpperCase(),
+      facility_code: acrEl.value.trim().toUpperCase(),
+      phone: phoneEl ? phoneEl.value.trim() : '',
+      email: emailEl ? emailEl.value.trim() : '',
+      address: addrEl ? addrEl.value.trim() : ''
+    };
+
+    try {
+      const res = yield fetch('/api/config/facility', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (res.ok) {
+        const saved = yield res.json();
+        const facTitleEl = document.getElementById('facility-name');
+        if (facTitleEl) facTitleEl.textContent = saved.facility_name;
+        this.showNotificationModal("Success", `Facility settings saved successfully! Sequential numbers will use prefix '${saved.facility_acronym}'.`, false);
+      } else {
+        const err = yield res.json();
+        this.showNotificationModal("Error", err.detail || "Failed to update facility settings.", true);
+      }
+    } catch (err) {
+      this.showNotificationModal("Error", "Network error updating facility settings.", true);
+    }
   }),
 
 
@@ -3335,7 +3460,7 @@ const app = {
     document.getElementById('ward-modal-id').value = '';
     document.getElementById('ward-modal-active').value = '1';
     document.getElementById('ward-modal-name').value = '';
-    document.getElementById('ward-modal').style.display = 'flex';
+    this.openModal('ward-modal');
     document.getElementById('ward-modal-name').focus();
   }),
 
@@ -3344,7 +3469,7 @@ const app = {
     document.getElementById('ward-modal-id').value = id;
     document.getElementById('ward-modal-active').value = isActive ? '1' : '0';
     document.getElementById('ward-modal-name').value = oldName;
-    document.getElementById('ward-modal').style.display = 'flex';
+    this.openModal('ward-modal');
     document.getElementById('ward-modal-name').focus();
   }),
 
@@ -3370,7 +3495,7 @@ const app = {
         });
       }
       if (res.ok) {
-        document.getElementById('ward-modal').style.display = 'none';
+        this.closeModal('ward-modal');
         this.loadWardsConfig();
       } else {
         const err = yield res.json();
@@ -3429,7 +3554,7 @@ const app = {
   
   showAddClinicianModal: function() {
     document.getElementById('clinician-modal-name').value = '';
-    document.getElementById('clinician-modal').style.display = 'flex';
+    this.openModal('clinician-modal');
   },
 
   submitClinicianModal: __async(function*(event) {
@@ -3442,7 +3567,7 @@ const app = {
         body: JSON.stringify({ name: name, is_active: true })
       });
       if (res.ok) {
-        document.getElementById('clinician-modal').style.display = 'none';
+        this.closeModal('clinician-modal');
         app.loadCliniciansConfig();
       } else {
         const err = yield res.json();
@@ -3531,7 +3656,7 @@ const app = {
     document.getElementById('ref-range-modal-plausible-min').value = '';
     document.getElementById('ref-range-modal-plausible-max').value = '';
     document.getElementById('ref-range-modal-unit').value = '';
-    document.getElementById('reference-range-modal').style.display = 'flex';
+    this.openModal('reference-range-modal');
   },
 
   showEditReferenceRangeModal: function(id) {
@@ -3552,7 +3677,7 @@ const app = {
     document.getElementById('ref-range-modal-plausible-min').value = r.plausible_min !== null ? r.plausible_min : '';
     document.getElementById('ref-range-modal-plausible-max').value = r.plausible_max !== null ? r.plausible_max : '';
     document.getElementById('ref-range-modal-unit').value = r.unit || '';
-    document.getElementById('reference-range-modal').style.display = 'flex';
+    this.openModal('reference-range-modal');
   },
 
   submitReferenceRangeModal: __async(function*(event) {
@@ -3605,7 +3730,7 @@ const app = {
       }
 
       if (res.ok) {
-        document.getElementById('reference-range-modal').style.display = 'none';
+        this.closeModal('reference-range-modal');
         app.loadReferenceRangesConfig();
       } else {
         const err = yield res.json();
@@ -3976,15 +4101,15 @@ const app = {
     okBtn.parentNode.replaceChild(newOk, okBtn);
     
     newCancel.addEventListener('click', () => {
-      modal.style.display = 'none';
+      app.closeModal(modal);
     });
     
     newOk.addEventListener('click', () => {
-      modal.style.display = 'none';
+      app.closeModal(modal);
       callback(input.value);
     });
     
-    modal.style.display = 'flex';
+    this.openModal(modal);
     input.focus();
   },
 
@@ -4117,7 +4242,7 @@ const app = {
     }
     this.handleTestResultTypeChange();
     this.handleTestStockTrackingToggle();
-    modal.style.display = 'flex';
+    this.openModal(modal);
     
     form.onsubmit = __async(function*(e) {
       e.preventDefault();
@@ -4220,7 +4345,7 @@ const app = {
       }
       
       if (res.ok) {
-        document.getElementById('test-config-modal').style.display = 'none';
+        this.closeModal('test-config-modal');
         this.showNotificationModal("Success", `Test ${id ? 'updated' : 'added'} successfully.`);
         yield this.loadConfigData();
       } else {
@@ -4741,7 +4866,7 @@ const app = {
     }
 
     const modal = document.getElementById('receive-stock-modal');
-    if (modal) modal.style.display = 'flex';
+    if (modal) this.openModal(modal);
   }),
 
   submitReceiveStock: __async(function*(e) {
@@ -4768,7 +4893,7 @@ const app = {
       });
 
       if (res.ok) {
-        document.getElementById('receive-stock-modal').style.display = 'none';
+        this.closeModal('receive-stock-modal');
         this.showNotificationModal("Success", `Stock lot received successfully (${initial_quantity} units of ${kit_name}).`);
         yield this.loadInventoryData(this.currentInventoryCategory || 'all');
       } else {
@@ -4787,7 +4912,7 @@ const app = {
     document.getElementById('adjust-stock-delta').value = '1';
     document.getElementById('adjust-stock-reason').value = '';
     this.handleAdjustStockTypeChange();
-    document.getElementById('adjust-stock-modal').style.display = 'flex';
+    this.openModal('adjust-stock-modal');
   },
 
   handleAdjustStockTypeChange: function() {
@@ -4839,7 +4964,7 @@ const app = {
       });
 
       if (res.ok) {
-        document.getElementById('adjust-stock-modal').style.display = 'none';
+        this.closeModal('adjust-stock-modal');
         this.showNotificationModal("Success", "Stock adjusted successfully.");
         yield this.loadInventoryData(this.currentInventoryCategory || 'all');
       } else {
@@ -4893,12 +5018,11 @@ const app = {
     }
 
     this.onExportDatasetChange();
-    modal.style.display = 'flex';
+    this.openModal(modal);
   }),
 
   closeBulkExportModal: function() {
-    const modal = document.getElementById('bulk-export-modal');
-    if (modal) modal.style.display = 'none';
+    this.closeModal('bulk-export-modal');
   },
 
   onExportDatasetChange: function() {
@@ -4952,13 +5076,11 @@ const app = {
     const dryRunCheckbox = document.getElementById('import-dry-run');
     if (dryRunCheckbox) dryRunCheckbox.checked = false;
 
-    const modal = document.getElementById('bulk-import-modal');
-    if (modal) modal.style.display = 'flex';
+    this.openModal('bulk-import-modal');
   },
 
   closeBulkImportModal: function() {
-    const modal = document.getElementById('bulk-import-modal');
-    if (modal) modal.style.display = 'none';
+    this.closeModal('bulk-import-modal');
   },
 
   submitBulkImport: __async(function*(e) {

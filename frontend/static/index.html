@@ -5,16 +5,16 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>M-LIS</title>
   <link rel="icon" type="image/x-icon" href="/assets/branding/favicon.ico">
-  <link rel="stylesheet" href="/static/css/style.css">
+  <link rel="stylesheet" href="/static/css/style.css?v=3">
 </head>
 <body>
   <!-- App Header -->
   <header class="app-header">
     <div class="brand-container">
-      <img id="header-logo" src="/assets/branding/logo.png" alt="Logo" class="brand-logo">
+      <img id="header-logo" src="/assets/branding/logo_white.png" alt="M-LIS Logo" class="brand-logo">
       <div class="brand-titles">
         <h1 id="app-title">M-LIS</h1>
-        <p id="facility-name">Diagnostic Laboratory</p>
+        <p id="facility-name">Ahmadiyya Muslim Hospital</p>
       </div>
     </div>
     <div class="user-nav" id="user-nav">
@@ -215,7 +215,7 @@
   <!-- Toast Notification Container -->
   <div id="toast-container"></div>
 
-  <script src="/static/js/app.js?v=2"></script>
+  <script src="/static/js/app.js?v=3"></script>
 
   
   <!-- Result Entry Modal -->
@@ -275,7 +275,7 @@
         </div>
 
         <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 24px;">
-          <button type="button" class="btn btn-secondary" onclick="document.getElementById('result-entry-modal').style.display='none'">Cancel</button>
+          <button type="button" class="btn btn-secondary" onclick="app.closeModal('result-entry-modal')">Cancel</button>
           <button type="submit" class="btn btn-primary" id="result-entry-submit-btn">Save Result</button>
         </div>
       </form>
@@ -289,7 +289,7 @@
     <div class="modal-content" style="max-width: 400px; text-align: center;">
       <h3 id="notif-title" style="margin-top: 0;"></h3>
       <p id="notif-message" style="margin-bottom: 24px; color: var(--text-color);"></p>
-      <button class="btn btn-primary" onclick="document.getElementById('notification-modal').style.display='none'" style="width: 100%;">OK</button>
+      <button class="btn btn-primary" onclick="app.closeModal('notification-modal')" style="width: 100%;">OK</button>
     </div>
   </div>
 
@@ -320,7 +320,7 @@
         Loading...
       </div>
       <div style="display: flex; justify-content: flex-end; gap: 12px;">
-        <button class="btn btn-secondary" onclick="document.getElementById('add-test-modal').style.display='none'">Cancel</button>
+        <button class="btn btn-secondary" onclick="app.closeModal('add-test-modal')">Cancel</button>
         <button class="btn btn-primary" onclick="app.submitAddTests()">Add Selected</button>
       </div>
     </div>
@@ -387,7 +387,7 @@
           <input type="text" id="test-config-consumable-name" placeholder="e.g. Malaria Rapid Diagnostic Test (RDT)" style="width: 100%; padding: 8px;">
         </div>
         <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 24px;">
-          <button type="button" class="btn btn-secondary" onclick="document.getElementById('test-config-modal').style.display='none'">Cancel</button>
+          <button type="button" class="btn btn-secondary" onclick="app.closeModal('test-config-modal')">Cancel</button>
           <button type="submit" class="btn btn-primary">Save Config</button>
         </div>
       </form>
@@ -436,7 +436,7 @@
           </div>
         </div>
         <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 24px;">
-          <button type="button" class="btn btn-secondary" onclick="document.getElementById('receive-stock-modal').style.display='none'">Cancel</button>
+          <button type="button" class="btn btn-secondary" onclick="app.closeModal('receive-stock-modal')">Cancel</button>
           <button type="submit" class="btn btn-primary">Receive Stock</button>
         </div>
       </form>
@@ -469,7 +469,7 @@
           <textarea id="adjust-stock-reason" required rows="3" placeholder="Required explanation for adjustment or QC wastage..." style="width: 100%; padding: 8px; box-sizing: border-box;"></textarea>
         </div>
         <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 24px;">
-          <button type="button" class="btn btn-secondary" onclick="document.getElementById('adjust-stock-modal').style.display='none'">Cancel</button>
+          <button type="button" class="btn btn-secondary" onclick="app.closeModal('adjust-stock-modal')">Cancel</button>
           <button type="submit" class="btn btn-primary">Apply Adjustment</button>
         </div>
       </form>
@@ -488,7 +488,7 @@
           <input type="text" id="ward-modal-name" required placeholder="e.g. Medical Ward" style="width: 100%; padding: 8px;">
         </div>
         <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 24px;">
-          <button type="button" class="btn btn-secondary" onclick="document.getElementById('ward-modal').style.display='none'">Cancel</button>
+          <button type="button" class="btn btn-secondary" onclick="app.closeModal('ward-modal')">Cancel</button>
           <button type="submit" class="btn btn-primary">Save Ward</button>
         </div>
       </form>
@@ -505,7 +505,7 @@
           <input type="text" id="clinician-modal-name" required placeholder="e.g. Dr. Smith" style="width: 100%; padding: 8px;">
         </div>
         <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 24px;">
-          <button type="button" class="btn btn-secondary" onclick="document.getElementById('clinician-modal').style.display='none'">Cancel</button>
+          <button type="button" class="btn btn-secondary" onclick="app.closeModal('clinician-modal')">Cancel</button>
           <button type="submit" class="btn btn-primary">Save Clinician</button>
         </div>
       </form>
@@ -585,7 +585,7 @@
           <input type="text" id="ref-range-modal-unit" placeholder="e.g. g/dL" style="width: 100%; padding: 8px;">
         </div>
         <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 20px;">
-          <button type="button" class="btn btn-secondary" onclick="document.getElementById('reference-range-modal').style.display='none'">Cancel</button>
+          <button type="button" class="btn btn-secondary" onclick="app.closeModal('reference-range-modal')">Cancel</button>
           <button type="submit" class="btn btn-primary">Save Rule</button>
         </div>
       </form>
@@ -630,7 +630,7 @@
         </div>
 
         <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 24px; padding-top: 12px; border-top: 1px solid #f1f5f9;">
-          <button type="button" class="btn btn-secondary" onclick="document.getElementById('edit-visit-modal').style.display='none'">Cancel</button>
+          <button type="button" class="btn btn-secondary" onclick="app.closeModal('edit-visit-modal')">Cancel</button>
           <button type="submit" class="btn btn-primary" style="padding: 8px 24px;">Save Changes</button>
         </div>
       </form>
@@ -673,7 +673,7 @@
           <input type="text" id="edit-client-phone" style="width: 100%; padding: 8px; box-sizing: border-box;">
         </div>
         <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 20px;">
-          <button type="button" class="btn btn-secondary" onclick="document.getElementById('edit-client-modal').style.display='none'">Cancel</button>
+          <button type="button" class="btn btn-secondary" onclick="app.closeModal('edit-client-modal')">Cancel</button>
           <button type="submit" class="btn btn-primary">Save Client Details</button>
         </div>
       </form>
@@ -706,7 +706,7 @@
   </div>
 
   <!-- Bulk Export Modal -->
-  <div id="bulk-export-modal" class="modal-overlay" style="display: none; z-index: 10000;">
+  <div id="bulk-export-modal" class="modal-overlay" style="display: none;">
     <div class="modal-content" style="max-width: 520px; width: 92vw;">
       <h3 style="margin-top: 0; color: var(--primary-color);">Bulk Data Export</h3>
       <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: -8px; margin-bottom: 16px;">Select dataset and filters for offline streaming export.</p>
@@ -760,7 +760,7 @@
   </div>
 
   <!-- Bulk Import Modal -->
-  <div id="bulk-import-modal" class="modal-overlay" style="display: none; z-index: 10000;">
+  <div id="bulk-import-modal" class="modal-overlay" style="display: none;">
     <div class="modal-content" style="max-width: 520px; width: 92vw;">
       <h3 style="margin-top: 0; color: var(--primary-color);">Bulk Data Import</h3>
       <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: -8px; margin-bottom: 16px;">Upload previously exported CSV or JSON dataset to restore or bulk insert data.</p>
