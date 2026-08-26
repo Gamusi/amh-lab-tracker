@@ -1,11 +1,10 @@
 import datetime, sqlite3, logging
 from pydantic import BaseModel
-from typing import Optional, List
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from typing import Optional
+from fastapi import APIRouter, Depends, HTTPException
 from ..database import get_db
 from ..auth import get_current_user, require_admin
-from ..schemas import VisitCreate, TestResultCreate, ParameterResultItem, AddOrdersRequest, ClientUpdate, BulkOrderDeleteRequest, BulkVisitDeleteRequest
-from ..evaluator import evaluate_result
+from ..schemas import VisitCreate, TestResultCreate, AddOrdersRequest, ClientUpdate, BulkOrderDeleteRequest, BulkVisitDeleteRequest
 from ..biochem_validator import validate_biochem_parameter, validate_panel_consistency
 from .stock import deplete_kit_stock
 
@@ -650,7 +649,6 @@ def enter_result(req: TestResultCreate, conn: sqlite3.Connection = Depends(get_d
 @router.put("/api/results/{result_id}")
 def edit_result(result_id: int, req: dict, conn: sqlite3.Connection = Depends(get_db), current_user: dict = Depends(get_current_user)):
     """Edit an existing test result. Admin/superadmin only. Requires a reason."""
-    import json as _json
     if current_user["role"] not in ["admin", "superadmin"]:
         raise HTTPException(status_code=403, detail="Only admins can edit saved results")
     

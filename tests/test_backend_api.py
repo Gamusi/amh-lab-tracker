@@ -1127,6 +1127,15 @@ def test_hiv_conclusive_algorithm_derivations():
     assert out8["clinical_flag"] == "\u26A0"
 
 
+def test_health_check_endpoint():
+    res = client.get("/api/health")
+    assert res.status_code == 200
+    data = res.json()
+    assert data["status"] == "ok"
+    assert data["app"] == "AMH Lab Tracker"
+
+
+
 
 
 

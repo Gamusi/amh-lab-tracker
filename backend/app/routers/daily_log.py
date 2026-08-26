@@ -1,5 +1,4 @@
 import datetime, sqlite3
-from pydantic import BaseModel
 from fastapi import APIRouter, Depends, HTTPException, Query
 from ..database import get_db
 from ..schemas import DailyLogSaveRequest

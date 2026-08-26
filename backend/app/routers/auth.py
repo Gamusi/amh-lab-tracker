@@ -1,10 +1,10 @@
 import datetime, sqlite3, logging
 from pydantic import BaseModel
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Response
 from ..database import get_db
 from typing import Optional
 from ..schemas import LoginRequest, UserCreate, UserRegister, UserUpdate, ChangePasswordRequest
-from ..auth import verify_password, hash_password, create_session, get_current_user, require_admin, require_superadmin
+from ..auth import verify_password, hash_password, create_session, get_current_user, require_admin
 from ..models import User
 
 logger = logging.getLogger("amh_auth")

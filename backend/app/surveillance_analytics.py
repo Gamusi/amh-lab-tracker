@@ -1,6 +1,6 @@
 import sqlite3
 import datetime
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any
 from .operations_analytics import calculate_date_range, format_reporting_period
 
 def is_order_surveillance_incident(test_name: str, results: list) -> bool:

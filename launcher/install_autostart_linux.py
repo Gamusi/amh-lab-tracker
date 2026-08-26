@@ -1,4 +1,4 @@
-import os, sys
+import os
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DESKTOP_APP = os.path.join(BASE_DIR, "launcher", "desktop_app.py")

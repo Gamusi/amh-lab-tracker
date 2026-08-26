@@ -1,4 +1,3 @@
-import sqlite3
 from typing import Optional, Dict, Any, Tuple, List
 from .evaluator import ALIAS_MAP, is_qualitative_abnormal
 

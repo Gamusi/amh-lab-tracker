@@ -1,14 +1,10 @@
 import sqlite3
 import datetime
-from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, Query
+from typing import Optional
+from fastapi import APIRouter, Depends, HTTPException
 from ..database import get_db
-from ..schemas import (
-    StockReceiveRequest, StockAdjustRequest, StockLotResponse,
-    StockSummaryResponse, StockTransactionResponse, StockAlertResponse,
-    StockReconciliationItem
-)
-from ..auth import get_current_user, require_admin
+from ..schemas import StockReceiveRequest, StockAdjustRequest
+from ..auth import get_current_user
 
 router = APIRouter(prefix="/api/stock", tags=["Inventory & Diagnostic Kits"])
 

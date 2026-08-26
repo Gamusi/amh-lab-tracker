@@ -1,4 +1,3 @@
-import os
 import io
 import datetime
 from reportlab.lib.pagesizes import A4

@@ -7,7 +7,6 @@ from ..schemas import (
     ClinicianCreate, ClinicianUpdate, ClinicianResponse,
     ReferenceRangeCreate, ReferenceRangeUpdate, ReferenceRangeResponse
 )
-from ..models import User
 from ..auth import get_current_user, require_admin
 
 router = APIRouter(prefix="/api/config", tags=["Configuration"])

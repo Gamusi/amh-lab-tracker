@@ -1,6 +1,6 @@
 import sqlite3
 import datetime
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any
 
 def calculate_date_range(period_type: str, ref_date: datetime.date):
     if period_type == "Day":

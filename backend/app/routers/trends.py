@@ -1,4 +1,4 @@
-import datetime, sqlite3
+import sqlite3
 from fastapi import APIRouter, Depends, Query
 from ..database import get_db
 from ..auth import get_current_user
