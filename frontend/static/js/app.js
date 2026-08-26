@@ -1978,16 +1978,28 @@ const app = {
     });
   },
   createVisit: __async(function*(pid) {
-    const ward = document.getElementById('visit-ward').value;
-    const clinician = document.getElementById('visit-clinician').value;
+    const ward = document.getElementById('visit-ward') ? document.getElementById('visit-ward').value.trim() : '';
+    const clinician = document.getElementById('visit-clinician') ? document.getElementById('visit-clinician').value : '';
     const specimenEl = document.getElementById('visit-specimen');
     const specimenId = (specimenEl && specimenEl.value) ? parseInt(specimenEl.value, 10) : null;
     const orderCat = document.getElementById('visit-order-category') ? document.getElementById('visit-order-category').value : 'in-house';
     const checkboxes = document.querySelectorAll('input[name="visit-test-cb"]:checked');
     const selectedTests = Array.from(checkboxes).map(cb => parseInt(cb.value, 10));
     
+    if (!ward) {
+      this.showNotificationModal("Validation Error", 'Ward of origin is required.', true);
+      return;
+    }
+    if (!clinician) {
+      this.showNotificationModal("Validation Error", 'Requesting clinician is required.', true);
+      return;
+    }
+    if (!specimenId) {
+      this.showNotificationModal("Validation Error", 'Specimen is required.', true);
+      return;
+    }
     if (selectedTests.length === 0) {
-      this.showNotificationModal("Error", 'Select at least one test.', true);
+      this.showNotificationModal("Validation Error", 'Select at least one test.', true);
       return;
     }
     
@@ -1995,11 +2007,11 @@ const app = {
       const payload = {
         client_id: pid,
         ward_of_origin: ward,
+        clinician_id: parseInt(clinician, 10),
+        specimen_type_id: specimenId,
         test_ids: selectedTests,
         order_category: orderCat
       };
-      if (clinician) payload.clinician_id = parseInt(clinician, 10);
-      if (specimenId) payload.specimen_type_id = specimenId;
       
       const res = yield fetch('/api/visits', {
         method: 'POST',
@@ -2017,7 +2029,8 @@ const app = {
         yield this.loadPendingTests(pid);
         yield this.loadHistoricalVisits(pid);
       } else {
-        this.showNotificationModal("Error", 'Failed to create visit.', true);
+        const err = yield res.json();
+        this.showNotificationModal("Error", (err && err.detail) ? err.detail : 'Failed to create visit.', true);
       }
     } catch(e) {
       this.showNotificationModal("Error", 'Error creating visit.', true);

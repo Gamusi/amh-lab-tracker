@@ -196,19 +196,29 @@ def create_visit(req: VisitCreate, conn: sqlite3.Connection = Depends(get_db), c
     if not cur.fetchone():
         logger.warning(f"Visit creation failed: client ID {req.client_id} not found")
         raise HTTPException(status_code=404, detail="Client not found")
-        
-    if req.clinician_id:
-        cur.execute("SELECT id FROM clinicians WHERE id = ?", (req.clinician_id,))
-        if not cur.fetchone():
-            logger.warning(f"Visit creation failed: clinician ID {req.clinician_id} not found")
-            raise HTTPException(status_code=400, detail="Clinician not found")
 
-    if req.specimen_type_id:
-        cur.execute("SELECT id FROM specimen_types WHERE id = ?", (req.specimen_type_id,))
-        if not cur.fetchone():
-            logger.warning(f"Visit creation failed: specimen_type_id {req.specimen_type_id} not found")
-            raise HTTPException(status_code=400, detail="Specimen type not found")
-            
+    if not req.ward_of_origin or not req.ward_of_origin.strip():
+        logger.warning("Visit creation failed: ward_of_origin is required")
+        raise HTTPException(status_code=400, detail="Ward of origin is required")
+        
+    if not req.clinician_id:
+        logger.warning("Visit creation failed: clinician_id is required")
+        raise HTTPException(status_code=400, detail="Requesting clinician is required")
+
+    cur.execute("SELECT id FROM clinicians WHERE id = ?", (req.clinician_id,))
+    if not cur.fetchone():
+        logger.warning(f"Visit creation failed: clinician ID {req.clinician_id} not found")
+        raise HTTPException(status_code=400, detail="Clinician not found")
+
+    if not req.specimen_type_id:
+        logger.warning("Visit creation failed: specimen_type_id is required")
+        raise HTTPException(status_code=400, detail="Specimen is required")
+
+    cur.execute("SELECT id FROM specimen_types WHERE id = ?", (req.specimen_type_id,))
+    if not cur.fetchone():
+        logger.warning(f"Visit creation failed: specimen_type_id {req.specimen_type_id} not found")
+        raise HTTPException(status_code=400, detail="Specimen type not found")
+        
     if not req.test_ids:
         raise HTTPException(status_code=400, detail="At least one test ID must be provided")
         
@@ -221,7 +231,7 @@ def create_visit(req: VisitCreate, conn: sqlite3.Connection = Depends(get_db), c
     cur.execute("""
         INSERT INTO visits (client_id, clinician_id, ward_of_origin, specimen_type_id)
         VALUES (?, ?, ?, ?)
-    """, (req.client_id, req.clinician_id, req.ward_of_origin, req.specimen_type_id))
+    """, (req.client_id, req.clinician_id, req.ward_of_origin.strip(), req.specimen_type_id))
     visit_id = cur.lastrowid
     
     for tid in req.test_ids:

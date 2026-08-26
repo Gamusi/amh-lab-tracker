@@ -45,6 +45,7 @@ def test_build_metadata_table_compliance():
         "sex": "F",
         "requested_by": "Dr. Sarah",
         "ward_of_origin": "Maternity",
+        "specimen": "Whole Blood (EDTA)",
         "ordered_date": "18/08/2026"
     }
     table = _build_metadata_table(order_data)
@@ -63,6 +64,8 @@ def test_build_metadata_table_compliance():
     assert table._cellvalues[2][3] == "18/08/2026"
     assert table._cellvalues[3][0] == "Ward / OPD:"
     assert table._cellvalues[3][1] == "Maternity"
+    assert table._cellvalues[3][2] == "Specimen:"
+    assert table._cellvalues[3][3] == "Whole Blood (EDTA)"
 
 def test_build_signatures_table():
     order_data = {

@@ -18,6 +18,10 @@ def mock_db():
     cur = conn.cursor()
     cur.execute("INSERT OR IGNORE INTO clinicians (name) VALUES ('SELF REQUEST')")
     
+    # Pre-seed a specimen type
+    cur.execute("INSERT INTO specimen_types (name, is_active) VALUES ('Whole Blood (EDTA)', 1)")
+    specimen_id = cur.lastrowid
+
     # Pre-seed a test section and test
     cur.execute("INSERT INTO sections (name, sort_order) VALUES ('Hematology', 1)")
     sec_id = cur.lastrowid
@@ -43,6 +47,7 @@ def mock_db():
     yield {
         "conn": conn,
         "section_id": sec_id,
+        "specimen_id": specimen_id,
         "cbc_id": cbc_id,
         "mps_id": mps_id,
         "wbc_param_id": wbc_param_id,
@@ -80,6 +85,7 @@ def test_create_visit_success(mock_db):
         "client_id": client_id,
         "clinician_id": clinician_id,
         "ward_of_origin": "Maternity",
+        "specimen_type_id": mock_db["specimen_id"],
         "test_ids": [mock_db["cbc_id"], mock_db["mps_id"]],
         "sample_id": "SAMP-101"
     }
@@ -97,6 +103,7 @@ def test_create_visit_success(mock_db):
     assert v_row["client_id"] == client_id
     assert v_row["clinician_id"] == clinician_id
     assert v_row["ward_of_origin"] == "Maternity"
+    assert v_row["specimen_type_id"] == mock_db["specimen_id"]
     assert v_row["lab_number"] is None  # Initialized as NULL before result entry
     
     cur.execute("SELECT * FROM test_orders WHERE visit_id = ?", (visit_id,))
@@ -106,30 +113,72 @@ def test_create_visit_success(mock_db):
     for o in orders:
         assert o["status"] == "pending"
         assert o["ordered_by_user_id"] == 1
+        assert o["specimen_type_id"] == mock_db["specimen_id"]
 
 def test_create_visit_validations(mock_db):
-    # Non-existent client
-    res = client.post("/api/visits", json={"client_id": 9999, "test_ids": [mock_db["cbc_id"]]})
-    assert res.status_code == 404
-    assert "Client not found" in res.json()["detail"]
-    
-    # Valid client, invalid clinician
     conn = mock_db["conn"]
     cur = conn.cursor()
     cur.execute("INSERT INTO clients (client_number, full_name, sex) VALUES ('AMH-002', 'Ben Mukasa', 'Male')")
     cid = cur.lastrowid
+    cur.execute("INSERT INTO clinicians (name) VALUES ('Dr. Nabeta')")
+    clinician_id = cur.lastrowid
     conn.commit()
+
+    # Non-existent client
+    res = client.post("/api/visits", json={
+        "client_id": 9999,
+        "clinician_id": clinician_id,
+        "ward_of_origin": "OPD",
+        "specimen_type_id": mock_db["specimen_id"],
+        "test_ids": [mock_db["cbc_id"]]
+    })
+    assert res.status_code == 404
+    assert "Client not found" in res.json()["detail"]
     
-    res = client.post("/api/visits", json={"client_id": cid, "clinician_id": 9999, "test_ids": [mock_db["cbc_id"]]})
+    # Missing required fields (e.g. ward_of_origin, clinician_id, specimen_type_id)
+    res_missing = client.post("/api/visits", json={"client_id": cid, "test_ids": [mock_db["cbc_id"]]})
+    assert res_missing.status_code == 422  # Pydantic validation error for missing required fields
+    
+    # Valid client, invalid clinician
+    res = client.post("/api/visits", json={
+        "client_id": cid,
+        "clinician_id": 9999,
+        "ward_of_origin": "OPD",
+        "specimen_type_id": mock_db["specimen_id"],
+        "test_ids": [mock_db["cbc_id"]]
+    })
     assert res.status_code == 400
     assert "Clinician not found" in res.json()["detail"]
+
+    # Valid client, invalid specimen
+    res = client.post("/api/visits", json={
+        "client_id": cid,
+        "clinician_id": clinician_id,
+        "ward_of_origin": "OPD",
+        "specimen_type_id": 9999,
+        "test_ids": [mock_db["cbc_id"]]
+    })
+    assert res.status_code == 400
+    assert "Specimen type not found" in res.json()["detail"]
     
     # Empty test_ids
-    res = client.post("/api/visits", json={"client_id": cid, "test_ids": []})
+    res = client.post("/api/visits", json={
+        "client_id": cid,
+        "clinician_id": clinician_id,
+        "ward_of_origin": "OPD",
+        "specimen_type_id": mock_db["specimen_id"],
+        "test_ids": []
+    })
     assert res.status_code == 400
     
     # Invalid test_id
-    res = client.post("/api/visits", json={"client_id": cid, "test_ids": [9999]})
+    res = client.post("/api/visits", json={
+        "client_id": cid,
+        "clinician_id": clinician_id,
+        "ward_of_origin": "OPD",
+        "specimen_type_id": mock_db["specimen_id"],
+        "test_ids": [9999]
+    })
     assert res.status_code == 404
 
 def test_enter_result_sets_verification_and_sequential_lab_number(mock_db):

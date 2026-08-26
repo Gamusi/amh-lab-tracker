@@ -324,6 +324,8 @@ def get_visit_report_pdf(visit_id: int, db: sqlite3.Connection = Depends(get_db)
             v.ward_of_origin,
             v.lab_number,
             v.created_at AS visit_created_at,
+            v.specimen_type_id,
+            st.name AS specimen_name,
             c.id AS client_id,
             c.client_number,
             c.full_name,
@@ -336,6 +338,7 @@ def get_visit_report_pdf(visit_id: int, db: sqlite3.Connection = Depends(get_db)
         FROM visits v
         JOIN clients c ON v.client_id = c.id
         LEFT JOIN clinicians cl ON v.clinician_id = cl.id
+        LEFT JOIN specimen_types st ON v.specimen_type_id = st.id
         WHERE v.id = ?
     """, (visit_id,))
     visit_row = cur.fetchone()
@@ -590,6 +593,7 @@ def get_visit_report_pdf(visit_id: int, db: sqlite3.Connection = Depends(get_db)
         "sex": sex,
         "lab_number": visit_row["lab_number"] or "",
         "ward_of_origin": visit_row["ward_of_origin"] or "",
+        "specimen": visit_row["specimen_name"] or "",
         "requested_by": clinician_name,
         "ordered_by": clinician_name,
         "ordered_date": ordered_date or (visit_row["visit_created_at"][:10] if visit_row["visit_created_at"] else ""),

@@ -62,12 +62,13 @@ def _build_metadata_table(order_data: dict) -> Table:
     requested_by = order_data.get("requested_by") or order_data.get("ordered_by", "")
     date_val = order_data.get("ordered_date") or order_data.get("date", "")
     ward = order_data.get("ward_of_origin", "")
+    specimen = order_data.get("specimen", "")
     
     data = [
         ["Patient Name:", str(order_data.get("full_name") or ""), "Lab No:", str(lab_no)],
         ["Age:", str(order_data.get("age") or ""), "Sex:", str(order_data.get("sex") or "")],
         ["Requested by:", str(requested_by), "Date:", str(date_val)],
-        ["Ward / OPD:", str(ward), "", ""]
+        ["Ward / OPD:", str(ward), "Specimen:", str(specimen)]
     ]
     
     t = Table(data, colWidths=[90, 150, 80, 160])
@@ -413,11 +414,12 @@ def _build_cbc_patient_header(order_data: dict) -> Table:
         sex = "F"
     lab_no = str(order_data.get("lab_number") or "")
     ward = str(order_data.get("ward_of_origin") or "OPD")
+    specimen = str(order_data.get("specimen") or "Blood")
     
     data = [
         ["Client No :", client_no, "Name :", name, "Lab No :", lab_no],
         ["Dated     :", date_val, "Age  :", age, "Ward/OPD :", ward],
-        ["Ref. By   :", ref_by, "Sex  :", sex, "Specimen :", "Blood"]
+        ["Ref. By   :", ref_by, "Sex  :", sex, "Specimen :", specimen]
     ]
     
     t = Table(data, colWidths=[70, 95, 45, 135, 70, 65])

@@ -162,11 +162,11 @@ class SpecimenTypeResponse(SpecimenTypeBase):
 
 class VisitCreate(BaseModel):
     client_id: int
-    clinician_id: Optional[int] = None
-    ward_of_origin: Optional[str] = None
+    clinician_id: int
+    ward_of_origin: str
+    specimen_type_id: int
     test_ids: List[int]
     sample_id: Optional[str] = None
-    specimen_type_id: Optional[int] = None
     order_category: Optional[str] = 'in-house' 
 
 class VisitResponse(BaseModel):
