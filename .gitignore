@@ -23,4 +23,6 @@ docs/superpowers/
 .superpowers/
 .pytest_cache/
 superpowers/
+dist/
+*.zip
 

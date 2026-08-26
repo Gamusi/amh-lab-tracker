@@ -7,7 +7,7 @@ def install_autostart_windows():
     startup_dir = os.path.expandvars(r"%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup")
     os.makedirs(startup_dir, exist_ok=True)
 
-    lnk_path = os.path.join(startup_dir, "AMH Lab Tracker.lnk")
+    lnk_path = os.path.join(startup_dir, "M-LIS.lnk")
     base_win = BASE_DIR.replace("/", "\\")
     app_path = DESKTOP_APP.replace("/", "\\")
 

@@ -573,7 +573,8 @@ const app = {
     }
   },
 
-  showNotificationModal: function(title, message, isError = false) {
+  showNotificationModal: function(title, message, isError) {
+    if (typeof isError === 'undefined') isError = false;
     const modal = document.getElementById('notification-modal');
     if (!modal) return;
     document.getElementById('notif-title').textContent = title;
@@ -2800,7 +2801,8 @@ const app = {
   }),
 
 
-  toggleAnalyzerPaste: function(show = null) {
+  toggleAnalyzerPaste: function(show) {
+    if (typeof show === 'undefined') show = null;
     const container = document.getElementById('analyzer-paste-container');
     if (!container) return;
     if (show === null) {

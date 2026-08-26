@@ -52,16 +52,20 @@ Categories=Medical;Healthcare;
         desktop_dir = get_windows_desktop_dir()
         os.makedirs(desktop_dir, exist_ok=True)
         lnk_shortcut = os.path.join(desktop_dir, "M-LIS.lnk")
-        
+        lnk_esc = lnk_shortcut.replace('\\', '\\\\')
+        run_bat_esc = run_bat.replace('\\', '\\\\')
+        base_dir_esc = BASE_DIR.replace('\\', '\\\\')
+        icon_ico_esc = icon_ico.replace('\\', '\\\\')
+
         # Build VBScript to create genuine Windows .lnk shortcut with icon
         vbs_script = f"""
 Set WshShell = WScript.CreateObject("WScript.Shell")
-Set Shortcut = WshShell.CreateShortcut("{lnk_shortcut.replace('\\', '\\\\')}")
-Shortcut.TargetPath = "{run_bat.replace('\\', '\\\\')}"
-Shortcut.WorkingDirectory = "{BASE_DIR.replace('\\', '\\\\')}"
+Set Shortcut = WshShell.CreateShortcut("{lnk_esc}")
+Shortcut.TargetPath = "{run_bat_esc}"
+Shortcut.WorkingDirectory = "{base_dir_esc}"
 Shortcut.WindowStyle = 1
 Shortcut.Description = "M-LIS - Laboratory Information System"
-Shortcut.IconLocation = "{icon_ico.replace('\\', '\\\\')},0"
+Shortcut.IconLocation = "{icon_ico_esc},0"
 Shortcut.Save
 """
         with tempfile.NamedTemporaryFile("w", suffix=".vbs", delete=False) as tf:

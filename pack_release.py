@@ -63,6 +63,7 @@ def pack():
         "requirements.txt",
         "setup.bat",
         "run.bat",
+        "run.sh",
         "install.py",
         "INSTRUCTIONS.txt"
     ]
