@@ -48,17 +48,17 @@ This is the technician's primary workbench. A test cannot be run or printed with
 *   **Department Dropdown**: Groups tests by sections (e.g., Parasitology, Hematology).
 *   **Test Selection**: Selecting a test and clicking `[Add]` generates the required backend rows and mounts the input fields.
 
-#### 3.2 High-Throughput Keyboard Data Entry
+#### 3.2 High-Throughput Keyboard Data Entry & Analyzer Portal
 To facilitate rapid batch-entry, fields are optimized for mouse-free transcription:
 *   **Vertical Tab Navigation**: Pressing `Tab` or `Enter` moves the browser focus vertically down to the next parameter.
-*   **Data Sanitization**: Inputs are bound to a strict numeric filter. Alphabetical keys trigger a subtle **red border glow** without disruptive pop-ups.
-*   **Automated Analyzer Clipboard Portal**: For tests run on automated equipment (e.g., Hematology Analyzers), a generic text area allows technicians to paste raw data strings (SQL/HL7). A backend RegEx engine instantly extracts values (WBC, RBC, etc.) and auto-populates the fields, avoiding manual transcription fatigue and preventing vendor lock-in.
+*   **Data Sanitization**: Inputs are bound to strict numeric filters with biochemical validator ranges. Alphabetical keys on numeric fields trigger a subtle red border indicator without disruptive pop-ups.
+*   **Automated Analyzer Clipboard Portal (Nihon Kohden MEK-6500K)**: For automated CBC panels, technicians click `[Import Analyzer Data]` and paste the raw text dump. A dedicated backend RegEx engine (`backend/app/parsers/nihon_kohden.py`) instantly extracts all 18 parameters (WBC, RBC, HGB, HCT, MCV, MCH, MCHC, PLT, differentials) and auto-populates the input fields.
 
 #### 3.3 Non-Blocking Clinical Alerts
-As values are entered, the backend calculates clean, color-coded indicators inside the table without using disruptive blocking modals:
-*   `[!] High` (Orange): Exceeds upper limits.
-*   `[!] Low` (Blue): Falls below lower limits.
-*   `[!!] Critical` (Red icon): Falls into extreme, life-threatening limits.
+As values are entered, the system dynamically renders high-contrast indicators directly within the results view:
+*   `[!] High` (Orange): Exceeds upper reference limits.
+*   `[!] Low` (Blue): Falls below lower reference limits.
+*   `[!!] Critical` (Red icon): Falls into life-threatening threshold bounds.
 
 ---
 
@@ -67,45 +67,46 @@ As values are entered, the backend calculates clean, color-coded indicators insi
 To comply with ISO 15189 (verification prior to release), entering a result does not authorize it for printing.
 
 #### 4.1 Granular Verification Rights
-*   Administrators can selectively assign a boolean flag `has_verification_rights` to specific trusted staff members. Only users with this permission can access the Verification queue.
+*   Administrators can selectively assign the `has_verification_rights` permission to trusted clinical staff. Only authorized users can access the Verification queue.
 
-#### 4.2 Interactive Verification
-*   **Audit Diff Insight**: The Verification Panel dynamically renders the audit log history for that specific test run, displaying a warning if a value was edited after its initial entry.
-*   **Click-to-Sign**: Clicking `[Approve and Sign Report]` writes the verifier’s unique ID into the database.
-*   **Unlocking the PDF**: The Official Report cannot be printed or generated until this digital signature is complete.
-
----
-
-### 5. Role-Based Editing and Correction Workflows
-
-#### 5.1 The "Trusted Technician" Model
-The system uses a granular boolean flag: `can_edit_results`.
-*   **Standard Staff**: Once results are submitted, fields become read-only. Modifications require an administrator or trusted technician.
-*   **Trusted Staff**: Users granted the `can_edit_results` flag can click `[Edit Results]` to unlock fields and correct typos in real-time.
-*   **Audit Trail**: Every modification is caught by the backend and logged in the immutable `audit_log` table (recording user ID, timestamp, old value, and new value).
+#### 4.2 Interactive Verification & Digital Signature
+*   **Audit Diff Insight**: The Verification Panel dynamically renders the audit log history for that specific test run, highlighting if a value was modified after initial entry.
+*   **Click-to-Sign**: Clicking `[Approve and Sign Report]` writes the verifier’s unique user ID and timestamp to the record.
+*   **Unlocking the PDF**: The official vector PDF cannot be generated or printed until digital verification is complete.
 
 ---
 
-### 6. Screen 4: Test Menu Configuration (Admin)
+### 5. Screen 4: Test Menu Configuration (Admin)
 
-Administrators have access to a full Test Configuration Panel to adapt to changing clinical offerings.
-*   **Full CRUD**: Create, read, and update test definitions and parameters.
+Administrators have access to a full Test Configuration Panel to adapt to changing clinical offerings:
+*   **Full CRUD**: Create, read, and update test definitions, units of measurement, reference ranges, and critical limits.
 *   **Soft-Deletion**: If a test is disabled, it is marked as `is_active = 0`. It disappears from the ordering list but remains permanently in the database to preserve historical relationships.
-*   **Incidence Tracking**: Tests can be flagged to track positives (e.g., Malaria, HIV). Positive results are automatically appended to the Monthly Epidemic Report.
+*   **Incidence Tracking**: Tests can be flagged to track positivity rates (e.g., Malaria RDT, HIV 1/2). Positives automatically increment HMIS 105 Section 6 surveillance totals.
 
 ---
 
-### 7. Screen 5: Reports & Epidemic Tracking
+### 6. Screen 5: Reagents & Consumables Inventory Management
 
-Generates administrative reports and public health summaries.
-*   **Filtering**: Supports custom date ranges and standard presets (Daily, Monthly, Ugandan Financial Year).
-*   **Export Options**: Reports can be exported as raw CSVs for MoH compliance or as text-selectable Vector PDFs (ReportLab intended final state).
+Technicians and administrators monitor stock levels, expiration dates, and consumption:
+*   **Kits Summary Table**: Real-time view of available units, minimum buffer thresholds, and active batch lots.
+*   **FIFO Lot Registry**: First-In, First-Out lot tracking displaying Lot Number, Expiry Date, Remaining Units, and status badges (`In Stock`, `Low Stock`, `Near Expiry`, `Expired`, `Depleted`).
+*   **Receive Stock Modal**: One-click modal to register newly received kits, specify lot numbers, and set expiry dates.
+*   **Wastage & QC Consumption**: Dedicated logging interface to record damaged kits, expired lot write-offs, and quality control usage with mandatory reason notes.
 
 ---
 
-### 8. Automated Database Backup & Restoration *(Intended State)*
+### 7. Screen 6: Reports & Epidemic Tracking
 
-To safeguard clinical data without relying on manual intervention, the system will implement an automated background service:
-1.  **6-Hour Daemon**: A lightweight scheduler will automatically copy the database to a user-configured local folder every 6 hours of continuous runtime.
-2.  **Safety Checks**: Backups will only execute if `PRAGMA integrity_check` passes.
-3.  **UI-Based Restoration**: Administrators will be able to restore corrupted databases directly from the UI. The backend will verify the backup schema before safely overwriting the active file.
+Generates administrative reports, surveillance aggregations, and official client softcopies:
+*   **Multi-Period Filtering**: Supports custom date ranges and standard presets (Daily, Weekly, Monthly, Ugandan Financial Year).
+*   **Uganda HMIS 105 Section 6 Surveillance**: Automated roll-up of positive/negative diagnostic counts for public health reporting.
+*   **Export Options**:
+    *   **Raw CSV Export**: Client demographic and ledger exports for offline spreadsheet analysis.
+    *   **ISO 15189 Vector PDF**: Text-selectable, official diagnostic report slips generated via ReportLab with dual identifiers, 2-column CBC layout, and digital signatures.
+
+---
+
+### 8. Future Roadmap
+
+1.  **Automated Database Backup Daemon**: 6-hour background scheduler to automatically snapshot `data/mlis.db` to configured backup directories after `PRAGMA integrity_check` validation.
+2.  **Printable MoH Register Sheet Layout**: Formatted multi-column grid mirroring the physical Uganda Ministry of Health Health Unit Laboratory Register book.

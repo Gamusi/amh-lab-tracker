@@ -10,17 +10,17 @@
 
 #### 1.1 Core Backend & Shell Runtime
 *   **Application Language:** Python 3.11+
-*   **Web Server Framework:** FastAPI. Selected for its high execution speed, automatic OpenAPI documentation, and minimal memory footprint.
-*   **ASGI Server:** Uvicorn. Runs as a lightweight local background daemon.
-*   **Local Desktop Container:** `pywebview` (Python desktop shell wrapping Edge WebView2 on Windows or WebKitGTK on Linux).
-*   **Unconditional Browser Fallback:** If PyWebView initialization fails due to legacy graphics drivers or missing native OS web components, the launcher automatically triggers `webbrowser.open()` to launch the user's default browser pointed to localhost.
+*   **Web Server Framework:** FastAPI. High execution speed, automatic OpenAPI documentation, and minimal memory footprint.
+*   **ASGI Server:** Uvicorn. Runs as a lightweight local background daemon bound to `127.0.0.1:8756`.
+*   **Zero-Install Desktop Browser:** **Firefox ESR Portable** bundled directly in `portable_browser/firefox/`. Pre-configured to render full modern HTML5/CSS3/ES2022 without depending on the host operating system's installed browser versions.
 *   **No-Cloud Isolation:** The app operates 100% offline, binding exclusively to the local loopback adapter (`127.0.0.1`) at port `8756`. This provides an impenetrable hardware-level firewall against cross-network eavesdropping over local Wi-Fi or LAN.
 
 #### 1.2 Target Hardware & Compatibility Tuning
-To accommodate low-specification clinical workstations (Intel Core 2 Duo era, 2GB RAM), the application is tuned with the following constraints:
-*   **Process Isolation:** The Python FastAPI backend runs as a single-threaded local process with minimal active workers, consuming less than **50MB of RAM** at rest.
+To accommodate low-specification clinical workstations (Intel Core 2 Duo era, **1.0 GB RAM**), the application is tuned with the following constraints:
+*   **Process Isolation:** The Python FastAPI backend runs as a single-process local daemon consuming less than **50MB of RAM** at rest.
+*   **Predictable Client Footprint:** The bundled portable browser runs with a low baseline memory profile (~**80MB RAM**), preventing pagefile thrashing on 1GB physical memory machines.
 *   **No Developer-Mode Overhead:** Development flags such as Uvicorn's `reload=True` are strictly disabled in production. This eliminates continuous file-system scanning and directory watching, which would saturate legacy hard drive I/O and freeze the system.
-*   **Offline Dependencies:** All application dependencies are packaged as pre-compiled Python wheel (`.whl`) files stored in `usb_drive/wheels/` to allow zero-network installations on air-gapped host machines.
+*   **Offline Dependencies:** All application dependencies are packaged as pre-compiled Python wheel (`.whl`) files stored in `offline_packages/wheels/` to allow zero-network installations on air-gapped host machines.
 
 ---
 
@@ -196,49 +196,61 @@ Because lab workstations are shared physically by multiple technicians, session 
 ---
 
 ### 6. Flexible Reference Range & Clinical Flagging Engine
-*Intended Final State:*
-A critical requirement of M-LIS is its dual-mode clinical flagging engine, which accommodates both vendor-calibrated hardware and manual test parameters. The system will be seeded with standard clinical reference ranges for common panels (CBC, LFTs, RFTs).
+M-LIS implements a high-performance clinical flagging engine (`backend/app/evaluator.py`, `backend/app/biochem_validator.py`) accommodating both vendor-calibrated hardware and manual test parameters. The system is pre-seeded with standard clinical reference ranges for common panels (CBC, LFTs, RFTs, Blood Glucose, Urinalysis).
 
 #### 6.1 Device-Preset Mode (`DEVICE_PRESET`)
-*   **Protocol:** For parameters flagged as `DEVICE_PRESET` (e.g., from an analyzer integration), M-LIS bypasses internal validation rules and records the clinical values and alerts exactly as transmitted from the analyzer to preserve calibration fidelity.
+*   **Protocol:** For parameters flagged as `DEVICE_PRESET` (e.g., from an automated analyzer integration), M-LIS bypasses internal range validation and records clinical values and flags exactly as transmitted from the analyzer to preserve calibration fidelity.
 
 #### 6.2 LIMS-Evaluated Mode (`LIMS_EVALUATED`)
-*   **Protocol:** The LIMS dynamically evaluates clinical ranges using the schema defined in `test_parameters`. If a value falls outside the defined range or breaches the `critical_low`/`critical_high` thresholds, it is dynamically stamped in the database with standard clinical codes (`H`, `L`, `CH`, `CL`).
+*   **Protocol:** The LIMS dynamically evaluates clinical ranges using the configuration defined in `test_parameters`. If a value falls outside defined limits or breaches `critical_low`/`critical_high` thresholds, it is stamped in the database with standard clinical codes (`H`, `L`, `CH`, `CL`) and triggers real-time UI indicator badges.
 
 ---
 
-### 7. Analyzer Integrations & PDF Exports (Intended State)
-#### 7.1 Selectable PDF Export Engine (ReportLab)
-To support the delivery of official clinical test results to clients as digital softcopies, the system will integrate a purely local PDF generation engine using **ReportLab** for vector-based, selectable text that requires no OS dependencies (like `wkhtmltopdf` or browser-engines).
-*   **Compliance:** PDF layouts will comply with **ISO 15189**, containing laboratory headers, double-identifier client info, order metadata, codified results, reference intervals, and immutable signatures.
+### 7. Analyzer Integrations & ReportLab PDF Engine
 
-#### 7.2 Automated Analyzer Integration Workflow
-The system will feature a generic "Analyzer Clipboard Portal":
-1.  **Frontend Interface:** A generic text ingestion area on the test order screens labeled "Import Analyzer Data".
-2.  **Modular Backend Parser:** A fast, adaptable RegEx parsing engine (`/api/orders/analyzer-import`) designed to interpret raw data strings (such as plain-text SQL or HL7 rows) exported from various automated analyzers. This enables instantaneous extraction of key values (e.g., WBC, RBC, HGB, HCT, PLT) without fragile OCR overhead or strict vendor lock-in.
+#### 7.1 ISO 15189 Selectable PDF Generator (ReportLab)
+Official clinical test results are generated as digital softcopies and printable reports via **ReportLab** (`backend/app/routers/pdf_report_generator.py`):
+*   **Compliance:** Meets **ISO 15189** guidelines: institutional header, dual client identifiers (Client Name & Sequential Lab Number), test metadata, structured 2-column CBC layout, reference intervals, biochemical flags, and verifier digital signature timestamp.
+*   **Zero External Dependencies:** Pure Python implementation; requires no external browser drivers, headless daemons, or `wkhtmltopdf`.
+
+#### 7.2 Automated Analyzer Integration Workflow (Nihon Kohden MEK-6500K)
+The system features a generic "Analyzer Clipboard Portal":
+*   **Frontend Interface:** Direct paste modal accessible from CBC result entry.
+*   **Modular Backend Parser:** RegEx parser (`backend/app/parsers/nihon_kohden.py`) extracts all 18 CBC parameters (WBC, RBC, HGB, HCT, MCV, MCH, MCHC, PLT, NE%, LY%, MO%, EO%, BA%, etc.) instantly without vendor lock-in or manual typing.
 
 ---
 
-### 8. Immutable Audit Logging & Data Integrity
-#### 8.1 FDA 21 CFR Part 11 Standard Audit Trail
+### 8. Reagents & Consumables Inventory Architecture
+
+#### 8.1 FIFO Stock Ledger Engine
+Diagnostic reagents and test kits (e.g., HIV Determine/STAT-PAK, Malaria RDTs) are tracked via `backend/app/routers/stock.py`:
+*   **Batch Lot Allocation:** First-In, First-Out (FIFO) lot allocation with automatic depletion tracking.
+*   **Buffer Threshold Alerts:** Dynamic calculation of `LOW_STOCK` and `EXPIRED` status flags with prominent UI alert banners.
+*   **Immutable Transaction Audit:** Logs all receipts, consumptions, and manual QC wastage.
+
+---
+
+### 9. Immutable Audit Logging & Data Integrity
+
+#### 9.1 FDA 21 CFR Part 11 Standard Audit Trail
 The `audit_log` table stores high-granularity technical payloads, including user attribution, loopback IP addresses, and complete JSON data diffs (`old_values` vs `new_values`). The table is append-only with no backend deletion functions.
 
-#### 8.2 Soft Deletes & Statistics Integrity
+#### 9.2 Soft Deletes & Statistics Integrity
 No client files or diagnostic orders can be physically deleted.
-*   **Implementation:** Primary tables will utilize the `is_deleted` BOOLEAN flag. Destructive actions execute `UPDATE is_deleted = 1`.
-*   **Query Safety:** All analytical and reporting queries (e.g., daily aggregates) must explicitly include `WHERE is_deleted = 0` to prevent statistical contamination.
+*   **Implementation:** Primary tables utilize the `is_deleted` BOOLEAN flag. Destructive actions execute `UPDATE is_deleted = 1`.
+*   **Query Safety:** All analytical and reporting queries (e.g., daily aggregates) explicitly include `WHERE is_deleted = 0` to prevent statistical contamination.
 
 ---
 
-### 9. Security & Performance Benchmarks
+### 10. Security & Performance Benchmarks
 To ensure M-LIS operates smoothly on legacy computers, the following non-functional benchmarks are enforced:
 
 | Operational Metric | Target Benchmark | Verification Method |
 | :--- | :--- | :--- |
-| **System RAM Footprint** | <= 150 MB (Uvicorn + Python + PyWebView) | Task Manager monitoring |
-| **Client Search Latency** | <= 200 ms for database lookup (5k records) | Chrome DevTools profiling |
-| **Page-View Load Time** | <= 100 ms (Instantaneous SPA Tab Switch) | Local lighthouse auditing |
-| **PDF Generation Speed** | <= 1.5 seconds for multi-page vector PDF | ReportLab performance logging |
+| **System RAM Footprint** | <= 150 MB combined (FastAPI <50MB, Portable Firefox ~80MB) | Task Manager monitoring |
+| **Client Search Latency** | <= 200 ms for database lookup (5k records) | Performance profiling |
+| **Page-View Load Time** | <= 100 ms (Instantaneous SPA Tab Switch) | DOM timing benchmarks |
+| **PDF Generation Speed** | <= 1.5 seconds for vector PDF report | ReportLab performance logging |
 
 **Security Benchmarks:**
 *   **Password Hashing Complexity:** PBKDF2 with SHA-256 and a minimum of 100,000 iterations.

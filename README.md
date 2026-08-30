@@ -45,62 +45,55 @@ This system was built to directly solve the structural vulnerabilities of the pr
 
 ## Features
 
-- **Client Diagnostic Logging:** Track client demographics alongside detailed multi-parameter test results (e.g., CBC panels, WBC counts, reference ranges).
-- **Automated Surveillance Roll-up:** Client-level diagnostics (like HIV Determine/STAT-PAK) automatically increment the master HMIS 105 daily aggregate counts.
-- **Dynamic Aggregation:** Real-time generation of Daily, Weekly, Monthly, and Financial Year (July–June) performance reports and positivity rates.
-- **Native Print Integration:** Custom `@media print` CSS strips out the UI for beautiful, official A4 paper slips and reports via `window.print()`.
-- **Client-Side CSV Export:** One-click data exports generated locally via JS Blob objects for use in Microsoft Excel.
-- **Robust Audit Trail:** Real-time "Paper Register Total" verification to catch mismatching tallies before data is committed to the database.
+- **Client Diagnostic Logging:** Track client demographics alongside detailed multi-parameter test results (e.g., CBC panels, WBC counts, biochemical assays, reference ranges).
+- **Automated Analyzer Portal:** One-click clipboard ingestion for automated hematology analyzers (e.g. Nihon Kohden Celltac α MEK-6500K) with instant regex parsing and input population.
+- **Clinical Flagging Engine:** Real-time calculation of reference range alerts (`[!] High`, `[!] Low`, `[!!] Critical`) based on national clinical standards.
+- **Stock & Reagent Management:** Comprehensive inventory tracking for diagnostic kits (HIV, Malaria, etc.) with FIFO batch lot tracking, buffer alerts, and wastage logging.
+- **ISO 15189 Vector PDF Engine:** Text-selectable, official diagnostic report slips generated directly in Python via ReportLab with dual-identifier security, letterhead branding, and verifier digital signatures.
+- **Automated Surveillance Roll-up:** Client-level diagnostics automatically increment the master Uganda HMIS 105 Section 6 daily aggregate counts.
+- **Dynamic Aggregation:** Real-time generation of Daily, Weekly, Monthly, and Financial Year (July–June) operations and surveillance reports.
+- **Audit Ledger & RBAC:** Complete 3-tier Role-Based Access Control mapped to Uganda Ministry of Health (MoH) cadres with immutable before/after change logs.
 
 ---
 
 ## Architecture & Tech Stack
 
-To meet the strict hardware constraints of legacy medical workstations, the architecture aggressively avoids heavy abstractions (No React, No ORMs, No Electron).
+To meet the strict hardware constraints of legacy medical workstations (down to 1.0 GB RAM), the architecture aggressively avoids heavy abstractions (No React, No ORMs, No Electron).
 
 ```mermaid
 graph TD
-    Launcher[desktop_app.py] -->|Spawns & Polls Health| API[FastAPI Server]
-    Launcher -->|Attempts Native Window| WebView[pywebview]
-    Launcher -->|Fallback| Browser[System Default Browser]
+    Launcher[run.bat / Desktop Shortcut] -->|Starts Background Daemon| API[FastAPI Server :8756]
+    Launcher -->|Launches Zero-Install| Browser[Bundled Firefox ESR Portable]
     
-    WebView <-->|Vanilla JS / Fetch API| API
-    Browser <-->|Vanilla JS / Fetch API| API
-    
-    API <-->|Raw sqlite3 Queries| DB[(SQLite Database)]
-
+    Browser <-->|Vanilla JS / REST API| API
+    API <-->|Raw sqlite3 Queries + WAL Mode| DB[(SQLite Database: data/mlis.db)]
+    API -->|ReportLab Engine| PDF[ISO 15189 Vector PDFs]
 ```
 
-### 1. Hybrid Desktop Shell
-
-The launcher (`desktop_app.py`) spawns the Uvicorn server in a non-blocking subprocess and polls `127.0.0.1:8756/api/health`.
-
-* **Primary:** Wraps the UI in a native OS window using `pywebview`.
-* **Graceful Fallback:** If native graphics drivers fail on 15-year-old hardware, it catches the exception and launches the application in the system's default browser.
+### 1. Bundled Zero-Install Portable Browser
+M-LIS packages **Firefox ESR Portable** directly within the release distribution. When the technician clicks the desktop shortcut or `run.bat`, the system launches the dedicated portable browser pointed to `http://127.0.0.1:8756/` with full modern CSS/JS rendering, native print dialogs, and low RAM footprint (~80MB), completely independent of whatever legacy browser is installed on the host OS.
 
 ### 2. Zero-Dependency Frontend
+The UI is built purely with **Vanilla JavaScript** and **Standard CSS**. It uses lightweight event-driven routing, tab navigation, dynamic DOM updates, and custom SVG icons without node_modules, Webpack, or heavy framework overhead.
 
-The UI is built purely with **Vanilla JavaScript** and **Standard CSS**. It uses custom JS classes for client-side routing, tab navigation, DOM updates, and SVG template rendering. No build steps, no Node.js, and negligible RAM footprint.
-
-### 3. Raw SQL Backend
-
-The database layer bypasses heavy ORMs (like SQLAlchemy). It uses standard Python `dataclasses` and raw `sqlite3` queries for maximum speed and predictable memory usage on low-spec machines.
+### 3. High-Performance Raw SQL Backend
+The database layer bypasses heavy ORMs. It uses standard Python `dataclasses` and raw `sqlite3` queries with Write-Ahead Logging (WAL) for maximum speed and sub-50MB server memory usage.
 
 ---
 
 ## System Requirements & Minimum Target Machine Checklist
 
-Engineered for extreme resource-constrained clinical environments:
+Engineered and field-verified for extreme resource-constrained clinical environments:
 
-| Component | Minimum Specification | Recommended / Target |
+| Component | Minimum Specification (Verified) | Recommended / Target |
 | :--- | :--- | :--- |
 | **Processor (CPU)** | Intel Core 2 Duo / Pentium Dual-Core 1.8 GHz | Intel Core i3 / i5 or equivalent AMD |
-| **Memory (RAM)** | 2 GB RAM (Application uses < 60 MB RAM) | 4 GB+ RAM |
-| **Storage (Disk)** | 500 MB free space (Python + Wheels + SQLite DB) | 1 GB+ free space |
-| **Operating System** | Windows 7 SP1 (32-bit or 64-bit) / Lightweight Linux | Windows 10 / 11 (64-bit) |
+| **Memory (RAM)** | **1.0 GB RAM** (Server < 50MB, Portable Browser ~80MB) | 2 GB – 4 GB+ RAM |
+| **Storage (Disk)** | 500 MB free space (Python + Wheels + SQLite DB + Portable Browser) | 1 GB+ free space |
+| **Operating System** | Windows 7 SP1 / Windows 10 (v1511+) / Windows 11 / Linux | Windows 10 / 11 (64-bit) |
 | **Display Resolution**| 1024 x 768 pixels (optimized high-contrast UI) | 1280 x 800 or 1920 x 1080 |
-| **Software Runtime** | Python 3.11+ (Check "Add Python to PATH" on install)| Python 3.11+ 64-bit |
-| **Web Browser** | Any installed browser (Edge, Chrome, Firefox) | Chrome / Edge (for native print dialog) |
+| **Software Runtime** | Python 3.11+ (Check "Add Python to PATH" on install) | Python 3.11+ 64-bit |
+| **Web Browser** | **Pre-bundled Firefox ESR Portable** (Zero installation required) | Pre-bundled Portable Edition |
 | **Network** | **100% Air-Gapped / Offline** (No internet required) | Isolated Localhost `127.0.0.1:8756` |
 
 ---
