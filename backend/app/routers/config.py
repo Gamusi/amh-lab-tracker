@@ -80,7 +80,7 @@ def create_test(req: TestCreate, admin_user: dict = Depends(require_admin), conn
     
 
 @router.put("/tests/{test_id}", response_model=TestResponse)
-def update_test(test_id: int, req: TestCreate, conn: sqlite3.Connection = Depends(get_db), current_user: dict = Depends(get_current_user)):
+def update_test(test_id: int, req: TestCreate, admin_user: dict = Depends(require_admin), conn: sqlite3.Connection = Depends(get_db)):
     cur = conn.cursor()
     cur.execute("SELECT id FROM tests WHERE id = ?", (test_id,))
     if not cur.fetchone():
@@ -99,6 +99,7 @@ def update_test(test_id: int, req: TestCreate, conn: sqlite3.Connection = Depend
         WHERE id = ?
     """, (req.name, req.section_id, effective_tracked, req.result_type, req.default_unit, req.options, req.parent_rollup_id, tracks_stock_val, req.consumable_name, test_id))
     
+    conn.execute("INSERT INTO audit_log (user_id, action, detail) VALUES (?, ?, ?)", (admin_user["id"], "update_test", f"Updated test ID {test_id} ('{req.name}')"))
     conn.commit()
     return TestResponse(
         id=test_id, name=req.name, section_id=req.section_id, 
@@ -127,7 +128,7 @@ def get_wards(active_only: Optional[bool] = None, conn: sqlite3.Connection = Dep
     return [dict(r) for r in cur.fetchall()]
 
 @router.post("/wards", response_model=WardResponse)
-def create_ward(req: WardCreate, conn: sqlite3.Connection = Depends(get_db), current_user: dict = Depends(get_current_user)):
+def create_ward(req: WardCreate, admin_user: dict = Depends(require_admin), conn: sqlite3.Connection = Depends(get_db)):
     name = req.name.strip() if req.name else ""
     if not name:
         raise HTTPException(status_code=400, detail="Ward name cannot be empty")
@@ -138,14 +139,12 @@ def create_ward(req: WardCreate, conn: sqlite3.Connection = Depends(get_db), cur
     cur.execute("INSERT INTO wards (name, is_active) VALUES (?, 1)", (name,))
     wid = cur.lastrowid
     conn.commit()
-    user_id = current_user.get("id") if isinstance(current_user, dict) else getattr(current_user, "id", None)
-    if user_id:
-        conn.execute("INSERT INTO audit_log (user_id, action, detail) VALUES (?, ?, ?)", (user_id, "create_ward", f"Created ward '{name}'"))
-        conn.commit()
+    conn.execute("INSERT INTO audit_log (user_id, action, detail) VALUES (?, ?, ?)", (admin_user["id"], "create_ward", f"Created ward '{name}'"))
+    conn.commit()
     return WardResponse(id=wid, name=name, is_active=True)
 
 @router.put("/wards/{ward_id}", response_model=WardResponse)
-def update_ward(ward_id: int, req: WardUpdate, conn: sqlite3.Connection = Depends(get_db), current_user: dict = Depends(get_current_user)):
+def update_ward(ward_id: int, req: WardUpdate, admin_user: dict = Depends(require_admin), conn: sqlite3.Connection = Depends(get_db)):
     cur = conn.cursor()
     cur.execute("SELECT id, name, is_active FROM wards WHERE id = ?", (ward_id,))
     existing = cur.fetchone()
@@ -165,14 +164,12 @@ def update_ward(ward_id: int, req: WardUpdate, conn: sqlite3.Connection = Depend
     
     cur.execute("UPDATE wards SET name = ?, is_active = ? WHERE id = ?", (new_name, 1 if new_is_active else 0, ward_id))
     conn.commit()
-    user_id = current_user.get("id") if isinstance(current_user, dict) else getattr(current_user, "id", None)
-    if user_id:
-        conn.execute("INSERT INTO audit_log (user_id, action, detail) VALUES (?, ?, ?)", (user_id, "update_ward", f"Updated ward ID {ward_id} ({new_name})"))
-        conn.commit()
+    conn.execute("INSERT INTO audit_log (user_id, action, detail) VALUES (?, ?, ?)", (admin_user["id"], "update_ward", f"Updated ward ID {ward_id} ({new_name})"))
+    conn.commit()
     return WardResponse(id=ward_id, name=new_name, is_active=new_is_active)
 
 @router.delete("/wards/{ward_id}")
-def delete_ward(ward_id: int, conn: sqlite3.Connection = Depends(get_db), current_user: dict = Depends(get_current_user)):
+def delete_ward(ward_id: int, admin_user: dict = Depends(require_admin), conn: sqlite3.Connection = Depends(get_db)):
     cur = conn.cursor()
     cur.execute("SELECT id, name FROM wards WHERE id = ?", (ward_id,))
     existing = cur.fetchone()
@@ -180,10 +177,8 @@ def delete_ward(ward_id: int, conn: sqlite3.Connection = Depends(get_db), curren
         raise HTTPException(status_code=404, detail="Ward not found")
     cur.execute("UPDATE wards SET is_active = 0 WHERE id = ?", (ward_id,))
     conn.commit()
-    user_id = current_user.get("id") if isinstance(current_user, dict) else getattr(current_user, "id", None)
-    if user_id:
-        conn.execute("INSERT INTO audit_log (user_id, action, detail) VALUES (?, ?, ?)", (user_id, "delete_ward", f"Soft deleted ward ID {ward_id} ({existing['name']})"))
-        conn.commit()
+    conn.execute("INSERT INTO audit_log (user_id, action, detail) VALUES (?, ?, ?)", (admin_user["id"], "delete_ward", f"Soft deleted ward ID {ward_id} ({existing['name']})"))
+    conn.commit()
     return {"status": "deleted"}
 
 @router.get("/clinicians", response_model=List[ClinicianResponse])
@@ -198,7 +193,7 @@ def get_clinicians(active_only: Optional[bool] = None, conn: sqlite3.Connection 
     return [dict(r) for r in cur.fetchall()]
 
 @router.post("/clinicians", response_model=ClinicianResponse)
-def create_clinician(req: ClinicianCreate, conn: sqlite3.Connection = Depends(get_db), current_user: dict = Depends(get_current_user)):
+def create_clinician(req: ClinicianCreate, admin_user: dict = Depends(require_admin), conn: sqlite3.Connection = Depends(get_db)):
     name = req.name.strip() if req.name else ""
     if not name:
         raise HTTPException(status_code=400, detail="Clinician name cannot be empty")
@@ -209,14 +204,12 @@ def create_clinician(req: ClinicianCreate, conn: sqlite3.Connection = Depends(ge
     cur.execute("INSERT INTO clinicians (name, is_active) VALUES (?, 1)", (name,))
     cid = cur.lastrowid
     conn.commit()
-    user_id = current_user.get("id") if isinstance(current_user, dict) else getattr(current_user, "id", None)
-    if user_id:
-        conn.execute("INSERT INTO audit_log (user_id, action, detail) VALUES (?, ?, ?)", (user_id, "create_clinician", f"Created clinician '{name}'"))
-        conn.commit()
+    conn.execute("INSERT INTO audit_log (user_id, action, detail) VALUES (?, ?, ?)", (admin_user["id"], "create_clinician", f"Created clinician '{name}'"))
+    conn.commit()
     return ClinicianResponse(id=cid, name=name, is_active=True)
 
 @router.put("/clinicians/{clinician_id}", response_model=ClinicianResponse)
-def update_clinician(clinician_id: int, req: ClinicianUpdate, conn: sqlite3.Connection = Depends(get_db), current_user: dict = Depends(get_current_user)):
+def update_clinician(clinician_id: int, req: ClinicianUpdate, admin_user: dict = Depends(require_admin), conn: sqlite3.Connection = Depends(get_db)):
     cur = conn.cursor()
     cur.execute("SELECT id, name, is_active FROM clinicians WHERE id = ?", (clinician_id,))
     existing = cur.fetchone()
@@ -236,14 +229,12 @@ def update_clinician(clinician_id: int, req: ClinicianUpdate, conn: sqlite3.Conn
     
     cur.execute("UPDATE clinicians SET name = ?, is_active = ? WHERE id = ?", (new_name, 1 if new_is_active else 0, clinician_id))
     conn.commit()
-    user_id = current_user.get("id") if isinstance(current_user, dict) else getattr(current_user, "id", None)
-    if user_id:
-        conn.execute("INSERT INTO audit_log (user_id, action, detail) VALUES (?, ?, ?)", (user_id, "update_clinician", f"Updated clinician ID {clinician_id} ({new_name})"))
-        conn.commit()
+    conn.execute("INSERT INTO audit_log (user_id, action, detail) VALUES (?, ?, ?)", (admin_user["id"], "update_clinician", f"Updated clinician ID {clinician_id} ({new_name})"))
+    conn.commit()
     return ClinicianResponse(id=clinician_id, name=new_name, is_active=new_is_active)
 
 @router.delete("/clinicians/{clinician_id}")
-def delete_clinician(clinician_id: int, conn: sqlite3.Connection = Depends(get_db), current_user: dict = Depends(get_current_user)):
+def delete_clinician(clinician_id: int, admin_user: dict = Depends(require_admin), conn: sqlite3.Connection = Depends(get_db)):
     cur = conn.cursor()
     cur.execute("SELECT id, name FROM clinicians WHERE id = ?", (clinician_id,))
     existing = cur.fetchone()
@@ -251,10 +242,8 @@ def delete_clinician(clinician_id: int, conn: sqlite3.Connection = Depends(get_d
         raise HTTPException(status_code=404, detail="Clinician not found")
     cur.execute("UPDATE clinicians SET is_active = 0 WHERE id = ?", (clinician_id,))
     conn.commit()
-    user_id = current_user.get("id") if isinstance(current_user, dict) else getattr(current_user, "id", None)
-    if user_id:
-        conn.execute("INSERT INTO audit_log (user_id, action, detail) VALUES (?, ?, ?)", (user_id, "delete_clinician", f"Soft deleted clinician ID {clinician_id} ({existing['name']})"))
-        conn.commit()
+    conn.execute("INSERT INTO audit_log (user_id, action, detail) VALUES (?, ?, ?)", (admin_user["id"], "delete_clinician", f"Soft deleted clinician ID {clinician_id} ({existing['name']})"))
+    conn.commit()
     return {"status": "deleted"}
 
 

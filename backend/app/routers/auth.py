@@ -1,6 +1,6 @@
 import datetime, sqlite3, logging
 from pydantic import BaseModel
-from fastapi import APIRouter, Depends, HTTPException, Response
+from fastapi import APIRouter, Depends, HTTPException, Response, Request
 from ..database import get_db
 from typing import Optional
 from ..schemas import LoginRequest, UserCreate, UserRegister, UserUpdate, ChangePasswordRequest
@@ -53,7 +53,12 @@ def login(req: LoginRequest, response: Response, conn: sqlite3.Connection = Depe
     }
 
 @router.post("/logout")
-def logout(response: Response, current_user: User = Depends(get_current_user), conn: sqlite3.Connection = Depends(get_db)):
+def logout(request: Request, response: Response, current_user: User = Depends(get_current_user), conn: sqlite3.Connection = Depends(get_db)):
+    token = request.cookies.get("amh_session") or request.headers.get("Authorization")
+    if token and token.startswith("Bearer "):
+        token = token[7:]
+    if token:
+        conn.execute("DELETE FROM user_sessions WHERE token = ?", (token,))
     response.delete_cookie("amh_session")
     conn.execute("INSERT INTO audit_log (user_id, action, detail) VALUES (?, ?, ?)", (current_user["id"], "logout", f"User {current_user['username']} logged out"))
     conn.commit()
@@ -224,8 +229,11 @@ def update_user(user_id: int, req: UserUpdate, admin_user: User = Depends(requir
     if target_user["role"] != "superadmin" and req.role == "superadmin":
         raise HTTPException(status_code=403, detail="Cannot promote a user to Superadmin. Only one Superadmin is allowed.")
         
-    if admin_user["role"] == "admin" and (target_user["role"] == "superadmin" or req.role == "superadmin"):
-        raise HTTPException(status_code=403, detail="Admins cannot modify or create Superadmin accounts.")
+    if admin_user["role"] == "admin":
+        if target_user["role"] in ["admin", "superadmin"] and target_user["id"] != admin_user["id"]:
+            raise HTTPException(status_code=403, detail="Admins can only modify staff accounts.")
+        if req.role in ["admin", "superadmin"] and target_user["id"] != admin_user["id"]:
+            raise HTTPException(status_code=403, detail="Admins cannot promote users to Admin or Superadmin.")
         
     if req.password:
         cur.execute(
@@ -259,8 +267,8 @@ def delete_user(user_id: int, admin_user: User = Depends(require_admin), conn: s
     if not target_user:
         raise HTTPException(status_code=404, detail="User not found")
         
-    if admin_user["role"] == "admin" and target_user["role"] == "superadmin":
-        raise HTTPException(status_code=403, detail="Admins cannot delete Superadmin accounts.")
+    if admin_user["role"] == "admin" and target_user["role"] in ["admin", "superadmin"]:
+        raise HTTPException(status_code=403, detail="Admins can only delete staff accounts.")
         
     cur.execute("DELETE FROM user_sessions WHERE user_id = ?", (user_id,))
     cur.execute("DELETE FROM users WHERE id = ?", (user_id,))

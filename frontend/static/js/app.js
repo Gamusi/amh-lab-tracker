@@ -229,6 +229,27 @@ if (typeof Object.assign !== 'function') {
   };
 }
 
+// Global Session Expiration & 401 Interceptor (EdgeHTML / ES6 safe)
+(function() {
+  var originalFetch = window.fetch;
+  window.fetch = function() {
+    var args = arguments;
+    return originalFetch.apply(window, args).then(function(res) {
+      if (res && res.status === 401) {
+        var rawUrl = typeof args[0] === 'string' ? args[0] : (args[0] && args[0].url ? args[0].url : '');
+        if (rawUrl.indexOf('/api/auth/login') === -1 && rawUrl.indexOf('/api/auth/me') === -1) {
+          if (window.app && window.app.currentUser) {
+            console.warn('Session expired or unauthorized (401). Resetting session.');
+            window.app.showLogin();
+            window.app.showNotificationModal('Session Expired', 'Your session has expired. Please log in again.', true);
+          }
+        }
+      }
+      return res;
+    });
+  };
+})();
+
 const app = {
   currentUser: null,
   currentView: 'clients',

@@ -18,9 +18,16 @@ def verify_password(plain_password: str, stored_string: str) -> bool:
     new_key = hashlib.pbkdf2_hmac("sha256", plain_password.encode("utf-8"), salt, 100000)
     return secrets.compare_digest(new_key.hex(), stored_hash_hex)
 
+def cleanup_expired_sessions(conn: sqlite3.Connection):
+    now_str = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+    conn.execute("DELETE FROM user_sessions WHERE expires_at < ?", (now_str,))
+    conn.commit()
+
 def create_session(conn: sqlite3.Connection, user_id: int) -> str:
+    cleanup_expired_sessions(conn)
     token = secrets.token_hex(32)
-    expires_at = (datetime.datetime.utcnow() + datetime.timedelta(minutes=15)).strftime("%Y-%m-%d %H:%M:%S")
+    now_utc = datetime.datetime.now(datetime.timezone.utc)
+    expires_at = (now_utc + datetime.timedelta(minutes=15)).strftime("%Y-%m-%d %H:%M:%S")
     conn.execute(
         "INSERT INTO user_sessions (user_id, token, expires_at) VALUES (?, ?, ?)",
         (user_id, token, expires_at)
@@ -36,7 +43,7 @@ def get_current_user(request: Request, conn: sqlite3.Connection = Depends(get_db
     if not token:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
     
-    now_str = datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+    now_str = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
     cur = conn.cursor()
     cur.execute("""
         SELECT u.id, u.username, u.full_name, u.role, u.cadre, u.is_active, u.password_reset_required, s.expires_at
@@ -53,10 +60,11 @@ def get_current_user(request: Request, conn: sqlite3.Connection = Depends(get_db
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Account is disabled")
     
     # Throttle DB writes: only update expires_at if less than 10 minutes (600 seconds) remain on current session
-    expires_dt = datetime.datetime.strptime(row["expires_at"], "%Y-%m-%d %H:%M:%S")
-    time_remaining = (expires_dt - datetime.datetime.utcnow()).total_seconds()
+    expires_dt = datetime.datetime.strptime(row["expires_at"], "%Y-%m-%d %H:%M:%S").replace(tzinfo=datetime.timezone.utc)
+    now_utc = datetime.datetime.now(datetime.timezone.utc)
+    time_remaining = (expires_dt - now_utc).total_seconds()
     if time_remaining < 600:
-        new_expires_at = (datetime.datetime.utcnow() + datetime.timedelta(minutes=15)).strftime("%Y-%m-%d %H:%M:%S")
+        new_expires_at = (now_utc + datetime.timedelta(minutes=15)).strftime("%Y-%m-%d %H:%M:%S")
         conn.execute("UPDATE user_sessions SET expires_at = ? WHERE token = ?", (new_expires_at, token))
         conn.commit()
     
