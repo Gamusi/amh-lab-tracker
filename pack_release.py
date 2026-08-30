@@ -41,13 +41,13 @@ def pack():
     os.makedirs(STAGE_DIR, exist_ok=True)
 
     # Folders to include (pure runtime only - no docs or planning artifacts)
-    include_dirs = ["backend", "frontend", "assets", "launcher"]
+    include_dirs = ["backend", "frontend", "assets", "launcher", "portable_browser"]
     for d in include_dirs:
         src = os.path.join(BASE_DIR, d)
         dst = os.path.join(STAGE_DIR, d)
         if os.path.exists(src):
             shutil.copytree(src, dst, ignore=shutil.ignore_patterns(
-                "__pycache__", "*.pyc", ".pytest_cache", "*.db", "*.log"
+                "__pycache__", "*.pyc", ".pytest_cache", "*.db", "*.log", "*.exe.baiduyun.downloading", "*.tmp", "*.paf.exe", "*setup.exe"
             ))
             print(f"   [+] Copied runtime folder: {d}/")
 

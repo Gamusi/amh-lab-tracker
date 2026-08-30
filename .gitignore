@@ -25,4 +25,10 @@ docs/superpowers/
 superpowers/
 dist/
 *.zip
+FirefoxPortableESR_153.1.0_English.paf.exe
+supermium_144_64_setup.exe
+portable_browser/firefox/
+portable_browser/supermium/
+portable_browser/*.exe
+
 

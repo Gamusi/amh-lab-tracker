@@ -74,10 +74,16 @@ echo Checking database schema and test catalog...
 "%PY_CMD%" -m backend.app.seed
 
 :: -------------------------------------------------------------
-:: Launch browser after short delay
+:: Launch browser after short delay (bundled Firefox ESR Portable)
 :: -------------------------------------------------------------
 echo Launching client browser...
-start "" "%PY_CMD%" -c "import time, webbrowser; time.sleep(2); webbrowser.open('http://127.0.0.1:8756/')"
+if exist "%~dp0portable_browser\firefox\FirefoxPortable.exe" (
+    start "" "%PY_CMD%" -c "import time, subprocess; time.sleep(2); subprocess.Popen([r'%~dp0portable_browser\firefox\FirefoxPortable.exe', 'http://127.0.0.1:8756/'])"
+) else if exist "%~dp0portable_browser\firefox\App\Firefox64\firefox.exe" (
+    start "" "%PY_CMD%" -c "import time, subprocess; time.sleep(2); subprocess.Popen([r'%~dp0portable_browser\firefox\App\Firefox64\firefox.exe', 'http://127.0.0.1:8756/'])"
+) else (
+    start "" "%PY_CMD%" -c "import time, webbrowser; time.sleep(2); webbrowser.open('http://127.0.0.1:8756/')"
+)
 
 :: -------------------------------------------------------------
 :: Run server
