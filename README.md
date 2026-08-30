@@ -16,7 +16,7 @@
 [![Frontend](https://img.shields.io/badge/frontend-Vanilla%20JS%20%7C%20CSS-f7df1e.svg)]()
 [![Backend](https://img.shields.io/badge/backend-FastAPI%20%7C%20Python-009688.svg)]()
 
-[Overview](#overview) • [The Excel Problem](#the-legacy-excel-problem) • [Features](#features) • [Architecture](#architecture--tech-stack) • [Air-Gapped Deployment](#air-gapped-offline-deployment--packaging) • [Customization](#portability--branding)
+[Overview](#overview) • [Features](#features) • [Architecture](#architecture--tech-stack) • [Installation & Setup](#installation--developer-setup) • [Air-Gapped Deployment](#air-gapped-offline-deployment--packaging) • [Customization](#portability--branding)
 
 </div>
 
@@ -24,22 +24,9 @@
 
 ## Overview
 
-**M-LIS** is an offline-first laboratory management system built to digitize diagnostic reporting and client test workflows. Designed to comply with standard **HMIS 105 Section 6 Laboratory Surveillance** guidelines, it completely replaces fragile legacy Excel macros with a robust, relational database-backed application.
+**M-LIS** is an offline-first laboratory information system engineered to digitize diagnostic workflows, reagent stock tracking, and clinical reporting. Designed in strict compliance with standard **Uganda HMIS 105 Section 6 Laboratory Surveillance** guidelines, it provides a robust relational database-backed application that eliminates manual registers and transcription errors.
 
-It is specifically engineered to run flawlessly on legacy hospital workstations (Core 2 Duo / 2GB RAM) without requiring an internet connection, complex installations, or heavy browser frameworks.
-
----
-
-## The Legacy Excel Problem
-
-This system was built to directly solve the structural vulnerabilities of the previous macro-heavy `.xlsb` reporting system:
-
-| The Legacy Excel Problem | The AMH Tracker Solution |
-| :--- | :--- |
-| **Silent Data Loss:** Full delete-and-reinsert macros wiped historical data if a test name was changed. | **Relational Integrity:** Raw SQLite ensures permanent, structured data retention and safe migrations. |
-| **Formula Corruption:** Technicians accidentally overwrote `SUMIFS` cells with static numbers, freezing reports. | **Immutable Logic:** Calculations happen dynamically on the FastAPI backend; the UI is strictly read-only for reports. |
-| **Hardcoded Limits:** Trend calculations stopped at row 292; later entries were silently ignored. | **Infinite Scaling:** Dynamic database queries aggregate thousands of records in milliseconds. |
-| **Zero Accountability:** No audit trail for who entered or altered data. | **Session Tracking:** Every entry, edit, and configuration change is stamped with the authenticated user ID and timestamp. |
+It is specifically engineered to run smoothly on resource-constrained hospital workstations (down to Intel Core 2 Duo / 1.0 GB RAM) without requiring an internet connection or modern OS upgrades.
 
 ---
 
@@ -47,7 +34,7 @@ This system was built to directly solve the structural vulnerabilities of the pr
 
 - **Client Diagnostic Logging:** Track client demographics alongside detailed multi-parameter test results (e.g., CBC panels, WBC counts, biochemical assays, reference ranges).
 - **Automated Analyzer Portal:** One-click clipboard ingestion for automated hematology analyzers (e.g. Nihon Kohden Celltac α MEK-6500K) with instant regex parsing and input population.
-- **Clinical Flagging Engine:** Real-time calculation of reference range alerts (`[!] High`, `[!] Low`, `[!!] Critical`) based on national clinical standards.
+- **Standard Clinical Flagging Engine:** Dynamic calculation of standard clinical indicators: Low (`L`), High (`H`), Critical Low (`L*`), Critical High (`H*`), Qualitative Abnormal (`⚠`), and automated evaluation of the Uganda MoH 3-test HIV algorithm.
 - **Stock & Reagent Management:** Comprehensive inventory tracking for diagnostic kits (HIV, Malaria, etc.) with FIFO batch lot tracking, buffer alerts, and wastage logging.
 - **ISO 15189 Vector PDF Engine:** Text-selectable, official diagnostic report slips generated directly in Python via ReportLab with dual-identifier security, letterhead branding, and verifier digital signatures.
 - **Automated Surveillance Roll-up:** Client-level diagnostics automatically increment the master Uganda HMIS 105 Section 6 daily aggregate counts.
@@ -98,32 +85,78 @@ Engineered and field-verified for extreme resource-constrained clinical environm
 
 ---
 
+## Installation & Developer Setup
+
+Because binary browser distributions and pre-downloaded wheels are excluded from Git to keep the repository lightweight, follow these steps when setting up the repository from scratch:
+
+### 1. External Prerequisites & Downloads
+
+| Resource | Required Version | Download Link | Notes |
+| :--- | :--- | :--- | :--- |
+| **Python** | 3.11 or higher | [python.org/downloads](https://www.python.org/downloads/) | **CRITICAL:** Check *"Add Python to PATH"* during install |
+| **Firefox ESR Portable** | Latest ESR | [PortableApps.com Firefox ESR](https://portableapps.com/apps/internet/firefox-portable-esr) | Bundled zero-install browser for legacy PCs |
+| **7-Zip** *(Optional)* | Any recent version | [7-zip.org](https://www.7-zip.org/) | Required to extract `.paf.exe` installers if doing manual staging |
+
+### 2. Setting Up the Portable Browser
+
+1. Download `FirefoxPortableESR_..._English.paf.exe` from [PortableApps.com](https://portableapps.com/apps/internet/firefox-portable-esr).
+2. Extract the contents into `portable_browser/firefox/` in the project root:
+   ```cmd
+   :: Using 7-Zip (or run the installer and set destination to portable_browser\firefox)
+   "C:\Program Files\7-Zip\7z.exe" x FirefoxPortableESR_*.paf.exe -o"portable_browser\firefox" -y
+   ```
+3. Verify that `portable_browser/firefox/FirefoxPortable.exe` (or `App/Firefox64/firefox.exe`) exists.
+
+### 3. Installing Dependencies & Seeding Database
+
+Open a terminal (Command Prompt / PowerShell) in the project directory:
+
+```bash
+# 1. Install Python packages
+pip install -r requirements.txt
+
+# 2. Run initial installation & database seed script
+python install.py
+```
+
+`install.py` will:
+* Initialize the SQLite schema in `data/mlis.db`.
+* Seed 7 laboratory sections, 126 clinical tests, specimen types, and reference ranges.
+* Create a customized **M-LIS** shortcut on your Desktop.
+
+### 4. Launching the System
+
+Double-click the **M-LIS** shortcut on your Desktop or run:
+
+```cmd
+run.bat
+```
+
+* The server starts on `http://127.0.0.1:8756/`.
+* The bundled portable browser opens automatically to the login screen.
+* **First-Time Setup:** Click **Register** on the initial screen to create your first account. The very first registered user is automatically designated as the **Super Administrator**.
+
+---
+
 ## Air-Gapped Offline Deployment & Packaging
 
-The application supports completely offline 1-click deployment via a self-contained ZIP archive or portable storage.
+To create a self-contained, 100% offline distribution package for target hospital PCs:
 
 ### 1. Build the Release Package (On internet-connected Development PC):
 ```cmd
-:: Builds the standalone release archive (downloads wheels, stages assets, creates ZIP)
-pack_usb.bat
+python pack_release.py
 ```
-*(Outputs `dist/mlis-release.zip` and staged folder at `dist/mlis/`)*
+*(Automatically stages backend, frontend, assets, launcher, offline wheels, and the portable browser into `dist/mlis-release.zip`)*
 
-### 2. Install on Target Workstation (Air-Gapped Client PC):
-1. Transfer `dist/mlis-release.zip` (or the unpacked folder) to the target PC.
-2. Extract the archive (Right-click -> **Extract All...**).
-3. Ensure Python 3.11+ is installed (with **"Add Python to PATH"** checked).
+### 2. Deploy on Target Workstation (Air-Gapped Client PC):
+1. Copy `dist/mlis-release.zip` via USB drive to the target computer.
+2. Extract the ZIP archive (Right-click -> **Extract All...**).
+3. Ensure Python 3.11+ is installed on the target PC (with **"Add Python to PATH"** enabled).
 4. Double-click **`setup.bat`**:
-   - Automatically installs pre-packaged dependency wheels offline from `offline_packages/wheels/`.
-   - Initializes the local SQLite database (`data/mlis.db`) and seeds standard clinical catalog data.
-   - Automatically creates the **M-LIS** shortcut on your Desktop.
-5. Double-click **`run.bat`** (or the Desktop shortcut) to launch the system.
-
-### 3. Incremental Updates & Maintenance:
-To deploy bugfixes or new features to an existing target installation without full reinstallation:
-- Simply copy the updated file(s) (e.g., `backend/app/parsers/nihon_kohden.py` or `frontend/static/js/app.js`) to the target installation directory.
-- Restart the server via `run.bat`.
-- The database in `data/mlis.db` is strictly preserved and never overwritten.
+   - Automatically installs pre-packaged wheels from `offline_packages/wheels/` (zero internet required).
+   - Initializes and seeds `data/mlis.db`.
+   - Creates the Desktop shortcut.
+5. Double-click the **M-LIS** Desktop shortcut (or `run.bat`) to launch.
 
 ---
 
