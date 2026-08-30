@@ -225,6 +225,12 @@ SCHEMA_SQL = """
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         user_id INTEGER REFERENCES users(id)
     );
+
+    CREATE INDEX IF NOT EXISTS idx_clients_full_name ON clients(full_name);
+    CREATE INDEX IF NOT EXISTS idx_clients_phone ON clients(phone);
+    CREATE INDEX IF NOT EXISTS idx_visits_client_id ON visits(client_id);
+    CREATE INDEX IF NOT EXISTS idx_test_orders_visit_id ON test_orders(visit_id);
+    CREATE INDEX IF NOT EXISTS idx_test_results_order_id ON test_results(order_id);
 """
 
 def get_connection():

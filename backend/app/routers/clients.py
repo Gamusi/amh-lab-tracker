@@ -112,13 +112,45 @@ def parse_age_string(s: str) -> float:
     try: return float(s.replace("y", "").strip())
     except ValueError: return 0.0
 
+def validate_client_demographics(full_name: str, sex: str, age_string: str, age_category: str) -> float:
+    name = (full_name or "").strip()
+    if len(name) < 2:
+        raise HTTPException(status_code=400, detail="Client full name is required and must be at least 2 characters.")
+    
+    if sex not in ("Male", "Female"):
+        raise HTTPException(status_code=400, detail="Sex must be either 'Male' or 'Female'.")
+        
+    valid_categories = ("Neonate", "Infant", "Toddler", "Child", "Adult")
+    if age_category not in valid_categories:
+        raise HTTPException(status_code=400, detail=f"Invalid age category '{age_category}'. Must be one of {valid_categories}.")
+
+    parsed_age = parse_age_string(age_string)
+    if parsed_age < 0.0:
+        raise HTTPException(status_code=400, detail="Invalid age value.")
+
+    # Consistency checks
+    if age_category == 'Neonate' and parsed_age > 0.0768: # > 28 days
+        raise HTTPException(status_code=400, detail=f"Age ({parsed_age*365.25:.0f} days) exceeds Neonate limit (<= 28 days).")
+    elif age_category == 'Infant' and (parsed_age <= 0.0768 or parsed_age > 1.0):
+        raise HTTPException(status_code=400, detail="Age does not match Infant category (29 days to 1 year).")
+    elif age_category == 'Toddler' and (parsed_age <= 1.0 or parsed_age > 3.0):
+        raise HTTPException(status_code=400, detail="Age does not match Toddler category (1 to 3 years).")
+    elif age_category == 'Child' and (parsed_age <= 3.0 or parsed_age > 14.0):
+        raise HTTPException(status_code=400, detail="Age does not match Child category (3 to 14 years).")
+    elif age_category == 'Adult' and parsed_age < 15.0:
+        raise HTTPException(status_code=400, detail="Age does not match Adult category (>= 15 years).")
+
+    return parsed_age
+
 @router.post("/api/clients")
 def create_client(req: ClientCreate, conn: sqlite3.Connection = Depends(get_db), current_user: dict = Depends(get_current_user)):
     logger.info(f"User '{current_user['username']}' is creating client: '{req.full_name}'")
-    cur = conn.cursor()
     
-    parsed_age = parse_age_string(req.age_string)
+    parsed_age = validate_client_demographics(req.full_name, req.sex, req.age_string, req.age_category)
+    cleaned_name = req.full_name.strip()
+    cleaned_phone = req.phone.strip() if req.phone else None
 
+    cur = conn.cursor()
     today = datetime.date.today()
     yy_str = today.strftime("%y")
     seq_name = f"client_number_{yy_str}"
@@ -137,7 +169,7 @@ def create_client(req: ClientCreate, conn: sqlite3.Connection = Depends(get_db),
     cur.execute("""
         INSERT INTO clients (client_number, full_name, age_years, age_category, sex, phone)
         VALUES (?, ?, ?, ?, ?, ?)
-    """, (generated_client_number, req.full_name, parsed_age, req.age_category, req.sex, req.phone))
+    """, (generated_client_number, cleaned_name, parsed_age, req.age_category, req.sex, cleaned_phone))
     
     pid = cur.lastrowid
     conn.commit()
@@ -148,37 +180,50 @@ def create_client(req: ClientCreate, conn: sqlite3.Connection = Depends(get_db),
 def update_client(client_id: int, req: ClientUpdate, conn: sqlite3.Connection = Depends(get_db), current_user: dict = Depends(get_current_user)):
     logger.info(f"User '{current_user['username']}' is updating client ID {client_id}")
     cur = conn.cursor()
-    cur.execute("SELECT id, full_name FROM clients WHERE id = ?", (client_id,))
+    cur.execute("SELECT id, full_name, age_years, age_category, sex, phone FROM clients WHERE id = ?", (client_id,))
     client_row = cur.fetchone()
     if not client_row:
         raise HTTPException(status_code=404, detail="Client not found")
+
+    new_name = req.full_name.strip() if req.full_name is not None else client_row["full_name"]
+    new_sex = req.sex if req.sex is not None else client_row["sex"]
+    new_cat = req.age_category if req.age_category is not None else client_row["age_category"]
+    
+    if req.age_string is not None:
+        parsed_age = parse_age_string(req.age_string)
+    else:
+        parsed_age = client_row["age_years"]
+
+    # Validate if any demographic changed
+    if any(x is not None for x in [req.full_name, req.sex, req.age_string, req.age_category]):
+        age_str_for_val = req.age_string if req.age_string is not None else f"{parsed_age}y"
+        parsed_age = validate_client_demographics(new_name, new_sex, age_str_for_val, new_cat)
 
     updates = []
     params = []
 
     if req.full_name is not None:
         updates.append("full_name = ?")
-        params.append(req.full_name.strip())
+        params.append(new_name)
     if req.age_string is not None:
-        parsed_age = parse_age_string(req.age_string)
         updates.append("age_years = ?")
         params.append(parsed_age)
     if req.age_category is not None:
         updates.append("age_category = ?")
-        params.append(req.age_category)
+        params.append(new_cat)
     if req.sex is not None:
         updates.append("sex = ?")
-        params.append(req.sex)
+        params.append(new_sex)
     if req.phone is not None:
         updates.append("phone = ?")
-        params.append(req.phone.strip())
+        params.append(req.phone.strip() if req.phone else None)
 
     if updates:
         params.append(client_id)
         cur.execute(f"UPDATE clients SET {', '.join(updates)} WHERE id = ?", tuple(params))
         conn.commit()
 
-        now_str = datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%d %H:%M:%S")
+        now_str = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
         cur.execute("INSERT INTO audit_log (user_id, action, detail, timestamp) VALUES (?, 'EDIT_CLIENT', ?, ?)",
                     (current_user["id"], f"Updated client ID {client_id}: {req.model_dump(exclude_unset=True)}", now_str))
         conn.commit()
@@ -254,6 +299,11 @@ def update_visit(visit_id: int, req: VisitEdit, conn: sqlite3.Connection = Depen
     if not row:
         raise HTTPException(status_code=404, detail="Visit not found")
         
+    if req.clinician_id is not None:
+        cur.execute("SELECT id FROM clinicians WHERE id = ?", (req.clinician_id,))
+        if not cur.fetchone():
+            raise HTTPException(status_code=400, detail="Clinician not found")
+            
     # Update visit
     cur.execute("UPDATE visits SET ward_of_origin = ?, clinician_id = ? WHERE id = ?",
                 (req.ward_of_origin, req.clinician_id, visit_id))
@@ -410,7 +460,7 @@ def create_order(req: TestOrderCreate, conn: sqlite3.Connection = Depends(get_db
     return {"status": "ordered", "order_id": oid, "visit_id": visit_id}
 
 def increment_daily_entry(cur: sqlite3.Cursor, entry_date: str, test_id: int, is_positive: bool, user_id: int):
-    now_str = datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+    now_str = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
     cur.execute("SELECT id, is_tracked, parent_rollup_id FROM tests WHERE id = ?", (test_id,))
     t_obj = cur.fetchone()
     if not t_obj:
@@ -465,7 +515,7 @@ def enter_result(req: TestResultCreate, conn: sqlite3.Connection = Depends(get_d
         logger.warning(f"Result entry failed: order ID {req.order_id} not found")
         raise HTTPException(status_code=404, detail="Order not found")
 
-    now_str = datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+    now_str = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
     today = datetime.date.today()
     today_str = today.strftime("%Y-%m-%d")
 
@@ -692,7 +742,7 @@ def edit_result(result_id: int, req: dict, conn: sqlite3.Connection = Depends(ge
     new_value = req.get("result_value", old_value)
     new_unit = req.get("result_unit")
     
-    now_str = __import__("datetime").datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+    now_str = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
     
     cur.execute("""
         UPDATE test_results
