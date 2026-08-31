@@ -1,4 +1,4 @@
-﻿import io
+import io
 import csv
 import json
 import sqlite3
@@ -209,3 +209,69 @@ def test_audit_logging_on_export_and_import(test_db):
     cur.execute("SELECT * FROM audit_log WHERE action IN ('BULK_EXPORT', 'BULK_IMPORT')")
     logs = cur.fetchall()
     assert len(logs) >= 2
+
+def test_clients_and_results_export_xlsx(test_db):
+    import openpyxl
+    conn = test_db["conn"]
+    cur = conn.cursor()
+    cur.execute("INSERT INTO clients (client_number, full_name, sex, age_years, phone) VALUES ('AMH-XLSX-01', 'Excel Client', 'Male', 30, '0788112233')")
+    cid = cur.lastrowid
+    cur.execute("INSERT INTO visits (client_id, clinician_id, ward_of_origin, lab_number, created_at) VALUES (?, 1, 'OPD', 'AMH-26-8-XLSX', '2026-08-25 10:00:00')", (cid,))
+    vid = cur.lastrowid
+    cur.execute("INSERT INTO test_orders (visit_id, test_id, status) VALUES (?, 1, 'completed')", (vid,))
+    oid = cur.lastrowid
+    cur.execute("INSERT INTO test_results (order_id, parameter_id, result_value, result_unit, clinical_flag, is_positive, entered_by_user_id) VALUES (?, 1, '5.8', 'x10^9/L', 'NORMAL', 0, 1)", (oid,))
+    conn.commit()
+
+    # Clients XLSX
+    res_c = client.get("/api/export/clients?format=xlsx")
+    assert res_c.status_code == 200
+    assert "spreadsheetml.sheet" in res_c.headers["content-type"]
+    wb_c = openpyxl.load_workbook(io.BytesIO(res_c.content))
+    ws_c = wb_c.active
+    assert ws_c.title == "Clients Registry"
+    headers = [cell.value for cell in ws_c[1]]
+    assert "client_number" in headers
+    assert "full_name" in headers
+    rows_c = list(ws_c.iter_rows(values_only=True))[1:]
+    assert any(r[0] == "AMH-XLSX-01" for r in rows_c)
+
+    # Results XLSX
+    res_r = client.get("/api/export/results?format=xlsx")
+    assert res_r.status_code == 200
+    assert "spreadsheetml.sheet" in res_r.headers["content-type"]
+    wb_r = openpyxl.load_workbook(io.BytesIO(res_r.content))
+    ws_r = wb_r.active
+    assert ws_r.title == "Diagnostic Results"
+    rows_r = list(ws_r.iter_rows(values_only=True))[1:]
+    assert any(r[0] == "AMH-26-8-XLSX" for r in rows_r)
+
+def test_import_xlsx_round_trip(test_db):
+    import openpyxl
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.append(["client_number", "full_name", "date_of_birth", "age_years", "age_category", "sex", "phone"])
+    ws.append(["AMH-XIMP-01", "Imported via Excel", "1995-05-15", 31, "Adult", "Female", "0755123456"])
+    
+    buf = io.BytesIO()
+    wb.save(buf)
+    xlsx_bytes = buf.getvalue()
+
+    res = client.post(
+        "/api/import/clients",
+        content=xlsx_bytes,
+        headers={"Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}
+    )
+    assert res.status_code == 200
+    data = res.json()
+    assert data["total"] == 1
+    assert data["inserted"] == 1
+
+    conn = test_db["conn"]
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM clients WHERE client_number = 'AMH-XIMP-01'")
+    row = cur.fetchone()
+    assert row is not None
+    assert row["full_name"] == "Imported via Excel"
+    assert row["sex"] == "Female"
+

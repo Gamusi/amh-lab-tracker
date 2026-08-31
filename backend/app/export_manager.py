@@ -328,3 +328,170 @@ WHERE v.is_deleted = 0
             yield line
             
     yield "\n]"
+
+def generate_clients_xlsx(conn: sqlite3.Connection, filters: Optional[Dict[str, Any]] = None) -> bytes:
+    import openpyxl
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    from openpyxl.utils import get_column_letter
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Clients Registry"
+
+    headers = CLIENT_CSV_HEADERS
+    ws.append(headers)
+
+    header_font = Font(name="Calibri", size=11, bold=True, color="FFFFFF")
+    header_fill = PatternFill(start_color="0284C7", end_color="0284C7", fill_type="solid")
+    center_align = Alignment(horizontal="center", vertical="center")
+    thin_border = Border(
+        left=Side(style='thin', color='E2E8F0'),
+        right=Side(style='thin', color='E2E8F0'),
+        top=Side(style='thin', color='E2E8F0'),
+        bottom=Side(style='thin', color='E2E8F0')
+    )
+
+    for col_num in range(1, len(headers) + 1):
+        cell = ws.cell(row=1, column=col_num)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = center_align
+
+    filters = filters or {}
+    start_date = filters.get("start_date")
+    end_date = filters.get("end_date")
+    
+    query = "SELECT client_number, full_name, date_of_birth, age_years, age_category, sex, phone, created_at FROM clients WHERE 1=1"
+    params = []
+    if start_date:
+        query += " AND date(created_at) >= date(?)"
+        params.append(start_date)
+    if end_date:
+        query += " AND date(created_at) <= date(?)"
+        params.append(end_date)
+    query += " ORDER BY id ASC"
+
+    cur = conn.cursor()
+    cur.execute(query, params)
+    
+    for row_idx, row in enumerate(cur.fetchall(), start=2):
+        for col_idx, val in enumerate(row, start=1):
+            cell = ws.cell(row=row_idx, column=col_idx, value=val if val is not None else "")
+            cell.border = thin_border
+            if col_idx in (1, 7):
+                cell.number_format = '@'
+
+    for col in ws.columns:
+        max_len = max(len(str(cell.value or '')) for cell in col)
+        col_letter = get_column_letter(col[0].column)
+        ws.column_dimensions[col_letter].width = max(max_len + 3, 12)
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    return buf.getvalue()
+
+def generate_results_xlsx(conn: sqlite3.Connection, filters: Optional[Dict[str, Any]] = None) -> bytes:
+    import openpyxl
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    from openpyxl.utils import get_column_letter
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Diagnostic Results"
+
+    headers = RESULTS_CSV_HEADERS
+    ws.append(headers)
+
+    header_font = Font(name="Calibri", size=11, bold=True, color="FFFFFF")
+    header_fill = PatternFill(start_color="0284C7", end_color="0284C7", fill_type="solid")
+    center_align = Alignment(horizontal="center", vertical="center")
+    thin_border = Border(
+        left=Side(style='thin', color='E2E8F0'),
+        right=Side(style='thin', color='E2E8F0'),
+        top=Side(style='thin', color='E2E8F0'),
+        bottom=Side(style='thin', color='E2E8F0')
+    )
+
+    for col_num in range(1, len(headers) + 1):
+        cell = ws.cell(row=1, column=col_num)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = center_align
+
+    filters = filters or {}
+    start_date = filters.get("start_date")
+    end_date = filters.get("end_date")
+    ward = filters.get("ward")
+    section_id = filters.get("section_id")
+
+    query = """
+SELECT 
+    v.lab_number,
+    v.created_at AS visit_date,
+    v.ward_of_origin,
+    v.order_category,
+    c.client_number,
+    c.full_name,
+    c.sex,
+    c.age_years,
+    c.age_category,
+    cl.name AS clinician_name,
+    s.name AS section_name,
+    t.name AS test_name,
+    tp.parameter_name,
+    tr.result_value,
+    tr.result_unit,
+    tr.clinical_flag,
+    tr.is_positive,
+    u_enter.username AS entered_by,
+    tr.entered_at,
+    u_ver.username AS verified_by,
+    tr.verified_at
+FROM test_results tr
+JOIN test_orders ord ON tr.order_id = ord.id
+JOIN tests t ON ord.test_id = t.id
+JOIN sections s ON t.section_id = s.id
+JOIN visits v ON ord.visit_id = v.id
+JOIN clients c ON v.client_id = c.id
+LEFT JOIN test_parameters tp ON tr.parameter_id = tp.id
+LEFT JOIN clinicians cl ON v.clinician_id = cl.id
+LEFT JOIN users u_enter ON tr.entered_by_user_id = u_enter.id
+LEFT JOIN users u_ver ON tr.verified_by_user_id = u_ver.id
+WHERE v.is_deleted = 0
+"""
+    params = []
+    if start_date:
+        query += " AND date(v.created_at) >= date(?)"
+        params.append(start_date)
+    if end_date:
+        query += " AND date(v.created_at) <= date(?)"
+        params.append(end_date)
+    if ward:
+        query += " AND v.ward_of_origin = ?"
+        params.append(ward)
+    if section_id:
+        query += " AND t.section_id = ?"
+        params.append(section_id)
+    query += " ORDER BY tr.id ASC"
+
+    cur = conn.cursor()
+    cur.execute(query, params)
+
+    for row_idx, row in enumerate(cur.fetchall(), start=2):
+        for col_idx, val in enumerate(row, start=1):
+            if col_idx == 17: # is_positive
+                val = 1 if val else 0 if val is not None else ""
+            cell = ws.cell(row=row_idx, column=col_idx, value=val if val is not None else "")
+            cell.border = thin_border
+            if col_idx in (1, 5):
+                cell.number_format = '@'
+
+    for col in ws.columns:
+        max_len = max(len(str(cell.value or '')) for cell in col)
+        col_letter = get_column_letter(col[0].column)
+        ws.column_dimensions[col_letter].width = max(max_len + 3, 12)
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    return buf.getvalue()
+

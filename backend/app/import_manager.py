@@ -8,14 +8,56 @@ from typing import List, Dict, Any, Optional, Tuple
 
 logger = logging.getLogger("amh_import")
 
-def parse_import_payload(raw_content: str, filename: Optional[str] = None) -> List[Dict[str, Any]]:
-    raw_content = raw_content.strip()
-    if not raw_content:
+def parse_import_payload(raw_content: Any, filename: Optional[str] = None) -> List[Dict[str, Any]]:
+    raw_bytes = None
+    if isinstance(raw_content, bytes):
+        raw_bytes = raw_content
+    elif isinstance(raw_content, str):
+        raw_bytes = raw_content.encode("utf-8")
+
+    if not raw_bytes or len(raw_bytes) == 0:
         return []
-        
-    if raw_content.startswith("[") or (filename and filename.endswith(".json")):
+
+    # Check for XLSX format (magic bytes b'PK\x03\x04' or filename ending with .xlsx)
+    if raw_bytes.startswith(b'PK\x03\x04') or (filename and filename.lower().endswith(".xlsx")):
         try:
-            parsed = json.loads(raw_content)
+            import openpyxl
+            wb = openpyxl.load_workbook(io.BytesIO(raw_bytes), read_only=True, data_only=True)
+            ws = wb.active
+            rows_iter = ws.iter_rows(values_only=True)
+            headers = next(rows_iter, None)
+            if not headers:
+                return []
+            
+            norm_headers = [
+                str(h).strip().lower().replace(" ", "_").replace("/", "_").replace("(", "").replace(")", "") if h is not None else f"col_{i}"
+                for i, h in enumerate(headers)
+            ]
+            
+            records = []
+            for row in rows_iter:
+                if row is None or all(c is None or str(c).strip() == "" for c in row):
+                    continue
+                clean_row = {}
+                for h, val in zip(norm_headers, row):
+                    if h:
+                        if isinstance(val, (datetime.date, datetime.datetime)):
+                            clean_row[h] = val.isoformat()
+                        elif val is not None:
+                            clean_row[h] = str(val).strip()
+                        else:
+                            clean_row[h] = ""
+                records.append(clean_row)
+            return records
+        except Exception as e:
+            logger.warning(f"Failed XLSX parsing: {e}")
+            raise ValueError(f"Failed to parse Excel (.xlsx) file: {str(e)}")
+
+    # JSON or CSV
+    text_content = raw_bytes.decode("utf-8", errors="replace").strip()
+    if text_content.startswith("[") or (filename and filename.lower().endswith(".json")):
+        try:
+            parsed = json.loads(text_content)
             if isinstance(parsed, list):
                 return parsed
             if isinstance(parsed, dict):
@@ -24,7 +66,7 @@ def parse_import_payload(raw_content: str, filename: Optional[str] = None) -> Li
             logger.warning(f"Failed JSON parsing: {e}")
             
     # CSV Parsing
-    reader = csv.DictReader(io.StringIO(raw_content))
+    reader = csv.DictReader(io.StringIO(text_content))
     records = []
     for row in reader:
         clean_row = {}

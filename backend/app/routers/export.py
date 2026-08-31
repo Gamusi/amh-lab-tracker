@@ -3,14 +3,16 @@ import datetime
 import logging
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, Response
 from ..database import get_db
 from ..auth import require_admin
 from ..export_manager import (
     stream_clients_csv,
     stream_clients_json,
+    generate_clients_xlsx,
     stream_results_csv,
-    stream_results_json
+    stream_results_json,
+    generate_results_xlsx
 )
 from ..import_manager import (
     parse_import_payload,
@@ -24,7 +26,7 @@ router = APIRouter(tags=["Bulk Data Export & Import"])
 
 @router.get("/api/export/clients")
 def export_clients(
-    format: str = Query("csv", pattern="^(csv|json)$"),
+    format: str = Query("csv", pattern="^(csv|json|xlsx)$"),
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
     conn: sqlite3.Connection = Depends(get_db),
@@ -50,6 +52,14 @@ def export_clients(
             media_type="application/json",
             headers={"Content-Disposition": f"attachment; filename={filename}"}
         )
+    elif format == "xlsx":
+        filename = f"clients_export_{today_str}.xlsx"
+        xlsx_bytes = generate_clients_xlsx(conn, filters)
+        return Response(
+            content=xlsx_bytes,
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={"Content-Disposition": f"attachment; filename={filename}"}
+        )
     else:
         filename = f"clients_export_{today_str}.csv"
         return StreamingResponse(
@@ -60,7 +70,7 @@ def export_clients(
 
 @router.get("/api/export/results")
 def export_results(
-    format: str = Query("csv", pattern="^(csv|json)$"),
+    format: str = Query("csv", pattern="^(csv|json|xlsx)$"),
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
     ward: Optional[str] = None,
@@ -93,6 +103,14 @@ def export_results(
             media_type="application/json",
             headers={"Content-Disposition": f"attachment; filename={filename}"}
         )
+    elif format == "xlsx":
+        filename = f"lab_results_export_{today_str}.xlsx"
+        xlsx_bytes = generate_results_xlsx(conn, filters)
+        return Response(
+            content=xlsx_bytes,
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={"Content-Disposition": f"attachment; filename={filename}"}
+        )
     else:
         filename = f"lab_results_export_{today_str}.csv"
         return StreamingResponse(
@@ -111,9 +129,11 @@ async def import_clients(
     logger.info(f"Admin '{current_user['username']}' initiated clients import (dry_run={dry_run})")
     
     body = await request.body()
-    raw_content = body.decode("utf-8", errors="replace")
-        
-    records = parse_import_payload(raw_content)
+    try:
+        records = parse_import_payload(body)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
     if not records:
         raise HTTPException(status_code=400, detail="No valid records found in payload.")
         
@@ -140,9 +160,11 @@ async def import_results(
     logger.info(f"Admin '{current_user['username']}' initiated results import (dry_run={dry_run})")
     
     body = await request.body()
-    raw_content = body.decode("utf-8", errors="replace")
-        
-    records = parse_import_payload(raw_content)
+    try:
+        records = parse_import_payload(body)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
     if not records:
         raise HTTPException(status_code=400, detail="No valid records found in payload.")
         

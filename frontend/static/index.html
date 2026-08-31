@@ -754,6 +754,7 @@
         <div class="form-group" style="margin-bottom: 16px;">
           <label for="export-format" style="font-weight: 600; display: block; margin-bottom: 4px;">Export Format:</label>
           <select id="export-format" style="width: 100%; padding: 8px;">
+            <option value="xlsx">Excel Workbook (.xlsx)</option>
             <option value="csv">CSV (Comma Separated Values - .csv)</option>
             <option value="json">JSON (JavaScript Object Notation - .json)</option>
           </select>
@@ -770,7 +771,7 @@
   <div id="bulk-import-modal" class="modal-overlay" style="display: none;">
     <div class="modal-content" style="max-width: 520px; width: 92vw;">
       <h3 style="margin-top: 0; color: var(--primary-color);">Bulk Data Import</h3>
-      <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: -8px; margin-bottom: 16px;">Upload previously exported CSV or JSON dataset to restore or bulk insert data.</p>
+      <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: -8px; margin-bottom: 16px;">Upload previously exported Excel, CSV or JSON dataset to restore or bulk insert data.</p>
       <form onsubmit="app.submitBulkImport(event)">
         <div class="form-group" style="margin-bottom: 14px;">
           <label for="import-dataset" style="font-weight: 600; display: block; margin-bottom: 4px;">Target Dataset:</label>
@@ -780,7 +781,7 @@
           </select>
         </div>
         <div class="form-group" style="margin-bottom: 16px;">
-          <label style="font-weight: 600; display: block; margin-bottom: 4px;">Select File (.csv or .json):</label>
+          <label style="font-weight: 600; display: block; margin-bottom: 4px;">Select File (.xlsx, .csv or .json):</label>
           <div id="import-dropzone" 
                onclick="document.getElementById('import-file').click()" 
                ondragover="app.onImportDragOver(event)" 
@@ -788,10 +789,10 @@
                ondrop="app.onImportDrop(event)"
                style="border: 2px dashed var(--border-color); border-radius: 8px; padding: 20px; text-align: center; background: #F8FAFC; cursor: pointer; transition: all 0.2s;">
             <svg class="lucide" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--primary-color)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom: 6px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" x2="12" y1="3" y2="15"></line></svg>
-            <div id="import-dropzone-text" style="font-size: 0.9rem; font-weight: 600; color: var(--primary-color);">Click or Drag & Drop .CSV or .JSON File Here</div>
-            <div id="import-file-details" style="font-size: 0.78rem; color: var(--text-muted); margin-top: 4px;">Supports standard M-LIS exported records</div>
+            <div id="import-dropzone-text" style="font-size: 0.9rem; font-weight: 600; color: var(--primary-color);">Click or Drag & Drop .XLSX, .CSV, or .JSON File Here</div>
+            <div id="import-file-details" style="font-size: 0.78rem; color: var(--text-muted); margin-top: 4px;">Supports standard M-LIS exported records (.xlsx, .csv, .json)</div>
           </div>
-          <input type="file" id="import-file" accept=".csv, .json, text/csv, application/json" onchange="app.onImportFileSelected(this)" style="display: none;">
+          <input type="file" id="import-file" accept=".xlsx, .csv, .json, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, text/csv, application/json" onchange="app.onImportFileSelected(this)" style="display: none;">
         </div>
         <div class="form-group" style="margin-bottom: 20px; display: flex; align-items: center; gap: 8px;">
           <input type="checkbox" id="import-dry-run" style="width: 16px; height: 16px;">

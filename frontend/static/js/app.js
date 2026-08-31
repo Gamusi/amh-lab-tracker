@@ -5666,7 +5666,7 @@ const app = {
     const dryRun = document.getElementById('import-dry-run') && document.getElementById('import-dry-run').checked ? 'true' : 'false';
     const fileInput = document.getElementById('import-file');
     if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
-      this.showNotificationModal("Validation Error", "Please select a CSV or JSON file to import.", true);
+      this.showNotificationModal("Validation Error", "Please select an Excel (.xlsx), CSV or JSON file to import.", true);
       return;
     }
 
@@ -5679,14 +5679,27 @@ const app = {
     }
 
     try {
+      const isXlsx = file.name && file.name.toLowerCase().endsWith('.xlsx');
+      const isJson = file.name && file.name.toLowerCase().endsWith('.json');
+
       const fileContent = yield new Promise(function(resolve, reject) {
         const reader = new FileReader();
         reader.onload = function(evt) { resolve(evt.target.result); };
         reader.onerror = function(err) { reject(err); };
-        reader.readAsText(file);
+        if (isXlsx) {
+          reader.readAsArrayBuffer(file);
+        } else {
+          reader.readAsText(file);
+        }
       });
 
-      const contentType = (file.name && file.name.endsWith('.json')) ? 'application/json' : 'text/csv';
+      let contentType = 'text/csv';
+      if (isXlsx) {
+        contentType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+      } else if (isJson) {
+        contentType = 'application/json';
+      }
+
       const endpoint = dataset === 'clients' ? `/api/import/clients?dry_run=${dryRun}` : `/api/import/results?dry_run=${dryRun}`;
 
       const res = yield fetch(endpoint, {
