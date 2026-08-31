@@ -50,7 +50,7 @@ def test_build_metadata_table_compliance():
     }
     table = _build_metadata_table(order_data)
     assert isinstance(table, Table)
-    assert table._cellvalues[0][0] == "Patient Name:"
+    assert table._cellvalues[0][0] == "Client Name:"
     assert table._cellvalues[0][1] == "SARAH NAMUBIRU"
     assert table._cellvalues[0][2] == "Lab No:"
     assert table._cellvalues[0][3] == "amh-26-08-001"

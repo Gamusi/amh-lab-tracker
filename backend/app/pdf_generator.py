@@ -65,7 +65,7 @@ def _build_metadata_table(order_data: dict) -> Table:
     specimen = order_data.get("specimen", "")
     
     data = [
-        ["Patient Name:", str(order_data.get("full_name") or ""), "Lab No:", str(lab_no)],
+        ["Client Name:", str(order_data.get("full_name") or ""), "Lab No:", str(lab_no)],
         ["Age:", str(order_data.get("age") or ""), "Sex:", str(order_data.get("sex") or "")],
         ["Requested by:", str(requested_by), "Date:", str(date_val)],
         ["Ward / OPD:", str(ward), "Specimen:", str(specimen)]
@@ -83,7 +83,7 @@ def _build_metadata_table(order_data: dict) -> Table:
     ]))
     return t
 
-def _build_department_table(dept_name: str, tests: list) -> KeepTogether:
+def _build_department_table(dept_name: str, tests: list, compact: bool = False) -> KeepTogether:
     # 5-column layout: Test (150), Result (75), Unit (60), Flag (55), Reference (140) = 480 pt total
     data = []
     
@@ -112,12 +112,13 @@ def _build_department_table(dept_name: str, tests: list) -> KeepTogether:
         Paragraph("Reference", tbl_header_style)
     ])
     
+    row_pad = 2.0 if compact else 3.5
     style_cmds = [
         ('FONTNAME', (0,0), (-1,-1), FONT_REGULAR),
         ('FONTSIZE', (0,0), (-1,-1), 8),
         ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#e0e0e0')),
-        ('TOPPADDING', (0,0), (-1,-1), 3.5),
-        ('BOTTOMPADDING', (0,0), (-1,-1), 3.5),
+        ('TOPPADDING', (0,0), (-1,-1), row_pad),
+        ('BOTTOMPADDING', (0,0), (-1,-1), row_pad),
         ('ALIGN', (0,0), (-1,-1), 'LEFT'),
         ('ALIGN', (3,0), (3,-1), 'CENTER'),
         ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
@@ -251,7 +252,7 @@ def _build_department_table(dept_name: str, tests: list) -> KeepTogether:
     
     t_elem.setStyle(TableStyle(style_cmds))
     
-    return KeepTogether([t_elem, Spacer(1, 10)])
+    return KeepTogether([t_elem, Spacer(1, 4 if compact else 10)])
 
 def _build_signatures_table(order_data: dict, compact: bool = False) -> KeepTogether:
     tech = str(order_data.get("technician_name") or "").strip()
@@ -291,12 +292,16 @@ def _clean_urinalysis_name(name: str) -> str:
     return name_str
 
 
-def _build_urinalysis_table(urinalysis_test: dict) -> KeepTogether:
+def _build_urinalysis_table(urinalysis_test: dict, compact: bool = False) -> KeepTogether:
     items = []
     ua_p_style = ParagraphStyle(name="UaParaStyle", fontName=FONT_REGULAR, fontSize=7.5, leading=9)
     
     if urinalysis_test.get("parameters"):
-        for p in urinalysis_test["parameters"]:
+        sorted_params = sorted(
+            urinalysis_test["parameters"],
+            key=lambda p: (p.get("sort_order") if p.get("sort_order") is not None else 999)
+        )
+        for p in sorted_params:
             pname = _clean_urinalysis_name(p.get("name") or p.get("parameter_name") or "")
             pres = p.get("result") if p.get("result") is not None else p.get("result_value", "")
             
@@ -379,6 +384,7 @@ def _build_urinalysis_table(urinalysis_test: dict) -> KeepTogether:
         data.append([p1, r1, p2, r2])
 
     t = Table(data, colWidths=[145, 95, 145, 95])
+    row_pad = 1.5 if compact else 2.0
     t.setStyle(TableStyle([
         ('SPAN', (0,0), (3,0)),
         ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
@@ -390,11 +396,11 @@ def _build_urinalysis_table(urinalysis_test: dict) -> KeepTogether:
         ('FONTNAME', (0,2), (-1,-1), 'Helvetica'),
         ('FONTSIZE', (0,2), (-1,-1), 7.5),
         ('ALIGN', (0,0), (-1,-1), 'LEFT'),
-        ('BOTTOMPADDING', (0,0), (-1,-1), 2),
-        ('TOPPADDING', (0,0), (-1,-1), 2),
+        ('BOTTOMPADDING', (0,0), (-1,-1), row_pad),
+        ('TOPPADDING', (0,0), (-1,-1), row_pad),
         ('GRID', (0,1), (-1,-1), 0.3, colors.HexColor('#d0d0d0')),
     ]))
-    return KeepTogether([t, Spacer(1, 10)])
+    return KeepTogether([t, Spacer(1, 4 if compact else 10)])
 
 def _build_cbc_patient_header(order_data: dict) -> Table:
     client_no = str(order_data.get("client_number") or order_data.get("client_id") or "")
@@ -525,6 +531,7 @@ def _build_cbc_table(order_data: dict, cbc_test: dict) -> list:
         if digits and int(digits) < 18:
             is_child = True
     demo_category = "Child" if is_child else "Adult"
+    sex = str(order_data.get("sex") or "").strip().upper()[:1]
 
     def get_row(name_matcher, display_name, def_unit, def_ref):
         match = None
@@ -556,34 +563,57 @@ def _build_cbc_table(order_data: dict, cbc_test: dict) -> list:
 
 
     # Section 1: Main Indices
-    sec1 = [
-        get_row("Total WBC Count", "Total WBC Count", "(10^3 / uL)", "6.0-14.0"),
-        get_row("Red Blood Cells", "Red Blood Cells (RBC)", "(10^6 / uL)", "4.00 -5.20"),
-        get_row("Hemoglobin", "Hemoglobin (Hb)", "g/dL", "11.5-15.5"),
-        get_row("Hematocrit", "Hematocrit (HCT)", "%", "35.0-45.0"),
-        get_row("Mean Cell Volume", "Mean Cell Volume (MCV)", "fL", "77.0-95.0"),
-        get_row("Mean Cell Hb (MCH)", "Mean Cell Hb (MCH)", "pg", "23.0-31.0"),
-        get_row("Mean Cell Hb Conc", "Mean Cell Hb Conc.(MCHC)", "g/dL", "28.0-33.0"),
-        get_row("Platelets Count", "Platelets Count", "(10^3 / uL)", "150-400"),
-    ]
-
-    # Section 2: Differential Relative (%)
-    sec2 = [
-        get_row("Neutrophils (%)", "Neutrophils", "%", "40.0-65.0"),
-        get_row("Lymphocytes (%)", "Lymphocytes", "%", "19.2-49.5"),
-        get_row("Monocytes (%)", "Monocytes", "%", "4.5-12.1"),
-        get_row("Eosinophils (%)", "Eosinophils", "%", "1.0-12.0"),
-        get_row("Basophils (%)", "Basophils", "%", "0.0-1.0"),
-    ]
-
-    # Section 3: Differential Absolute
-    sec3 = [
-        get_row("Neutrophils (Absolute", "Neutrophils Count", "(10^9 / uL)", "2.00-6.00"),
-        get_row("Lymphocytes (Absolute", "Lymphocytes Count", "(10^9 / uL)", "5.00-8.50"),
-        get_row("Monocytes (Absolute", "Monocytes Count", "(10^9 / uL)", "0.70-1.50"),
-        get_row("Eosinophils (Absolute", "Eosinophils Count", "(10^9 / uL)", "0.30-0.80"),
-        get_row("Basophils (Absolute", "Basophils Count", "(10^9 / uL)", "0.0-0.5"),
-    ]
+    if is_child:
+        sec1 = [
+            get_row("Total WBC Count", "Total WBC Count", "(10^3 / uL)", "6.0-14.0"),
+            get_row("Red Blood Cells", "Red Blood Cells (RBC)", "(10^6 / uL)", "4.00 -5.20"),
+            get_row("Hemoglobin", "Hemoglobin (Hb)", "g/dL", "11.5-15.5"),
+            get_row("Hematocrit", "Hematocrit (HCT)", "%", "35.0-45.0"),
+            get_row("Mean Cell Volume", "Mean Cell Volume (MCV)", "fL", "77.0-95.0"),
+            get_row("Mean Cell Hb (MCH)", "Mean Cell Hb (MCH)", "pg", "23.0-31.0"),
+            get_row("Mean Cell Hb Conc", "Mean Cell Hb Conc.(MCHC)", "g/dL", "28.0-33.0"),
+            get_row("Platelets Count", "Platelets Count", "(10^3 / uL)", "150-450"),
+        ]
+        sec2 = [
+            get_row("Neutrophils (%)", "Neutrophils", "%", "28.0-78.0"),
+            get_row("Lymphocytes (%)", "Lymphocytes", "%", "19.0-60.0"),
+            get_row("Monocytes (%)", "Monocytes", "%", "2.0-12.0"),
+            get_row("Eosinophils (%)", "Eosinophils", "%", "1.0-6.0"),
+            get_row("Basophils (%)", "Basophils", "%", "0.0-1.0"),
+        ]
+        sec3 = [
+            get_row("Neutrophils (Absolute", "Neutrophils Count", "(10^9 / uL)", "1.50-8.50"),
+            get_row("Lymphocytes (Absolute", "Lymphocytes Count", "(10^9 / uL)", "1.50-7.00"),
+            get_row("Monocytes (Absolute", "Monocytes Count", "(10^9 / uL)", "0.20-1.00"),
+            get_row("Eosinophils (Absolute", "Eosinophils Count", "(10^9 / uL)", "0.05-0.70"),
+            get_row("Basophils (Absolute", "Basophils Count", "(10^9 / uL)", "0.0-0.2"),
+        ]
+    else:
+        # Adult
+        sec1 = [
+            get_row("Total WBC Count", "Total WBC Count", "(10^3 / uL)", "4.0-10.0"),
+            get_row("Red Blood Cells", "Red Blood Cells (RBC)", "(10^6 / uL)", "4.50-5.90" if sex == "M" else "4.00-5.20"),
+            get_row("Hemoglobin", "Hemoglobin (Hb)", "g/dL", "13.0-17.5" if sex == "M" else "12.0-15.5"),
+            get_row("Hematocrit", "Hematocrit (HCT)", "%", "40.0-52.0" if sex == "M" else "36.0-48.0"),
+            get_row("Mean Cell Volume", "Mean Cell Volume (MCV)", "fL", "80.0-100.0"),
+            get_row("Mean Cell Hb (MCH)", "Mean Cell Hb (MCH)", "pg", "27.0-34.0"),
+            get_row("Mean Cell Hb Conc", "Mean Cell Hb Conc.(MCHC)", "g/dL", "32.0-36.0"),
+            get_row("Platelets Count", "Platelets Count", "(10^3 / uL)", "150-400"),
+        ]
+        sec2 = [
+            get_row("Neutrophils (%)", "Neutrophils", "%", "40.0-75.0"),
+            get_row("Lymphocytes (%)", "Lymphocytes", "%", "20.0-45.0"),
+            get_row("Monocytes (%)", "Monocytes", "%", "2.0-10.0"),
+            get_row("Eosinophils (%)", "Eosinophils", "%", "1.0-6.0"),
+            get_row("Basophils (%)", "Basophils", "%", "0.0-1.0"),
+        ]
+        sec3 = [
+            get_row("Neutrophils (Absolute", "Neutrophils Count", "(10^9 / uL)", "2.00-7.00"),
+            get_row("Lymphocytes (Absolute", "Lymphocytes Count", "(10^9 / uL)", "1.00-3.00"),
+            get_row("Monocytes (Absolute", "Monocytes Count", "(10^9 / uL)", "0.20-1.00"),
+            get_row("Eosinophils (Absolute", "Eosinophils Count", "(10^9 / uL)", "0.02-0.50"),
+            get_row("Basophils (Absolute", "Basophils Count", "(10^9 / uL)", "0.0-0.1"),
+        ]
 
     # Section 4: RBC / Platelet Indices
     sec4 = [
@@ -700,10 +730,13 @@ def generate_pdf(order_data: dict, results_data: list) -> bytes:
 
     # If we have other tests, render main report page first
     if other_departments or not cbc_test:
+        total_tests_count = sum(len(d.get("tests", [])) for d in other_departments)
+        is_dense = total_tests_count > 5
+
         flowables.append(Paragraph("Laboratory Report", title_style))
-        flowables.append(Spacer(1, 8))
+        flowables.append(Spacer(1, 4 if is_dense else 8))
         flowables.append(_build_metadata_table(order_data))
-        flowables.append(Spacer(1, 10))
+        flowables.append(Spacer(1, 6 if is_dense else 10))
         
         urinalysis_test = None
         for dept_data in other_departments:
@@ -736,12 +769,12 @@ def generate_pdf(order_data: dict, results_data: list) -> bytes:
                     tests_to_render.append(t)
                     
             if tests_to_render:
-                flowables.append(_build_department_table(dept_name, tests_to_render))
+                flowables.append(_build_department_table(dept_name, tests_to_render, compact=is_dense))
                 
         if urinalysis_test:
-            flowables.append(_build_urinalysis_table(urinalysis_test))
+            flowables.append(_build_urinalysis_table(urinalysis_test, compact=is_dense))
             
-        flowables.append(_build_signatures_table(order_data))
+        flowables.append(_build_signatures_table(order_data, compact=is_dense))
         
         if cbc_test:
             flowables.append(PageBreak())

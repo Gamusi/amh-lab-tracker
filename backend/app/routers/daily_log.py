@@ -67,6 +67,7 @@ def get_daily_log(date_str: str = Query(..., alias="date"), conn: sqlite3.Connec
     order_stats = cur.fetchall()
     total_orders = 0
     pending_orders = 0
+    entered_orders = 0
     completed_orders = 0
     
     for stat in order_stats:
@@ -75,6 +76,8 @@ def get_daily_log(date_str: str = Query(..., alias="date"), conn: sqlite3.Connec
         total_orders += count
         if status == "pending":
             pending_orders += count
+        elif status == "entered":
+            entered_orders += count
         elif status == "completed":
             completed_orders += count
 
@@ -89,16 +92,16 @@ def get_daily_log(date_str: str = Query(..., alias="date"), conn: sqlite3.Connec
         "order_summary": {
             "total": total_orders,
             "pending": pending_orders,
+            "entered": entered_orders,
             "completed": completed_orders
         }
     }
 
 @router.post("")
 def save_daily_log(req: DailyLogSaveRequest, conn: sqlite3.Connection = Depends(get_db), current_user: dict = Depends(get_current_user)):
-    
     cur = conn.cursor()
     saved_count = 0
-    now_str = datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+    now_str = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
 
     for item in req.entries:
         cur.execute("SELECT id, is_tracked FROM tests WHERE id = ?", (item.test_id,))
@@ -128,5 +131,6 @@ def save_daily_log(req: DailyLogSaveRequest, conn: sqlite3.Connection = Depends(
         saved_count += 1
 
     conn.commit()
+    return {"status": "saved", "rows_saved": saved_count}
 
 
