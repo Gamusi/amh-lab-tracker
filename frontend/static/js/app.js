@@ -3402,6 +3402,10 @@ const app = {
          if (paramResults && paramResults.length > 0) {
            const isEditMode = document.getElementById('result-entry-is-edit') ? document.getElementById('result-entry-is-edit').value === '1' : false;
            const editReason = document.getElementById('result-entry-reason') ? document.getElementById('result-entry-reason').value.trim() : '';
+           if (isEditMode && !editReason) {
+             app.showNotificationModal("Error", "Reason for edit is required.", true);
+             return;
+           }
 
            const res = yield fetch('/api/clients/results', {
              method: 'POST',

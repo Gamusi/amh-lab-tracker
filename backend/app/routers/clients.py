@@ -6,6 +6,7 @@ from ..database import get_db
 from ..auth import get_current_user, require_admin
 from ..schemas import VisitCreate, TestResultCreate, AddOrdersRequest, ClientUpdate, BulkOrderDeleteRequest, BulkVisitDeleteRequest
 from ..biochem_validator import validate_biochem_parameter, validate_panel_consistency
+from ..evaluator import derive_hiv_outcome
 from .stock import deplete_kit_stock
 
 logger = logging.getLogger("amh_clients")
@@ -498,97 +499,145 @@ def increment_daily_entry(cur: sqlite3.Cursor, entry_date: str, test_id: int, is
 @router.post("/api/clients/results")
 def enter_result(req: TestResultCreate, conn: sqlite3.Connection = Depends(get_db), current_user: dict = Depends(get_current_user)):
     logger.info(f"User '{current_user['username']}' is entering result for order ID {req.order_id}")
-    cur = conn.cursor()
-    cur.execute("""
-        SELECT 
-            o.id as order_id, o.visit_id, o.test_id,
-            t.name as test_name, t.is_tracked,
-            c.date_of_birth, c.sex
-        FROM test_orders o
-        JOIN tests t ON o.test_id = t.id
-        LEFT JOIN visits v ON o.visit_id = v.id
-        LEFT JOIN clients c ON v.client_id = c.id
-        WHERE o.id = ?
-    """, (req.order_id,))
-    order = cur.fetchone()
-    if not order:
-        logger.warning(f"Result entry failed: order ID {req.order_id} not found")
-        raise HTTPException(status_code=404, detail="Order not found")
+    try:
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT 
+                o.id as order_id, o.visit_id, o.test_id,
+                t.name as test_name, t.is_tracked,
+                c.date_of_birth, c.sex
+            FROM test_orders o
+            JOIN tests t ON o.test_id = t.id
+            LEFT JOIN visits v ON o.visit_id = v.id
+            LEFT JOIN clients c ON v.client_id = c.id
+            WHERE o.id = ?
+        """, (req.order_id,))
+        order = cur.fetchone()
+        if not order:
+            logger.warning(f"Result entry failed: order ID {req.order_id} not found")
+            raise HTTPException(status_code=404, detail="Order not found")
 
-    now_str = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
-    today = datetime.date.today()
-    today_str = today.strftime("%Y-%m-%d")
+        now_str = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+        today = datetime.date.today()
+        today_str = today.strftime("%Y-%m-%d")
 
-    dob_str = order["date_of_birth"]
-    dob = None
-    if dob_str:
-        try:
-            dob = datetime.datetime.strptime(dob_str[:10], "%Y-%m-%d").date()
-        except ValueError:
-            dob = None
-    sex = order["sex"] or ""
-    test_name = order["test_name"] or ""
-    age = (today.year - dob.year - ((today.month, today.day) < (dob.month, dob.day))) if dob else None
-
-    overall_positive = False
-
-    # Insert main result or parameter results with verified_at and verified_by_user_id
-    is_admin = current_user.get("role") in ["admin", "superadmin"]
-    verified_by = current_user["id"] if is_admin else None
-    verified_time = now_str if is_admin else None
-    order_status = "completed" if is_admin else "entered"
-
-    if req.parameter_results:
-        param_map = {}
-        param_info_list = []
-        for pr in req.parameter_results:
-            cur.execute("SELECT parameter_name, unit, secondary_unit FROM test_parameters WHERE id = ?", (pr.parameter_id,))
-            p_row = cur.fetchone()
-            param_name = ""
-            param_default_unit = None
-            if p_row:
-                param_name = p_row["parameter_name"]
-                param_default_unit = p_row["unit"]
-            else:
-                # Fallback: parameter_id may refer to a child test in the tests table
-                cur.execute("SELECT name, default_unit, secondary_unit FROM tests WHERE id = ?", (pr.parameter_id,))
-                t_row = cur.fetchone()
-                if t_row:
-                    param_name = t_row["name"]
-                    param_default_unit = t_row["default_unit"]
-
-            effective_unit = pr.result_unit or req.result_unit or param_default_unit
-            param_map[param_name] = (pr.result_value, effective_unit)
-            param_info_list.append((pr, param_name, effective_unit))
-
-        # Cross-analyte panel consistency check
-        try:
-            validate_panel_consistency(param_map)
-        except ValueError as e:
-            raise HTTPException(status_code=400, detail=str(e))
-
-        # Parameter validation, sanity checks, and scoring
-        for pr, param_name, effective_unit in param_info_list:
+        dob_str = order["date_of_birth"]
+        dob = None
+        if dob_str:
             try:
-                eval_dict = validate_biochem_parameter(cur, param_name, pr.result_value, age=age, sex=sex, unit=effective_unit)
+                dob = datetime.datetime.strptime(dob_str[:10], "%Y-%m-%d").date()
+            except ValueError:
+                dob = None
+        sex = order["sex"] or ""
+        test_name = order["test_name"] or ""
+        age = (today.year - dob.year - ((today.month, today.day) < (dob.month, dob.day))) if dob else None
+
+        overall_positive = False
+
+        # Insert main result or parameter results with verified_at and verified_by_user_id
+        is_admin = current_user.get("role") in ["admin", "superadmin"]
+        verified_by = current_user["id"] if is_admin else None
+        verified_time = now_str if is_admin else None
+        order_status = "completed" if is_admin else "entered"
+
+        if req.parameter_results:
+            param_map = {}
+            param_info_list = []
+            for pr in req.parameter_results:
+                cur.execute("SELECT parameter_name, unit, secondary_unit FROM test_parameters WHERE id = ?", (pr.parameter_id,))
+                p_row = cur.fetchone()
+                param_name = ""
+                param_default_unit = None
+                if p_row:
+                    param_name = p_row["parameter_name"]
+                    param_default_unit = p_row["unit"]
+                else:
+                    # Fallback: parameter_id may refer to a child test in the tests table
+                    cur.execute("SELECT name, default_unit, secondary_unit FROM tests WHERE id = ?", (pr.parameter_id,))
+                    t_row = cur.fetchone()
+                    if t_row:
+                        param_name = t_row["name"]
+                        param_default_unit = t_row["default_unit"]
+
+                effective_unit = pr.result_unit or req.result_unit or param_default_unit
+                param_map[param_name] = (pr.result_value, effective_unit)
+                param_info_list.append((pr, param_name, effective_unit))
+
+            # Cross-analyte panel consistency check
+            try:
+                validate_panel_consistency(param_map)
+            except ValueError as e:
+                raise HTTPException(status_code=400, detail=str(e))
+
+            # Parameter validation, sanity checks, and scoring
+            for pr, param_name, effective_unit in param_info_list:
+                try:
+                    eval_dict = validate_biochem_parameter(cur, param_name, pr.result_value, age=age, sex=sex, unit=effective_unit)
+                except ValueError as e:
+                    raise HTTPException(status_code=400, detail=str(e))
+
+                clinical_flag = eval_dict.get("flag")
+                pr_is_positive = eval_dict.get("is_abnormal", False)
+                saved_unit = effective_unit or eval_dict.get("unit")
+
+                if pr.result_value:
+                    pr_val_lower = str(pr.result_value).strip().lower()
+                    if pr_val_lower in ["positive", "abnormal", "reactive"] or pr_val_lower.startswith("positive") or pr_val_lower.startswith("reactive"):
+                        pr_is_positive = True
+                        if not clinical_flag:
+                            clinical_flag = "\u26A0"
+
+                if pr_is_positive:
+                    overall_positive = True
+
+                cur.execute("SELECT id, result_value FROM test_results WHERE order_id = ? AND parameter_id = ?", (req.order_id, pr.parameter_id))
+                res_row = cur.fetchone()
+                if res_row:
+                    if res_row["result_value"] is not None:
+                        if not req.edit_reason or not req.edit_reason.strip():
+                            raise HTTPException(status_code=400, detail="Reason for editing result is required")
+                        cur.execute("""
+                            INSERT INTO audit_log (user_id, action, detail, timestamp)
+                            VALUES (?, 'EDIT_RESULT', ?, ?)
+                        """, (current_user["id"], f"order_id={req.order_id} param_id={pr.parameter_id} old_value={res_row['result_value']!r} new_value={pr.result_value!r} reason={req.edit_reason!r}", now_str))
+
+                    cur.execute("""
+                        UPDATE test_results
+                        SET result_value = ?, is_positive = ?, result_unit = ?, clinical_flag = ?, edit_reason = ?, edited_by_user_id = ?, edited_at = ?, verified_by_user_id = ?, verified_at = ?
+                        WHERE id = ?
+                    """, (pr.result_value, pr_is_positive, saved_unit, clinical_flag, req.edit_reason, current_user["id"], now_str, verified_by, verified_time, res_row["id"]))
+                else:
+                    cur.execute("""
+                        INSERT INTO test_results (order_id, parameter_id, result_value, result_unit, clinical_flag, is_positive, entered_by_user_id, entered_at, verified_by_user_id, verified_at)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """, (req.order_id, pr.parameter_id, pr.result_value, saved_unit, clinical_flag, pr_is_positive, current_user["id"], now_str, verified_by, verified_time))
+
+            # Conclusive outcome derivation for HIV algorithm panels
+            if "hiv" in test_name.lower():
+                hiv_kit_data = [{"name": p_name, "result": pr.result_value} for pr, p_name, _ in param_info_list if pr.result_value]
+                if hiv_kit_data:
+                    hiv_outcome = derive_hiv_outcome(hiv_kit_data)
+                    overall_positive = (hiv_outcome.get("conclusive_status") == "Positive")
+        else:
+            try:
+                eval_dict = validate_biochem_parameter(cur, test_name, req.result_value, age=age, sex=sex, unit=req.result_unit)
             except ValueError as e:
                 raise HTTPException(status_code=400, detail=str(e))
 
             clinical_flag = eval_dict.get("flag")
-            pr_is_positive = eval_dict.get("is_abnormal", False)
-            saved_unit = effective_unit or eval_dict.get("unit")
+            is_positive = eval_dict.get("is_abnormal", False)
+            saved_unit = req.result_unit or eval_dict.get("unit")
 
-            if pr.result_value:
-                pr_val_lower = str(pr.result_value).strip().lower()
-                if pr_val_lower in ["positive", "abnormal", "reactive"] or pr_val_lower.startswith("positive") or pr_val_lower.startswith("reactive"):
-                    pr_is_positive = True
+            if req.result_value:
+                val_lower = str(req.result_value).strip().lower()
+                if val_lower in ["positive", "abnormal", "reactive"] or val_lower.startswith("positive") or val_lower.startswith("reactive"):
+                    is_positive = True
                     if not clinical_flag:
                         clinical_flag = "\u26A0"
 
-            if pr_is_positive:
-                overall_positive = True
+            overall_positive = is_positive
 
-            cur.execute("SELECT id, result_value FROM test_results WHERE order_id = ? AND parameter_id = ?", (req.order_id, pr.parameter_id))
+            cur.execute("SELECT id, result_value, result_unit FROM test_results WHERE order_id = ? AND parameter_id IS NULL", (req.order_id,))
             res_row = cur.fetchone()
             if res_row:
                 if res_row["result_value"] is not None:
@@ -597,66 +646,22 @@ def enter_result(req: TestResultCreate, conn: sqlite3.Connection = Depends(get_d
                     cur.execute("""
                         INSERT INTO audit_log (user_id, action, detail, timestamp)
                         VALUES (?, 'EDIT_RESULT', ?, ?)
-                    """, (current_user["id"], f"order_id={req.order_id} param_id={pr.parameter_id} old_value={res_row['result_value']!r} new_value={pr.result_value!r} reason={req.edit_reason!r}", now_str))
+                    """, (current_user["id"], f"order_id={req.order_id} old_value={res_row['result_value']!r} new_value={req.result_value!r} old_unit={res_row['result_unit']!r} new_unit={saved_unit!r} reason={req.edit_reason!r}", now_str))
 
                 cur.execute("""
                     UPDATE test_results
                     SET result_value = ?, is_positive = ?, result_unit = ?, clinical_flag = ?, edit_reason = ?, edited_by_user_id = ?, edited_at = ?, verified_by_user_id = ?, verified_at = ?
                     WHERE id = ?
-                """, (pr.result_value, pr_is_positive, saved_unit, clinical_flag, req.edit_reason, current_user["id"], now_str, verified_by, verified_time, res_row["id"]))
+                """, (req.result_value, is_positive, saved_unit, clinical_flag, req.edit_reason, current_user["id"], now_str, verified_by, verified_time, res_row["id"]))
             else:
                 cur.execute("""
                     INSERT INTO test_results (order_id, parameter_id, result_value, result_unit, clinical_flag, is_positive, entered_by_user_id, entered_at, verified_by_user_id, verified_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """, (req.order_id, pr.parameter_id, pr.result_value, saved_unit, clinical_flag, pr_is_positive, current_user["id"], now_str, verified_by, verified_time))
-    else:
-        try:
-            eval_dict = validate_biochem_parameter(cur, test_name, req.result_value, age=age, sex=sex, unit=req.result_unit)
-        except ValueError as e:
-            raise HTTPException(status_code=400, detail=str(e))
+                    VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (req.order_id, req.result_value, saved_unit, clinical_flag, is_positive, current_user["id"], now_str, verified_by, verified_time))
 
-        clinical_flag = eval_dict.get("flag")
-        is_positive = eval_dict.get("is_abnormal", False)
-        saved_unit = req.result_unit or eval_dict.get("unit")
+        cur.execute("UPDATE test_orders SET status = ? WHERE id = ?", (order_status, req.order_id))
 
-        if req.result_value:
-            val_lower = str(req.result_value).strip().lower()
-            if val_lower in ["positive", "abnormal", "reactive"] or val_lower.startswith("positive") or val_lower.startswith("reactive"):
-                is_positive = True
-                if not clinical_flag:
-                    clinical_flag = "\u26A0"
-
-        overall_positive = is_positive
-
-        cur.execute("SELECT id, result_value, result_unit FROM test_results WHERE order_id = ? AND parameter_id IS NULL", (req.order_id,))
-        res_row = cur.fetchone()
-        if res_row:
-            if res_row["result_value"] is not None:
-                if not req.edit_reason or not req.edit_reason.strip():
-                    raise HTTPException(status_code=400, detail="Reason for editing result is required")
-                cur.execute("""
-                    INSERT INTO audit_log (user_id, action, detail, timestamp)
-                    VALUES (?, 'EDIT_RESULT', ?, ?)
-                """, (current_user["id"], f"order_id={req.order_id} old_value={res_row['result_value']!r} new_value={req.result_value!r} old_unit={res_row['result_unit']!r} new_unit={saved_unit!r} reason={req.edit_reason!r}", now_str))
-
-            cur.execute("""
-                UPDATE test_results
-                SET result_value = ?, is_positive = ?, result_unit = ?, clinical_flag = ?, edit_reason = ?, edited_by_user_id = ?, edited_at = ?, verified_by_user_id = ?, verified_at = ?
-                WHERE id = ?
-            """, (req.result_value, is_positive, saved_unit, clinical_flag, req.edit_reason, current_user["id"], now_str, verified_by, verified_time, res_row["id"]))
-        else:
-            cur.execute("""
-                INSERT INTO test_results (order_id, parameter_id, result_value, result_unit, clinical_flag, is_positive, entered_by_user_id, entered_at, verified_by_user_id, verified_at)
-                VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (req.order_id, req.result_value, saved_unit, clinical_flag, is_positive, current_user["id"], now_str, verified_by, verified_time))
-
-    cur.execute("UPDATE test_orders SET status = ? WHERE id = ?", (order_status, req.order_id))
-
-    # Generalized Stock / Diagnostic Kit FEFO Auto-Depletion Engine
-    cur.execute("SELECT id FROM diagnostic_kit_transactions WHERE order_id = ? AND transaction_type = 'TEST_USAGE'", (req.order_id,))
-    already_depleted = cur.fetchone() is not None
-
-    if not already_depleted:
+        # Generalized Stock / Diagnostic Kit FEFO Auto-Depletion Engine
         cur.execute("SELECT name, tracks_stock, consumable_name FROM tests WHERE id = ?", (order["test_id"],))
         t_info = cur.fetchone()
         t_name = t_info["name"] if t_info else ""
@@ -665,60 +670,78 @@ def enter_result(req: TestResultCreate, conn: sqlite3.Connection = Depends(get_d
 
         if "hiv" in t_name.lower() and req.parameter_results:
             for pr in req.parameter_results:
-                if pr.result_value and str(pr.result_value).strip():
+                if pr.result_value and str(pr.result_value).strip() and str(pr.result_value).strip().lower() != "not done":
                     cur.execute("SELECT parameter_name FROM test_parameters WHERE id = ?", (pr.parameter_id,))
                     p_info = cur.fetchone()
                     if p_info and p_info["parameter_name"]:
-                        try:
-                            deplete_kit_stock(conn, kit_name=p_info["parameter_name"], order_id=req.order_id, user_id=current_user["id"], count=1)
-                        except Exception as e:
-                            logger.warning(f"HIV Stock depletion skipped/failed for {p_info['parameter_name']}: {e}")
+                        k_name = p_info["parameter_name"]
+                        # Check if this specific kit was already depleted for this order
+                        cur.execute("""
+                            SELECT id FROM diagnostic_kit_transactions
+                            WHERE order_id = ? AND transaction_type = 'TEST_USAGE'
+                            AND reason LIKE ?
+                        """, (req.order_id, f"%{k_name}%"))
+                        if not cur.fetchone():
+                            try:
+                                deplete_kit_stock(conn, kit_name=k_name, order_id=req.order_id, user_id=current_user["id"], count=1)
+                            except Exception as e:
+                                logger.warning(f"HIV Stock depletion skipped/failed for {k_name}: {e}")
         elif "urinalysis" in t_name.lower():
-            try:
-                deplete_kit_stock(conn, kit_name="Siemens Multistix 10SG Reagent Strips", order_id=req.order_id, user_id=current_user["id"], count=1)
-            except Exception as e:
-                logger.warning(f"Urinalysis strip depletion skipped/failed: {e}")
+            cur.execute("SELECT id FROM diagnostic_kit_transactions WHERE order_id = ? AND transaction_type = 'TEST_USAGE'", (req.order_id,))
+            if not cur.fetchone():
+                try:
+                    deplete_kit_stock(conn, kit_name="Siemens Multistix 10SG Reagent Strips", order_id=req.order_id, user_id=current_user["id"], count=1)
+                except Exception as e:
+                    logger.warning(f"Urinalysis strip depletion skipped/failed: {e}")
         elif t_tracks or t_consumable:
-            target_kit = t_consumable or t_name
-            try:
-                deplete_kit_stock(conn, test_id=order["test_id"], kit_name=target_kit, order_id=req.order_id, user_id=current_user["id"], count=1)
-            except Exception as e:
-                logger.warning(f"Stock depletion skipped/failed for {target_kit}: {e}")
+            cur.execute("SELECT id FROM diagnostic_kit_transactions WHERE order_id = ? AND transaction_type = 'TEST_USAGE'", (req.order_id,))
+            if not cur.fetchone():
+                target_kit = t_consumable or t_name
+                try:
+                    deplete_kit_stock(conn, test_id=order["test_id"], kit_name=target_kit, order_id=req.order_id, user_id=current_user["id"], count=1)
+                except Exception as e:
+                    logger.warning(f"Stock depletion skipped/failed for {target_kit}: {e}")
 
-    # Auto-increment DailyEntry counts (with HIV algorithm rollup support)
-    increment_daily_entry(cur, today_str, order["test_id"], overall_positive, current_user["id"])
+        # Auto-increment DailyEntry counts (with HIV algorithm rollup support)
+        increment_daily_entry(cur, today_str, order["test_id"], overall_positive, current_user["id"])
 
-    # Sequential Lab Number Assignment on the parent visit
-    assigned_lab_number = None
-    visit_id = order["visit_id"]
-    if visit_id:
-        cur.execute("SELECT id, lab_number FROM visits WHERE id = ?", (visit_id,))
-        v_row = cur.fetchone()
-        if v_row:
-            if not v_row["lab_number"]:
-                today = datetime.date.today()
-                yy_str = today.strftime("%y")
-                m_str = str(today.month)  # Non-zero-padded month (e.g. 8 not 08)
-                ym_key = f"{yy_str}_{m_str}"
-                seq_name = f"lab_number_{ym_key}"
-                cur.execute("INSERT OR IGNORE INTO sequence_tracker (seq_name, last_value) VALUES (?, 0)", (seq_name,))
-                cur.execute("UPDATE sequence_tracker SET last_value = last_value + 1 WHERE seq_name = ?", (seq_name,))
-                cur.execute("SELECT last_value FROM sequence_tracker WHERE seq_name = ?", (seq_name,))
-                seq_row = cur.fetchone()
-                seq_val = seq_row["last_value"] if seq_row else 1
+        # Sequential Lab Number Assignment on the parent visit
+        assigned_lab_number = None
+        visit_id = order["visit_id"]
+        if visit_id:
+            cur.execute("SELECT id, lab_number FROM visits WHERE id = ?", (visit_id,))
+            v_row = cur.fetchone()
+            if v_row:
+                if not v_row["lab_number"]:
+                    today = datetime.date.today()
+                    yy_str = today.strftime("%y")
+                    m_str = str(today.month)  # Non-zero-padded month (e.g. 8 not 08)
+                    ym_key = f"{yy_str}_{m_str}"
+                    seq_name = f"lab_number_{ym_key}"
+                    cur.execute("INSERT OR IGNORE INTO sequence_tracker (seq_name, last_value) VALUES (?, 0)", (seq_name,))
+                    cur.execute("UPDATE sequence_tracker SET last_value = last_value + 1 WHERE seq_name = ?", (seq_name,))
+                    cur.execute("SELECT last_value FROM sequence_tracker WHERE seq_name = ?", (seq_name,))
+                    seq_row = cur.fetchone()
+                    seq_val = seq_row["last_value"] if seq_row else 1
 
-                cur.execute("SELECT facility_acronym FROM facility_settings WHERE id = 1")
-                fac_row = cur.fetchone()
-                fac_acronym = fac_row["facility_acronym"] if fac_row and fac_row["facility_acronym"] else "AMH"
+                    cur.execute("SELECT facility_acronym FROM facility_settings WHERE id = 1")
+                    fac_row = cur.fetchone()
+                    fac_acronym = fac_row["facility_acronym"] if fac_row and fac_row["facility_acronym"] else "AMH"
 
-                assigned_lab_number = f"{fac_acronym}-{yy_str}-{m_str}-{seq_val:03d}"
-                cur.execute("UPDATE visits SET lab_number = ? WHERE id = ?", (assigned_lab_number, visit_id))
-            else:
-                assigned_lab_number = v_row["lab_number"]
+                    assigned_lab_number = f"{fac_acronym}-{yy_str}-{m_str}-{seq_val:03d}"
+                    cur.execute("UPDATE visits SET lab_number = ? WHERE id = ?", (assigned_lab_number, visit_id))
+                else:
+                    assigned_lab_number = v_row["lab_number"]
 
-    conn.commit()
-    logger.info(f"Result saved successfully for order ID {req.order_id}, lab_number={assigned_lab_number}")
-    return {"status": "result_saved", "order_id": req.order_id, "auto_incremented_daily_log": True, "lab_number": assigned_lab_number}
+        conn.commit()
+        logger.info(f"Result saved successfully for order ID {req.order_id}, lab_number={assigned_lab_number}")
+        return {"status": "result_saved", "order_id": req.order_id, "auto_incremented_daily_log": True, "lab_number": assigned_lab_number}
+    except Exception as e:
+        conn.rollback()
+        if isinstance(e, HTTPException):
+            raise e
+        logger.error(f"Error entering result for order {req.order_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Database error saving result: {str(e)}")
 
 
 
