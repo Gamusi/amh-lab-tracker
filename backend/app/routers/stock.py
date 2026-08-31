@@ -245,25 +245,40 @@ def receive_stock_lot(
     if not kit_name or not lot_number:
         raise HTTPException(status_code=400, detail="Kit name and lot number are required")
 
-    cur = conn.cursor()
-    cur.execute("SELECT id FROM diagnostic_kit_lots WHERE LOWER(kit_name) = LOWER(?) AND LOWER(lot_number) = LOWER(?)", (kit_name, lot_number))
-    if cur.fetchone():
-        raise HTTPException(status_code=400, detail=f"Lot '{lot_number}' already exists for kit '{kit_name}'")
+    try:
+        exp_date = datetime.date.fromisoformat(req.expiry_date.strip()[:10])
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid expiry date format. Expected YYYY-MM-DD.")
+    
+    if exp_date <= datetime.date.today():
+        raise HTTPException(status_code=400, detail=f"Safety Gate: Cannot receive expired stock lot (Expiry date {req.expiry_date}). Expiry must be a future date.")
 
-    cur.execute("""
-        INSERT INTO diagnostic_kit_lots (test_id, kit_name, category, lot_number, expiry_date, initial_quantity, current_quantity, min_threshold, is_active, received_by_user_id)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
-    """, (req.test_id, kit_name, req.category or "General", lot_number, req.expiry_date, req.initial_quantity, req.initial_quantity, req.min_threshold or 25, current_user["id"]))
-    lot_id = cur.lastrowid
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT id FROM diagnostic_kit_lots WHERE LOWER(kit_name) = LOWER(?) AND LOWER(lot_number) = LOWER(?)", (kit_name, lot_number))
+        if cur.fetchone():
+            raise HTTPException(status_code=400, detail=f"Lot '{lot_number}' already exists for kit '{kit_name}'")
 
-    cur.execute("""
-        INSERT INTO diagnostic_kit_transactions (lot_id, transaction_type, quantity_delta, reason, user_id)
-        VALUES (?, 'RECEIPT', ?, 'New stock lot received', ?)
-    """, (lot_id, req.initial_quantity, current_user["id"]))
+        cur.execute("""
+            INSERT INTO diagnostic_kit_lots (test_id, kit_name, category, lot_number, expiry_date, initial_quantity, current_quantity, min_threshold, is_active, received_by_user_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
+        """, (req.test_id, kit_name, req.category or "General", lot_number, req.expiry_date, req.initial_quantity, req.initial_quantity, max(0, req.min_threshold or 25), current_user["id"]))
+        lot_id = cur.lastrowid
 
-    conn.execute("INSERT INTO audit_log (user_id, action, detail) VALUES (?, 'STOCK_RECEIVE', ?)",
-                 (current_user["id"], f"Received {req.initial_quantity} units of {kit_name} (Lot {lot_number}, Exp: {req.expiry_date})"))
-    conn.commit()
+        cur.execute("""
+            INSERT INTO diagnostic_kit_transactions (lot_id, transaction_type, quantity_delta, reason, user_id)
+            VALUES (?, 'RECEIPT', ?, 'New stock lot received', ?)
+        """, (lot_id, req.initial_quantity, current_user["id"]))
+
+        conn.execute("INSERT INTO audit_log (user_id, action, detail) VALUES (?, 'STOCK_RECEIVE', ?)",
+                     (current_user["id"], f"Received {req.initial_quantity} units of {kit_name} (Lot {lot_number}, Exp: {req.expiry_date})"))
+        conn.commit()
+    except HTTPException:
+        conn.rollback()
+        raise
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to receive stock lot: {str(e)}")
 
     return {"status": "success", "lot_id": lot_id, "message": f"Successfully received {req.initial_quantity} units of {kit_name}"}
 
@@ -284,25 +299,32 @@ def adjust_stock(
     if delta == 0:
         raise HTTPException(status_code=400, detail="Quantity adjustment cannot be zero")
 
-    cur = conn.cursor()
-    cur.execute("SELECT id, kit_name, lot_number, current_quantity FROM diagnostic_kit_lots WHERE id = ?", (req.lot_id,))
-    lot = cur.fetchone()
-    if not lot:
-        raise HTTPException(status_code=404, detail="Stock lot not found")
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT id, kit_name, lot_number, current_quantity FROM diagnostic_kit_lots WHERE id = ?", (req.lot_id,))
+        lot = cur.fetchone()
+        if not lot:
+            raise HTTPException(status_code=404, detail="Stock lot not found")
 
-    new_qty = lot["current_quantity"] + delta
-    if new_qty < 0:
-        raise HTTPException(status_code=400, detail=f"Adjustment would result in negative stock ({new_qty}). Current on hand: {lot['current_quantity']}")
+        new_qty = lot["current_quantity"] + delta
+        if new_qty < 0:
+            raise HTTPException(status_code=400, detail=f"Adjustment would result in negative stock ({new_qty}). Current on hand: {lot['current_quantity']}")
 
-    cur.execute("UPDATE diagnostic_kit_lots SET current_quantity = ? WHERE id = ?", (new_qty, req.lot_id))
-    cur.execute("""
-        INSERT INTO diagnostic_kit_transactions (lot_id, transaction_type, quantity_delta, reason, user_id)
-        VALUES (?, ?, ?, ?, ?)
-    """, (req.lot_id, req.transaction_type, delta, req.reason.strip(), current_user["id"]))
+        cur.execute("UPDATE diagnostic_kit_lots SET current_quantity = ? WHERE id = ?", (new_qty, req.lot_id))
+        cur.execute("""
+            INSERT INTO diagnostic_kit_transactions (lot_id, transaction_type, quantity_delta, reason, user_id)
+            VALUES (?, ?, ?, ?, ?)
+        """, (req.lot_id, req.transaction_type, delta, req.reason.strip(), current_user["id"]))
 
-    conn.execute("INSERT INTO audit_log (user_id, action, detail) VALUES (?, 'STOCK_ADJUST', ?)",
-                 (current_user["id"], f"Adjusted {lot['kit_name']} (Lot {lot['lot_number']}) by {delta} ({req.transaction_type}). Reason: {req.reason}"))
-    conn.commit()
+        conn.execute("INSERT INTO audit_log (user_id, action, detail) VALUES (?, 'STOCK_ADJUST', ?)",
+                     (current_user["id"], f"Adjusted {lot['kit_name']} (Lot {lot['lot_number']}) by {delta} ({req.transaction_type}). Reason: {req.reason}"))
+        conn.commit()
+    except HTTPException:
+        conn.rollback()
+        raise
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to adjust stock: {str(e)}")
 
     return {"status": "success", "new_quantity": new_qty, "message": f"Stock updated. New balance: {new_qty} units"}
 
@@ -459,6 +481,23 @@ def get_stock_reconciliation(
               AND DATE(o.ordered_at) >= ? AND DATE(o.ordered_at) <= ?
         """, (k_name, k_name, start_date, end_date))
         tests_done = cur.fetchone()[0]
+
+        # 4. Check for sub-parameter kit usage (e.g. Determine, Stat-Pak, Multistix)
+        if tests_done == 0:
+            cur.execute("""
+                SELECT COUNT(tr.id)
+                FROM test_results tr
+                JOIN test_parameters tp ON tr.parameter_id = tp.id
+                JOIN test_orders o ON tr.order_id = o.id
+                WHERE o.status IN ('entered', 'completed')
+                  AND (LOWER(tp.parameter_name) = LOWER(?) OR LOWER(tp.parameter_name) LIKE ?)
+                  AND tr.result_value IS NOT NULL
+                  AND LOWER(tr.result_value) NOT IN ('not done', 'pending', '', 'none')
+                  AND DATE(o.ordered_at) >= ? AND DATE(o.ordered_at) <= ?
+            """, (k_name, f"%{k_name}%", start_date, end_date))
+            param_done = cur.fetchone()[0]
+            if param_done > 0:
+                tests_done = param_done
 
         variance = consumed - tests_done
 
