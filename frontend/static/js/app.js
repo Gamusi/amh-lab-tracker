@@ -1698,6 +1698,18 @@ const app = {
 
   // Test Reports View
   renderClients: __async(function*(container) {
+    const isAdmin = this.currentUser && (this.currentUser.role === 'admin' || this.currentUser.role === 'superadmin');
+    const bulkBar = isAdmin ? `
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+        <label style="display: flex; align-items: center; gap: 6px; font-size: 0.8rem; cursor: pointer; font-weight: 600;">
+          <input type="checkbox" id="select-all-clients" onchange="app.toggleSelectAllClients(this.checked)"> Select All
+        </label>
+        <button id="btn-bulk-delete-clients" class="btn btn-danger btn-sm" style="display: none; padding: 2px 8px; font-size: 0.78rem;" onclick="app.bulkDeleteClients()">
+          Delete Selected (<span id="selected-clients-count">0</span>)
+        </button>
+      </div>
+    ` : '';
+
     container.innerHTML = `
       <div class="card">
         <div class="card-header">
@@ -1711,9 +1723,10 @@ const app = {
           <!-- Client List -->
           <div>
             <h3 style="font-size: 0.95rem; color: var(--primary-color); margin-bottom: 10px;">Registered Clients</h3>
-            <div class="form-group" style="margin-bottom: 12px;">
+            <div class="form-group" style="margin-bottom: 10px;">
               <input type="text" id="client-search-input" placeholder="Search client name/ID..." oninput="app.searchClients(this.value)">
             </div>
+            ${bulkBar}
             <div id="client-list-box" style="background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 6px; max-height: 500px; overflow-y: auto;">
               <p style="padding: 12px; color: var(--text-muted);">Loading client directory...</p>
             </div>
@@ -1743,21 +1756,92 @@ const app = {
         return;
       }
 
+      const isAdmin = this.currentUser && (this.currentUser.role === 'admin' || this.currentUser.role === 'superadmin');
       let html = '';
       clients.forEach(p => {
+        const checkboxHtml = isAdmin ? `
+          <input type="checkbox" class="client-checkbox" value="${p.id}" onclick="event.stopPropagation()" onchange="app.onClientSelectionChange()" style="margin-right: 10px; cursor: pointer;">
+        ` : '';
+
         html += `
-          <div style="padding: 10px 14px; border-bottom: 1px solid var(--border-color); cursor: pointer; transition: background 0.2s;" 
+          <div style="padding: 10px 14px; border-bottom: 1px solid var(--border-color); cursor: pointer; transition: background 0.2s; display: flex; align-items: center;" 
                onclick="app.selectClient(${p.id}, '${this.escape(p.client_number)}', '${this.escape(p.full_name)}', '${p.sex}')"
                onmouseover="this.style.background='#F1F5F9'" onmouseout="this.style.background='transparent'">
-            <div style="font-weight: 700; color: var(--primary-color);">${this.escape(p.full_name)}</div>
-            <div style="font-size: 0.8rem; color: var(--text-muted);">ID: ${this.escape(p.client_number)} | Sex: ${p.sex}</div>
+            ${checkboxHtml}
+            <div style="flex: 1;">
+              <div style="font-weight: 700; color: var(--primary-color);">${this.escape(p.full_name)}</div>
+              <div style="font-size: 0.8rem; color: var(--text-muted);">ID: ${this.escape(p.client_number)} | Sex: ${p.sex}</div>
+            </div>
           </div>
         `;
       });
       box.innerHTML = html;
+      this.onClientSelectionChange();
     } catch (e) {
       console.error('Client search error:', e);
     }
+  }),
+
+  toggleSelectAllClients: function(checked) {
+    const checkboxes = document.querySelectorAll('.client-checkbox');
+    checkboxes.forEach(cb => cb.checked = checked);
+    this.onClientSelectionChange();
+  },
+
+  onClientSelectionChange: function() {
+    const selected = document.querySelectorAll('.client-checkbox:checked');
+    const all = document.querySelectorAll('.client-checkbox');
+    const selectAllCb = document.getElementById('select-all-clients');
+    if (selectAllCb && all.length > 0) {
+      selectAllCb.checked = selected.length === all.length;
+    }
+    const btn = document.getElementById('btn-bulk-delete-clients');
+    const countSpan = document.getElementById('selected-clients-count');
+    if (btn && countSpan) {
+      countSpan.textContent = selected.length;
+      btn.style.display = selected.length > 0 ? 'inline-block' : 'none';
+    }
+  },
+
+  bulkDeleteClients: __async(function*() {
+    const selected = Array.from(document.querySelectorAll('.client-checkbox:checked')).map(cb => parseInt(cb.value, 10));
+    if (selected.length === 0) return;
+
+    this.confirmAction(
+      "Delete Selected Clients",
+      `Are you sure you want to delete ${selected.length} client(s)? All associated visits, orders, and diagnostic results will be permanently removed.`,
+      __async(function*() {
+        try {
+          const res = yield fetch('/api/clients/bulk', {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ client_ids: selected })
+          });
+          if (res.ok) {
+            const data = yield res.json();
+            const deleted = data.deleted_client_ids || [];
+            app.showNotificationModal("Success", `Successfully deleted ${deleted.length} client(s).`, false);
+            const searchInput = document.getElementById('client-search-input');
+            const q = searchInput ? searchInput.value : '';
+            yield app.searchClients(q);
+            const detailBox = document.getElementById('client-detail-box');
+            if (detailBox) {
+              detailBox.innerHTML = `
+                <div style="padding: 32px; background: #F8FAFC; border-radius: 8px; border: 2px dashed var(--border-color); text-align: center; color: var(--text-muted);">
+                  Select a client from the list on the left to log diagnostic test results or view their official letterhead report.
+                </div>
+              `;
+            }
+          } else {
+            const err = yield res.json();
+            app.showNotificationModal("Error", err.detail || "Failed to delete selected clients.", true);
+          }
+        } catch(e) {
+          console.error(e);
+          app.showNotificationModal("Error", "Server error while deleting clients.", true);
+        }
+      })
+    );
   }),
 
   selectClient: __async(function*(pid, pnum, pname, psex) {
@@ -5429,7 +5513,7 @@ const app = {
     }
   },
 
-  submitBulkExport: function(e) {
+  submitBulkExport: __async(function*(e) {
     if (e) e.preventDefault();
     const dataset = document.getElementById('export-dataset') ? document.getElementById('export-dataset').value : 'clients';
     const format = document.getElementById('export-format') ? document.getElementById('export-format').value : 'csv';
@@ -5451,16 +5535,54 @@ const app = {
       if (sectionId) url += `&section_id=${encodeURIComponent(sectionId)}`;
     }
 
-    this.closeBulkExportModal();
-    this.showNotificationModal("Export Started", "Your dataset download has been initiated.", false);
+    const submitBtn = document.getElementById('export-submit-btn');
+    const origText = submitBtn ? submitBtn.textContent : 'Export and Download Data';
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Preparing Download...';
+    }
 
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', '');
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  },
+    try {
+      const res = yield fetch(url);
+      if (!res.ok) {
+        let errMsg = 'Failed to export dataset.';
+        try {
+          const errData = yield res.json();
+          if (errData && errData.detail) errMsg = errData.detail;
+        } catch(_) {}
+        this.showNotificationModal("Export Error", errMsg, true);
+        return;
+      }
+
+      const disposition = res.headers.get('Content-Disposition') || '';
+      let filename = dataset === 'clients' ? `clients_export.${format}` : `lab_results_export.${format}`;
+      if (disposition && disposition.indexOf('filename=') !== -1) {
+        const match = disposition.match(/filename="?([^"]+)"?/);
+        if (match && match[1]) filename = match[1];
+      }
+
+      const blob = yield res.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(blobUrl);
+
+      this.closeBulkExportModal();
+      this.showNotificationModal("Export Complete", `Downloaded ${filename} successfully.`, false);
+    } catch(err) {
+      console.error('Export error:', err);
+      this.showNotificationModal("Export Error", "Connection error during export: " + (err.message || String(err)), true);
+    } finally {
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.textContent = origText;
+      }
+    }
+  }),
 
   openBulkImportModal: function() {
     if (!this.currentUser || (this.currentUser.role !== 'admin' && this.currentUser.role !== 'superadmin')) {
@@ -5472,7 +5594,66 @@ const app = {
     const dryRunCheckbox = document.getElementById('import-dry-run');
     if (dryRunCheckbox) dryRunCheckbox.checked = false;
 
+    const dropzone = document.getElementById('import-dropzone');
+    const textEl = document.getElementById('import-dropzone-text');
+    const detailEl = document.getElementById('import-file-details');
+    if (dropzone) {
+      dropzone.style.borderColor = 'var(--border-color)';
+      dropzone.style.background = '#F8FAFC';
+    }
+    if (textEl) textEl.textContent = 'Click or Drag & Drop .CSV or .JSON File Here';
+    if (detailEl) detailEl.textContent = 'Supports standard M-LIS exported records';
+
     this.openModal('bulk-import-modal');
+  },
+
+  onImportDragOver: function(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    const dropzone = document.getElementById('import-dropzone');
+    if (dropzone) {
+      dropzone.style.borderColor = 'var(--primary-color)';
+      dropzone.style.background = '#EFF6FF';
+    }
+  },
+
+  onImportDragLeave: function(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    const dropzone = document.getElementById('import-dropzone');
+    if (dropzone) {
+      dropzone.style.borderColor = 'var(--border-color)';
+      dropzone.style.background = '#F8FAFC';
+    }
+  },
+
+  onImportDrop: function(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    const dropzone = document.getElementById('import-dropzone');
+    if (dropzone) {
+      dropzone.style.borderColor = 'var(--border-color)';
+      dropzone.style.background = '#F8FAFC';
+    }
+    const files = e.dataTransfer ? e.dataTransfer.files : null;
+    if (files && files.length > 0) {
+      const fileInput = document.getElementById('import-file');
+      if (fileInput) {
+        fileInput.files = files;
+        this.onImportFileSelected(fileInput);
+      }
+    }
+  },
+
+  onImportFileSelected: function(input) {
+    const textEl = document.getElementById('import-dropzone-text');
+    const detailEl = document.getElementById('import-file-details');
+    if (input && input.files && input.files.length > 0) {
+      const file = input.files[0];
+      const sizeKb = (file.size / 1024).toFixed(1);
+      if (textEl) textEl.textContent = `Selected: ${file.name}`;
+      if (detailEl) detailEl.textContent = `Size: ${sizeKb} KB | Type: ${file.type || 'text/csv'}`;
+    }
   },
 
   closeBulkImportModal: function() {
