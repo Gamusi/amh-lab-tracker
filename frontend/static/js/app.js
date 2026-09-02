@@ -3362,7 +3362,11 @@ const app = {
                 let optsHtml = pOpts.map(o => `<option value="${this.escape(o)}">${this.escape(o)}</option>`).join('');
                 valInputHtml = `<select class="modal-param-val" style="width: 100%; padding: 6px 8px; border: 1px solid var(--border-color); border-radius: 4px; font-size: 0.85rem;">${optsHtml}</select>`;
               } else {
-                valInputHtml = `<input type="text" class="modal-param-val" placeholder="Value" style="width: 100%; padding: 6px 8px; border: 1px solid var(--border-color); border-radius: 4px; box-sizing: border-box; font-size: 0.85rem;">`;
+                let pHolder = "Value";
+                if (p.ref_range) {
+                  pHolder = "Ref: " + p.ref_range;
+                }
+                valInputHtml = `<input type="text" class="modal-param-val" placeholder="${this.escape(pHolder)}" style="width: 100%; padding: 6px 8px; border: 1px solid var(--border-color); border-radius: 4px; box-sizing: border-box; font-size: 0.85rem;">`;
               }
 
               html += `
