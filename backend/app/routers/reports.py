@@ -398,11 +398,10 @@ def get_visit_report_pdf(visit_id: int, db: sqlite3.Connection = Depends(get_db)
     if not rows:
         raise HTTPException(status_code=400, detail="No completed test results found for this visit. Enter results before printing.")
     
-    dob_obj = None
+    dob_obj = dob
     age_int = None
-    if dob:
+    if dob_obj:
         try:
-            dob_obj = datetime.datetime.strptime(dob, "%Y-%m-%d").date()
             age_int = evaluator.calculate_age(dob_obj, datetime.date.today())
         except Exception:
             pass
@@ -574,15 +573,18 @@ def get_visit_report_pdf(visit_id: int, db: sqlite3.Connection = Depends(get_db)
         age_str = f"{age_val}y" if age_val > 0 else "<1y"
     elif visit_row["age_years"] is not None:
         ay = visit_row["age_years"]
-        if ay < 1.0:
-            months = int(round(ay * 12))
-            if months > 0:
-                age_str = f"{months}m"
-            else:
-                days = int(round(ay * 365))
-                age_str = f"{days}d" if days > 0 else "<1y"
+        if ay < 0.08: # ~29 days
+            days = round(ay * 365.25)
+            age_str = f"{days}d"
+        elif ay < 1.0:
+            months = round(ay * 12)
+            age_str = f"{months}m"
+        elif ay < 3.0:
+            yrs = int(ay)
+            rem_m = round((ay - yrs) * 12)
+            age_str = f"{yrs}y {rem_m}m" if rem_m > 0 else f"{yrs}y"
         else:
-            age_str = f"{int(ay)}y" if ay == int(ay) else f"{ay}y"
+            age_str = f"{int(ay)}y" if ay.is_integer() else f"{ay:g}y"
         
     clinician_name = visit_row["clinician_name"] or "SELF REQUEST"
 
