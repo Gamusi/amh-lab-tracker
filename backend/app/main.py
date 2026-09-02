@@ -28,11 +28,12 @@ async def log_requests(request: Request, call_next):
     logger.info(f"Method={request.method} Path={request.url.path} Status={response.status_code} Time={process_time:.2f}ms")
     return response
 
-from .routers import auth, daily_log, config, reports, trends, audit, clients, integrations, stock, export
+from .routers import auth, daily_log, config, reports, trends, audit, clients, integrations, stock, export, backlog
 
 # Register API Routers
 app.include_router(auth.router)
 app.include_router(daily_log.router)
+app.include_router(backlog.router)
 app.include_router(config.router)
 app.include_router(reports.router)
 app.include_router(trends.router)
