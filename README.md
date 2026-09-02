@@ -38,6 +38,7 @@ It is specifically engineered to run smoothly on resource-constrained hospital w
 - **Stock & Reagent Management:** Comprehensive inventory tracking for diagnostic kits (HIV, Malaria, etc.) with FIFO batch lot tracking, buffer alerts, and wastage logging.
 - **ISO 15189 Vector PDF Engine:** Text-selectable, official diagnostic report slips generated directly in Python via ReportLab with dual-identifier security, letterhead branding, and verifier digital signatures.
 - **Automated Surveillance Roll-up:** Client-level diagnostics automatically increment the master Uganda HMIS 105 Section 6 daily aggregate counts.
+- **Historical & Backlog Data Entry:** Permanent, high-speed register capture module allowing rapid summary entry of physical lab books (Tests Done, Positive/Findings, In-House, Referral, Outreach, Self-Request) across any historical date range with seamless blending into Operations and Surveillance analytics.
 - **Dynamic Aggregation:** Real-time generation of Daily, Weekly, Monthly, and Financial Year (July–June) operations and surveillance reports.
 - **Audit Ledger & RBAC:** Complete 3-tier Role-Based Access Control mapped to Uganda Ministry of Health (MoH) cadres with immutable before/after change logs.
 
