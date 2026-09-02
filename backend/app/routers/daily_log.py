@@ -2,7 +2,7 @@ import datetime, sqlite3
 from fastapi import APIRouter, Depends, HTTPException, Query
 from ..database import get_db
 from ..schemas import DailyLogSaveRequest
-from ..auth import get_current_user
+from ..auth import get_current_user, require_admin
 
 router = APIRouter(prefix="/api/daily-log", tags=["Daily Log"])
 
@@ -17,22 +17,39 @@ def get_daily_log(date_str: str = Query(..., alias="date"), conn: sqlite3.Connec
     cur.execute("SELECT id, name, sort_order FROM sections ORDER BY sort_order, id")
     sections = cur.fetchall()
     
+    # Query all active tests and their daily entries for this date in a single batch query
+    cur.execute("""
+        SELECT 
+            t.id as test_id, t.name as test_name, t.section_id, t.is_tracked, t.sort_order,
+            e.done, e.positive, e.entered_by_user_id, e.updated_at
+        FROM tests t
+        LEFT JOIN daily_entries e ON e.test_id = t.id AND e.entry_date = ?
+        WHERE t.is_active = 1
+        ORDER BY t.section_id, t.sort_order, t.id
+    """, (date_str,))
+    all_tests = cur.fetchall()
+
+    # Group tests by section_id
+    tests_by_section = {}
+    for row in all_tests:
+        sec_id = row["section_id"]
+        if sec_id not in tests_by_section:
+            tests_by_section[sec_id] = []
+        tests_by_section[sec_id].append(row)
+
     result_sections = []
     total_done_today = 0
     total_positive_today = 0
     total_rows_today = 0
 
     for sec in sections:
-        cur.execute("SELECT id, name, is_tracked FROM tests WHERE section_id = ? AND is_active = 1 ORDER BY sort_order, id", (sec["id"],))
-        tests = cur.fetchall()
+        sec_id = sec["id"]
+        tests = tests_by_section.get(sec_id, [])
         test_items = []
         
         for t in tests:
-            cur.execute("SELECT done, positive, entered_by_user_id, updated_at FROM daily_entries WHERE entry_date = ? AND test_id = ?", (date_str, t["id"]))
-            entry = cur.fetchone()
-            
-            done = entry["done"] if entry else 0
-            pos = entry["positive"] if entry else None
+            done = t["done"] if t["done"] is not None else 0
+            pos = t["positive"] if t["positive"] is not None else None
             
             if done > 0 or (pos is not None and pos > 0):
                 total_rows_today += 1
@@ -41,13 +58,13 @@ def get_daily_log(date_str: str = Query(..., alias="date"), conn: sqlite3.Connec
                     total_positive_today += pos
 
             test_items.append({
-                "test_id": t["id"],
-                "test_name": t["name"],
+                "test_id": t["test_id"],
+                "test_name": t["test_name"],
                 "is_tracked": bool(t["is_tracked"]),
                 "done": done,
                 "positive": pos if t["is_tracked"] else None,
-                "entered_by": entry["entered_by_user_id"] if entry else None,
-                "updated_at": entry["updated_at"] if entry else None
+                "entered_by": t["entered_by_user_id"],
+                "updated_at": t["updated_at"]
             })
         
         result_sections.append({
@@ -98,7 +115,7 @@ def get_daily_log(date_str: str = Query(..., alias="date"), conn: sqlite3.Connec
     }
 
 @router.post("")
-def save_daily_log(req: DailyLogSaveRequest, conn: sqlite3.Connection = Depends(get_db), current_user: dict = Depends(get_current_user)):
+def save_daily_log(req: DailyLogSaveRequest, conn: sqlite3.Connection = Depends(get_db), admin_user: dict = Depends(require_admin)):
     cur = conn.cursor()
     saved_count = 0
     now_str = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
@@ -126,7 +143,7 @@ def save_daily_log(req: DailyLogSaveRequest, conn: sqlite3.Connection = Depends(
             END,
             updated_by_user_id = excluded.entered_by_user_id,
             updated_at = excluded.entered_at
-        """, (req.entry_date, test["id"], done_val, pos_val, current_user["id"], now_str, current_user["id"], now_str))
+        """, (req.entry_date, test["id"], done_val, pos_val, admin_user["id"], now_str, admin_user["id"], now_str))
         
         saved_count += 1
 
