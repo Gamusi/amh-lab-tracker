@@ -4,14 +4,15 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
 from ..database import get_db
 from ..schemas import StockReceiveRequest, StockAdjustRequest
-from ..auth import get_current_user
+from ..auth import get_current_user, require_admin
 
 router = APIRouter(prefix="/api/stock", tags=["Inventory & Diagnostic Kits"])
 
 def deplete_kit_stock(conn: sqlite3.Connection, kit_name: Optional[str] = None, test_id: Optional[int] = None, order_id: Optional[int] = None, user_id: Optional[int] = None, count: int = 1):
     """
     FEFO (First-Expiring-First-Out) Auto-Depletion Engine.
-    Deducts stock from the earliest-expiring active unexpired lot.
+    Deducts stock from the earliest-expiring active unexpired lot(s).
+    Supports multi-lot split depletion if count exceeds a single lot.
     Enforces strict Expiry Lockout Safety Gate.
     """
     cur = conn.cursor()
@@ -41,48 +42,48 @@ def deplete_kit_stock(conn: sqlite3.Connection, kit_name: Optional[str] = None, 
     if not lots:
         return None
 
-    # Check for unexpired lots with available quantity
-    valid_lot = None
-    all_expired = True
+    unexpired_lots = [l for l in lots if str(l["expiry_date"]) >= today_str and l["current_quantity"] > 0]
+    matched_name = lots[0]["kit_name"]
 
-    for lot in lots:
-        is_expired = str(lot["expiry_date"]) < today_str
-        if not is_expired:
-            all_expired = False
-            if lot["current_quantity"] >= count:
-                valid_lot = lot
-                break
+    if not unexpired_lots:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Safety Block: Attempted use of expired kit lot for '{matched_name}'. All active lots have expired or are depleted."
+        )
 
-    if not valid_lot:
-        matched_name = lots[0]["kit_name"]
-        if all_expired:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Safety Block: Attempted use of expired kit lot for '{matched_name}'. All active lots have expired."
-            )
-        total_avail = sum(l["current_quantity"] for l in lots if str(l["expiry_date"]) >= today_str)
-        if total_avail < count:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Stock Depleted: Insufficient unexpired stock for '{matched_name}' ({total_avail} available, {count} required)."
-            )
+    total_avail = sum(l["current_quantity"] for l in unexpired_lots)
+    if total_avail < count:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Stock Depleted: Insufficient unexpired stock for '{matched_name}' ({total_avail} available, {count} required)."
+        )
 
-    lot_id = valid_lot["id"]
-    new_qty = valid_lot["current_quantity"] - count
+    remaining_to_deduct = count
+    depleted_records = []
 
-    cur.execute("UPDATE diagnostic_kit_lots SET current_quantity = ? WHERE id = ?", (new_qty, lot_id))
-    cur.execute("""
-        INSERT INTO diagnostic_kit_transactions (lot_id, transaction_type, quantity_delta, order_id, reason, user_id)
-        VALUES (?, 'TEST_USAGE', ?, ?, 'Automated clinical test deduction', ?)
-    """, (lot_id, -count, order_id, user_id))
+    for lot in unexpired_lots:
+        if remaining_to_deduct <= 0:
+            break
+        lot_id = lot["id"]
+        deduct_from_this_lot = min(lot["current_quantity"], remaining_to_deduct)
+        new_qty = lot["current_quantity"] - deduct_from_this_lot
 
-    return {
-        "lot_id": lot_id,
-        "kit_name": valid_lot["kit_name"],
-        "lot_number": valid_lot["lot_number"],
-        "deducted": count,
-        "current_quantity": new_qty
-    }
+        cur.execute("UPDATE diagnostic_kit_lots SET current_quantity = ? WHERE id = ?", (new_qty, lot_id))
+        cur.execute("""
+            INSERT INTO diagnostic_kit_transactions (lot_id, transaction_type, quantity_delta, order_id, reason, user_id)
+            VALUES (?, 'TEST_USAGE', ?, ?, 'Automated clinical test deduction', ?)
+        """, (lot_id, -deduct_from_this_lot, order_id, user_id))
+
+        depleted_records.append({
+            "lot_id": lot_id,
+            "kit_name": lot["kit_name"],
+            "lot_number": lot["lot_number"],
+            "deducted": deduct_from_this_lot,
+            "current_quantity": new_qty
+        })
+        remaining_to_deduct -= deduct_from_this_lot
+
+    return depleted_records[0] if len(depleted_records) == 1 else {"depleted_lots": depleted_records, "total_deducted": count}
 
 
 def compute_lot_status(expiry_date_str: str, current_quantity: int, min_threshold: int) -> str:
@@ -235,7 +236,7 @@ def get_stock_summary(
 def receive_stock_lot(
     req: StockReceiveRequest,
     conn: sqlite3.Connection = Depends(get_db),
-    current_user: dict = Depends(get_current_user)
+    admin_user: dict = Depends(require_admin)
 ):
     if req.initial_quantity <= 0:
         raise HTTPException(status_code=400, detail="Initial quantity must be greater than 0")
@@ -262,16 +263,16 @@ def receive_stock_lot(
         cur.execute("""
             INSERT INTO diagnostic_kit_lots (test_id, kit_name, category, lot_number, expiry_date, initial_quantity, current_quantity, min_threshold, is_active, received_by_user_id)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
-        """, (req.test_id, kit_name, req.category or "General", lot_number, req.expiry_date, req.initial_quantity, req.initial_quantity, max(0, req.min_threshold or 25), current_user["id"]))
+        """, (req.test_id, kit_name, req.category or "General", lot_number, req.expiry_date, req.initial_quantity, req.initial_quantity, max(0, req.min_threshold or 25), admin_user["id"]))
         lot_id = cur.lastrowid
 
         cur.execute("""
             INSERT INTO diagnostic_kit_transactions (lot_id, transaction_type, quantity_delta, reason, user_id)
             VALUES (?, 'RECEIPT', ?, 'New stock lot received', ?)
-        """, (lot_id, req.initial_quantity, current_user["id"]))
+        """, (lot_id, req.initial_quantity, admin_user["id"]))
 
         conn.execute("INSERT INTO audit_log (user_id, action, detail) VALUES (?, 'STOCK_RECEIVE', ?)",
-                     (current_user["id"], f"Received {req.initial_quantity} units of {kit_name} (Lot {lot_number}, Exp: {req.expiry_date})"))
+                     (admin_user["id"], f"Received {req.initial_quantity} units of {kit_name} (Lot {lot_number}, Exp: {req.expiry_date})"))
         conn.commit()
     except HTTPException:
         conn.rollback()
