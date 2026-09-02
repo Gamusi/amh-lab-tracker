@@ -4732,6 +4732,7 @@ const app = {
       document.getElementById('test-config-tracked').checked = !!test.is_tracked;
       document.getElementById('test-config-tracks-stock').checked = !!test.tracks_stock;
       document.getElementById('test-config-consumable-name').value = test.consumable_name || '';
+      document.getElementById('test-config-comments').value = test.clinical_comments || '';
     } else {
       document.getElementById('test-config-title').textContent = 'Add New Test';
       document.getElementById('test-config-id').value = '';
@@ -4741,6 +4742,7 @@ const app = {
       document.getElementById('test-config-tracked').checked = true;
       document.getElementById('test-config-tracks-stock').checked = false;
       document.getElementById('test-config-consumable-name').value = '';
+      document.getElementById('test-config-comments').value = '';
     }
     this.handleTestResultTypeChange();
     this.handleTestStockTrackingToggle();
@@ -4815,6 +4817,7 @@ const app = {
     const is_tracked = document.getElementById('test-config-tracked').checked;
     const tracks_stock = document.getElementById('test-config-tracks-stock').checked;
     const consumable_name = tracks_stock ? (document.getElementById('test-config-consumable-name').value.trim() || name) : null;
+    const clinical_comments = document.getElementById('test-config-comments').value.trim() || null;
     const parentRaw = document.getElementById('test-config-parent') ? document.getElementById('test-config-parent').value : '';
     const parent_rollup_id = parentRaw ? parseInt(parentRaw, 10) : null;
 
@@ -4828,7 +4831,7 @@ const app = {
       options = JSON.stringify(optionsRaw.split(',').map(s => s.trim()).filter(s => s));
     }
 
-    const payload = { name, section_id, is_tracked, result_type, default_unit, options, sort_order: 0, parent_rollup_id, tracks_stock, consumable_name };
+    const payload = { name, section_id, is_tracked, result_type, default_unit, options, sort_order: 0, parent_rollup_id, tracks_stock, consumable_name, clinical_comments };
     
     try {
       let res;

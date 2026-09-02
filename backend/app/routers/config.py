@@ -28,7 +28,7 @@ def get_sections(conn: sqlite3.Connection = Depends(get_db), current_user: dict 
 @router.get("/tests")
 def get_tests(conn: sqlite3.Connection = Depends(get_db), current_user: dict = Depends(get_current_user)):
     cur = conn.cursor()
-    cur.execute("SELECT id, name, section_id, is_tracked, parent_rollup_id, ref_range, panic_value_low, panic_value_high, is_active, sort_order, result_type, default_unit, secondary_unit, options, tracks_stock, consumable_name FROM tests WHERE is_active = 1 ORDER BY section_id, sort_order, id")
+    cur.execute("SELECT id, name, section_id, is_tracked, parent_rollup_id, ref_range, panic_value_low, panic_value_high, is_active, sort_order, result_type, default_unit, secondary_unit, options, tracks_stock, consumable_name, clinical_comments FROM tests WHERE is_active = 1 ORDER BY section_id, sort_order, id")
     return [dict(r) for r in cur.fetchall()]
 
 @router.get("/tests/{test_id}/parameters")
@@ -43,7 +43,7 @@ def get_test_children(test_id: int, conn: sqlite3.Connection = Depends(get_db), 
     cur = conn.cursor()
     cur.execute(
         """SELECT id, name, section_id, is_tracked, parent_rollup_id, sort_order,
-                  result_type, default_unit, secondary_unit, options, tracks_stock, consumable_name
+                  result_type, default_unit, secondary_unit, options, tracks_stock, consumable_name, clinical_comments
            FROM tests
            WHERE parent_rollup_id = ? AND is_active = 1
            ORDER BY sort_order, id""",
@@ -67,8 +67,8 @@ def create_test(req: TestCreate, admin_user: dict = Depends(require_admin), conn
     tracks_stock_val = 1 if req.tracks_stock else 0
 
     cur.execute(
-        "INSERT INTO tests (name, section_id, is_tracked, sort_order, result_type, default_unit, options, parent_rollup_id, tracks_stock, consumable_name) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-        (req.name, req.section_id, effective_tracked, req.sort_order, req.result_type, req.default_unit, req.options, req.parent_rollup_id, tracks_stock_val, req.consumable_name)
+        "INSERT INTO tests (name, section_id, is_tracked, sort_order, result_type, default_unit, options, parent_rollup_id, tracks_stock, consumable_name, clinical_comments) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (req.name, req.section_id, effective_tracked, req.sort_order, req.result_type, req.default_unit, req.options, req.parent_rollup_id, tracks_stock_val, req.consumable_name, req.clinical_comments)
     )
     tid = cur.lastrowid
     conn.commit()
@@ -76,7 +76,7 @@ def create_test(req: TestCreate, admin_user: dict = Depends(require_admin), conn
     conn.execute("INSERT INTO audit_log (user_id, action, detail) VALUES (?, ?, ?)", (admin_user["id"], "create_test", f"Created test '{req.name}'"))
     conn.commit()
     
-    return {"id": tid, "name": req.name, "section_id": req.section_id, "is_tracked": bool(effective_tracked), "result_type": req.result_type, "default_unit": req.default_unit, "options": req.options, "parent_rollup_id": req.parent_rollup_id, "tracks_stock": bool(tracks_stock_val), "consumable_name": req.consumable_name}
+    return {"id": tid, "name": req.name, "section_id": req.section_id, "is_tracked": bool(effective_tracked), "result_type": req.result_type, "default_unit": req.default_unit, "options": req.options, "parent_rollup_id": req.parent_rollup_id, "tracks_stock": bool(tracks_stock_val), "consumable_name": req.consumable_name, "clinical_comments": req.clinical_comments}
     
 
 @router.put("/tests/{test_id}", response_model=TestResponse)
@@ -96,9 +96,9 @@ def update_test(test_id: int, req: TestCreate, admin_user: dict = Depends(requir
 
     cur.execute("""
         UPDATE tests
-        SET name = ?, section_id = ?, is_tracked = ?, sort_order = ?, result_type = ?, default_unit = ?, options = ?, parent_rollup_id = ?, tracks_stock = ?, consumable_name = ?
+        SET name = ?, section_id = ?, is_tracked = ?, sort_order = ?, result_type = ?, default_unit = ?, options = ?, parent_rollup_id = ?, tracks_stock = ?, consumable_name = ?, clinical_comments = ?
         WHERE id = ?
-    """, (req.name, req.section_id, effective_tracked, req.sort_order, req.result_type, req.default_unit, req.options, req.parent_rollup_id, tracks_stock_val, req.consumable_name, test_id))
+    """, (req.name, req.section_id, effective_tracked, req.sort_order, req.result_type, req.default_unit, req.options, req.parent_rollup_id, tracks_stock_val, req.consumable_name, req.clinical_comments, test_id))
     
     conn.execute("INSERT INTO audit_log (user_id, action, detail) VALUES (?, ?, ?)", (admin_user["id"], "update_test", f"Updated test ID {test_id} ('{req.name}')"))
     conn.commit()
@@ -107,7 +107,7 @@ def update_test(test_id: int, req: TestCreate, admin_user: dict = Depends(requir
         is_tracked=bool(effective_tracked), sort_order=req.sort_order, is_active=bool(test_row["is_active"]),
         result_type=req.result_type, default_unit=req.default_unit, options=req.options,
         parent_rollup_id=req.parent_rollup_id, tracks_stock=bool(tracks_stock_val),
-        consumable_name=req.consumable_name
+        consumable_name=req.consumable_name, clinical_comments=req.clinical_comments
     )
 
 @router.delete("/tests/{test_id}")

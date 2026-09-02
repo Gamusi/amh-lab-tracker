@@ -393,6 +393,10 @@
           <label for="test-config-consumable-name">Diagnostic Kit / Consumable Name:</label>
           <input type="text" id="test-config-consumable-name" placeholder="e.g. Malaria Rapid Diagnostic Test (RDT)" style="width: 100%; padding: 8px;">
         </div>
+        <div class="form-group" style="margin-bottom: 12px;">
+          <label for="test-config-comments">Clinical Correlation & Interpretive Comment:</label>
+          <textarea id="test-config-comments" rows="3" placeholder="Clinical utility, normal correlates, abnormal correlates, and medical implications..." style="width: 100%; padding: 8px; font-size: 0.85rem; font-family: inherit; box-sizing: border-box;"></textarea>
+        </div>
         <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 24px;">
           <button type="button" class="btn btn-secondary" onclick="app.closeModal('test-config-modal')">Cancel</button>
           <button type="submit" class="btn btn-primary">Save Config</button>

@@ -47,6 +47,7 @@ class TestBase(BaseModel):
     parent_rollup_id: Optional[int] = None
     tracks_stock: Optional[bool] = False
     consumable_name: Optional[str] = None
+    clinical_comments: Optional[str] = None
 
 class TestCreate(TestBase):
     pass

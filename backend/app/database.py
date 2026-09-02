@@ -64,6 +64,7 @@ SCHEMA_SQL = """
         panic_value_low FLOAT,
         panic_value_high FLOAT,
         options TEXT,
+        clinical_comments TEXT,
         tracks_stock BOOLEAN NOT NULL DEFAULT 0,
         consumable_name TEXT,
         UNIQUE(name, section_id)
@@ -300,6 +301,7 @@ def init_db():
         ("tests", "result_type", "TEXT DEFAULT 'qualitative'"),
         ("tests", "default_unit", "TEXT"),
         ("tests", "options", "TEXT"),
+        ("tests", "clinical_comments", "TEXT"),
         ("clients", "age_years", "FLOAT"),
         ("clients", "age_category", "TEXT"),
         ("tests", "ref_range", "TEXT"),

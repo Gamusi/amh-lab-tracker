@@ -145,24 +145,24 @@ PANELS = {
 }
 
 TESTS = [
-    {'name': 'Complete Blood Count (CBC)', 'section': 'Hematology', 'is_tracked': 1, 'result_type': 'panel', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': None, 'parent_name': None, 'sort_order': 0},
-    {'name': 'LFTS', 'section': 'Clinical Biochemistry', 'is_tracked': 0, 'result_type': 'panel', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': None, 'parent_name': None, 'sort_order': 0},
-    {'name': 'RFTS', 'section': 'Clinical Biochemistry', 'is_tracked': 0, 'result_type': 'panel', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': None, 'parent_name': None, 'sort_order': 0},
-    {'name': 'CARDIAC', 'section': 'Clinical Biochemistry', 'is_tracked': 0, 'result_type': 'panel', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': None, 'parent_name': None, 'sort_order': 0},
-    {'name': 'ELECTROLYTES', 'section': 'Clinical Biochemistry', 'is_tracked': 0, 'result_type': 'panel', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': None, 'parent_name': None, 'sort_order': 0},
-    {'name': 'LIPID PROFILE', 'section': 'Clinical Biochemistry', 'is_tracked': 0, 'result_type': 'panel', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': None, 'parent_name': None, 'sort_order': 0},
-    {'name': 'URINALYSIS', 'section': 'Urinalysis Profile', 'is_tracked': 1, 'result_type': 'panel', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': None, 'parent_name': None, 'sort_order': 0},
-    {'name': 'STOOL ANALYSIS', 'section': 'Parasitology & Stool Diagnostics', 'is_tracked': 1, 'result_type': 'panel', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': None, 'parent_name': None, 'sort_order': 0},
-    {'name': 'HIV Testing', 'section': 'Serology & Clinical Immunology', 'is_tracked': 1, 'result_type': 'panel', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': None, 'parent_name': None, 'sort_order': 0},
-    {'name': 'E.S.R (Erythrocyte Sedimentation Rate)', 'section': 'Hematology', 'is_tracked': 0, 'result_type': 'quantitative', 'default_unit': 'mm/hour', 'secondary_unit': None, 'ref_range': None, 'options': None, 'parent_name': None, 'sort_order': 0},
-    {'name': 'Aptt (Activated Partial Thromboplastin Time)', 'section': 'Hematology', 'is_tracked': 0, 'result_type': 'quantitative', 'default_unit': 'Seconds', 'secondary_unit': None, 'ref_range': None, 'options': None, 'parent_name': None, 'sort_order': 0},
-    {'name': 'Prothrombin Time (PT)', 'section': 'Hematology', 'is_tracked': 0, 'result_type': 'quantitative', 'default_unit': 'Seconds', 'secondary_unit': None, 'ref_range': None, 'options': None, 'parent_name': None, 'sort_order': 0},
-    {'name': 'International Normalized Ratio (INR)', 'section': 'Hematology', 'is_tracked': 0, 'result_type': 'quantitative', 'default_unit': 'Calculated ratio', 'secondary_unit': None, 'ref_range': None, 'options': None, 'parent_name': None, 'sort_order': 0},
-    {'name': 'Bleeding Time (BT)', 'section': 'Hematology', 'is_tracked': 0, 'result_type': 'quantitative', 'default_unit': 'Minutes', 'secondary_unit': None, 'ref_range': None, 'options': None, 'parent_name': None, 'sort_order': 0},
-    {'name': 'Clotting Time (CT)', 'section': 'Hematology', 'is_tracked': 0, 'result_type': 'quantitative', 'default_unit': 'Minutes', 'secondary_unit': None, 'ref_range': None, 'options': None, 'parent_name': None, 'sort_order': 0},
-    {'name': 'Reticulocyte Count', 'section': 'Hematology', 'is_tracked': 0, 'result_type': 'quantitative', 'default_unit': '%', 'secondary_unit': None, 'ref_range': None, 'options': None, 'parent_name': None, 'sort_order': 0},
-    {'name': 'Sickling Test (Sodium Metabisulfite)', 'section': 'Hematology', 'is_tracked': 1, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['Positive', 'Negative'], 'parent_name': None, 'sort_order': 0},
-    {'name': 'WIDAL (Salmonella Typhi Agglutination)', 'section': 'Serology & Clinical Immunology', 'is_tracked': 1, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['Negative', 'Positive'], 'parent_name': None, 'sort_order': 0},
+    {'name': 'Complete Blood Count (CBC)', 'section': 'Hematology', 'is_tracked': 1, 'result_type': 'panel', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': None, 'parent_name': None, 'sort_order': 0, 'clinical_comments': 'Evaluates cellular elements of peripheral blood (erythroid, myeloid, thromboid series). Normal: baseline hematopoiesis. Abnormal: cytopenias indicate marrow suppression/destruction; cytoses indicate reactive/inflammatory or myeloproliferative processes.'},
+    {'name': 'LFTS', 'section': 'Clinical Biochemistry', 'is_tracked': 0, 'result_type': 'panel', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': None, 'parent_name': None, 'sort_order': 0, 'clinical_comments': 'Assesses hepatic synthetic function (Albumin, Total Protein), hepatocellular integrity (ALT, AST), and biliary excretion (ALP, Bilirubin, GGT).'},
+    {'name': 'RFTS', 'section': 'Clinical Biochemistry', 'is_tracked': 0, 'result_type': 'panel', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': None, 'parent_name': None, 'sort_order': 0, 'clinical_comments': 'Evaluates glomerular filtration, tubular clearance, and nitrogenous waste excretion. Elevated urea/creatinine indicates pre-renal, intrinsic renal, or post-renal azotemia.'},
+    {'name': 'CARDIAC', 'section': 'Clinical Biochemistry', 'is_tracked': 0, 'result_type': 'panel', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': None, 'parent_name': None, 'sort_order': 0, 'clinical_comments': 'Screens for acute myocardial necrosis (Troponins, CK-MB, Myoglobin) and hemodynamic myocardial strain/thromboembolism (BNP, D-Dimer).'},
+    {'name': 'ELECTROLYTES', 'section': 'Clinical Biochemistry', 'is_tracked': 0, 'result_type': 'panel', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': None, 'parent_name': None, 'sort_order': 0, 'clinical_comments': 'Evaluates fluid balance, cellular transmembrane potential, and acid-base homeostasis (Na, K, Cl, HCO3, Ca, Mg, PO4).'},
+    {'name': 'LIPID PROFILE', 'section': 'Clinical Biochemistry', 'is_tracked': 0, 'result_type': 'panel', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': None, 'parent_name': None, 'sort_order': 0, 'clinical_comments': 'Atherogenic risk stratification. Evaluates total cholesterol, triglycerides, LDL, and protective HDL fractions.'},
+    {'name': 'URINALYSIS', 'section': 'Urinalysis Profile', 'is_tracked': 1, 'result_type': 'panel', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': None, 'parent_name': None, 'sort_order': 0, 'clinical_comments': 'Screens renal function, urinary tract infection, glomerulonephritis, and metabolic status (glucosuria, ketonuria, proteinuria).'},
+    {'name': 'STOOL ANALYSIS', 'section': 'Parasitology & Stool Diagnostics', 'is_tracked': 1, 'result_type': 'panel', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': None, 'parent_name': None, 'sort_order': 0, 'clinical_comments': 'Evaluates intestinal parasitosis, enteric inflammation, and lower gastrointestinal bleeding.'},
+    {'name': 'HIV Testing', 'section': 'Serology & Clinical Immunology', 'is_tracked': 1, 'result_type': 'panel', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': None, 'parent_name': None, 'sort_order': 0, 'clinical_comments': 'Standard national algorithm HIV diagnostic screening and rapid antibody confirmation.'},
+    {'name': 'E.S.R (Erythrocyte Sedimentation Rate)', 'section': 'Hematology', 'is_tracked': 0, 'result_type': 'quantitative', 'default_unit': 'mm/hour', 'secondary_unit': None, 'ref_range': 'Male: <15, Female: <20 mm/hr', 'options': None, 'parent_name': None, 'sort_order': 0, 'clinical_comments': 'Non-specific marker of systemic inflammation, tissue injury, and plasma protein alterations.'},
+    {'name': 'Aptt (Activated Partial Thromboplastin Time)', 'section': 'Hematology', 'is_tracked': 0, 'result_type': 'quantitative', 'default_unit': 'Seconds', 'secondary_unit': None, 'ref_range': '25.0 - 35.0 Seconds', 'options': None, 'parent_name': None, 'sort_order': 0, 'clinical_comments': 'Screens intrinsic and common coagulation pathways. Prolongation indicates factor deficiency or heparin therapy.'},
+    {'name': 'Prothrombin Time (PT)', 'section': 'Hematology', 'is_tracked': 0, 'result_type': 'quantitative', 'default_unit': 'Seconds', 'secondary_unit': None, 'ref_range': '11.0 - 13.5 Seconds', 'options': None, 'parent_name': None, 'sort_order': 0, 'clinical_comments': 'Screens extrinsic and common coagulation pathways (Factors VII, X, V, II, I).'},
+    {'name': 'International Normalized Ratio (INR)', 'section': 'Hematology', 'is_tracked': 0, 'result_type': 'quantitative', 'default_unit': 'Calculated ratio', 'secondary_unit': None, 'ref_range': '0.8 - 1.2 (Therapeutic: 2.0 - 3.0)', 'options': None, 'parent_name': None, 'sort_order': 0, 'clinical_comments': 'Standardized monitoring parameter for oral vitamin K antagonist anticoagulation (Warfarin).'},
+    {'name': 'Bleeding Time (BT)', 'section': 'Hematology', 'is_tracked': 0, 'result_type': 'quantitative', 'default_unit': 'Minutes', 'secondary_unit': None, 'ref_range': '2.0 - 7.0 Minutes', 'options': None, 'parent_name': None, 'sort_order': 0, 'clinical_comments': 'Screens in-vivo primary hemostatic platelet plug formation and microvascular integrity.'},
+    {'name': 'Clotting Time (CT)', 'section': 'Hematology', 'is_tracked': 0, 'result_type': 'quantitative', 'default_unit': 'Minutes', 'secondary_unit': None, 'ref_range': '4.0 - 10.0 Minutes', 'options': None, 'parent_name': None, 'sort_order': 0, 'clinical_comments': 'Screens whole-blood intrinsic and common coagulation pathway functional integrity.'},
+    {'name': 'Reticulocyte Count', 'section': 'Hematology', 'is_tracked': 0, 'result_type': 'quantitative', 'default_unit': '%', 'secondary_unit': None, 'ref_range': '0.5 - 2.5 %', 'options': None, 'parent_name': None, 'sort_order': 0, 'clinical_comments': 'Evaluates dynamic bone marrow erythropoietic activity. Distinguishes hyperregenerative from hyporegenerative anemias.'},
+    {'name': 'Sickling Test (Sodium Metabisulfite)', 'section': 'Hematology', 'is_tracked': 1, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': 'Negative', 'options': ['Positive', 'Negative'], 'parent_name': None, 'sort_order': 0, 'clinical_comments': 'Screens for abnormal HbS under deoxygenating conditions (Sickle Cell Trait / Disease).'},
+    {'name': 'WIDAL (Salmonella Typhi Agglutination)', 'section': 'Serology & Clinical Immunology', 'is_tracked': 1, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': '< 1:80', 'options': ['Negative', 'Positive'], 'parent_name': None, 'sort_order': 0, 'clinical_comments': 'Serological screen for Salmonella enteric fever agglutinins (O and H antigens). Titer >= 1:80 indicates acute/recent exposure.'},
 
     {'name': 'VDRL/RPR (Syphilis Screening)', 'section': 'Serology & Clinical Immunology', 'is_tracked': 1, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['Non-Reactive', 'Reactive (1:2)', 'Reactive (1:4)', 'Reactive (1:8)', 'Reactive (1:16)', 'Reactive (1:32)', 'Reactive (1:64)'], 'parent_name': None, 'sort_order': 0},
     {'name': 'HBsAg (Hepatitis B)', 'section': 'Serology & Clinical Immunology', 'is_tracked': 1, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['Positive', 'Negative'], 'parent_name': None, 'sort_order': 0},
@@ -545,21 +545,22 @@ def seed_database(conn=None):
         if not sec_id:
             continue
         opts = json.dumps(t["options"]) if t["options"] else None
+        clin_comments = t.get("clinical_comments")
         cur.execute("SELECT id FROM tests WHERE name = ? AND section_id = ?", (t["name"], sec_id))
         r = cur.fetchone()
         if not r:
             cur.execute("""
                 INSERT INTO tests (name, section_id, is_tracked, sort_order, result_type,
-                    default_unit, secondary_unit, ref_range, options)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    default_unit, secondary_unit, ref_range, options, clinical_comments)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (t["name"], sec_id, t["is_tracked"], t["sort_order"], t["result_type"],
-                  t["default_unit"], t["secondary_unit"], t["ref_range"], opts))
+                  t["default_unit"], t["secondary_unit"], t["ref_range"], opts, clin_comments))
             test_id_map[t["name"]] = cur.lastrowid
         else:
             cur.execute("""
-                UPDATE tests SET is_tracked=?, result_type=?, default_unit=?, secondary_unit=?, ref_range=?, options=?
+                UPDATE tests SET is_tracked=?, result_type=?, default_unit=?, secondary_unit=?, ref_range=?, options=?, clinical_comments=?
                 WHERE id=?
-            """, (t["is_tracked"], t["result_type"], t["default_unit"], t["secondary_unit"], t["ref_range"], opts, r["id"]))
+            """, (t["is_tracked"], t["result_type"], t["default_unit"], t["secondary_unit"], t["ref_range"], opts, clin_comments, r["id"]))
             test_id_map[t["name"]] = r["id"]
 
     conn.commit()
@@ -579,19 +580,20 @@ def seed_database(conn=None):
         if not sec_id:
             sec_id = list(sec_map.values())[0]
         opts = json.dumps(t["options"]) if t["options"] else None
+        clin_comments = t.get("clinical_comments")
         cur.execute("SELECT id FROM tests WHERE name = ? AND section_id = ?", (t["name"], sec_id))
         r = cur.fetchone()
         if not r:
             cur.execute("""INSERT OR IGNORE INTO tests (name, section_id, is_tracked, sort_order, result_type,
-                    default_unit, secondary_unit, ref_range, options, parent_rollup_id)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    default_unit, secondary_unit, ref_range, options, parent_rollup_id, clinical_comments)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (t["name"], sec_id, t["is_tracked"], t["sort_order"], t["result_type"],
-                  t["default_unit"], t["secondary_unit"], t["ref_range"], opts, parent_id))
+                  t["default_unit"], t["secondary_unit"], t["ref_range"], opts, parent_id, clin_comments))
         else:
             cur.execute("""
-                UPDATE tests SET result_type=?, default_unit=?, secondary_unit=?, ref_range=?, options=?, sort_order=?, parent_rollup_id=?
+                UPDATE tests SET result_type=?, default_unit=?, secondary_unit=?, ref_range=?, options=?, sort_order=?, parent_rollup_id=?, clinical_comments=?
                 WHERE id=?
-            """, (t["result_type"], t["default_unit"], t["secondary_unit"], t["ref_range"], opts, t["sort_order"], parent_id, r["id"]))
+            """, (t["result_type"], t["default_unit"], t["secondary_unit"], t["ref_range"], opts, t["sort_order"], parent_id, clin_comments, r["id"]))
 
         # Also sync into test_parameters for panel sub-parameter tracking and FK constraints
         cur.execute("SELECT id FROM test_parameters WHERE test_id = ? AND parameter_name = ?", (parent_id, t["name"]))

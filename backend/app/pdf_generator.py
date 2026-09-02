@@ -319,6 +319,22 @@ def _build_department_table(dept_name: str, tests: list, compact: bool = False) 
                     data.append(adv_row)
                     style_cmds.append(('SPAN', (0, adv_row_idx), (-1, adv_row_idx)))
                     style_cmds.append(('BACKGROUND', (0, adv_row_idx), (-1, adv_row_idx), colors.HexColor('#f8fafc')))
+
+            clin_comm = t.get("clinical_comments")
+            if clin_comm and "hiv" not in panel_name.lower():
+                comm_row_idx = len(data)
+                comm_style = ParagraphStyle(
+                    name=f"ClinComm_{comm_row_idx}",
+                    fontName=FONT_REGULAR,
+                    fontSize=7,
+                    leading=8.5,
+                    textColor=colors.HexColor('#475569'),
+                    leftIndent=8
+                )
+                comm_row = [Paragraph(f"<i><b>Clinical Note:</b> {clin_comm}</i>", comm_style)] + [""] * (num_cols - 1)
+                data.append(comm_row)
+                style_cmds.append(('SPAN', (0, comm_row_idx), (-1, comm_row_idx)))
+                style_cmds.append(('BACKGROUND', (0, comm_row_idx), (-1, comm_row_idx), colors.HexColor('#f8fafc')))
         else:
             # Standalone single test
             res_text = str(t.get("result") or "")
