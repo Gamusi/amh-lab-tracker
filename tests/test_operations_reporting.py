@@ -56,8 +56,8 @@ def test_operations_reporting_aggregates(db_connection):
     assert summary["total_clients"] >= 1
     assert summary["menu_coverage_percent"] > 0
 
-    # Categories breakdown
-    assert len(data["categories_breakdown"]) == 3
+    # Categories breakdown (In-House, Referral, Outreach, Self-Request)
+    assert len(data["categories_breakdown"]) == 4
     in_house = next((c for c in data["categories_breakdown"] if c["category"] == "In-House"), None)
     assert in_house is not None
     assert in_house["count"] >= 1

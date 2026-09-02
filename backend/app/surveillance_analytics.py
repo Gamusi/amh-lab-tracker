@@ -185,6 +185,66 @@ def calculate_surveillance_metrics(
                 orderable_tracked_map[tid]["positive"] += 1
             ward_stats[w_origin]["positive"] += 1
 
+    # Blend summary entries from daily_entries (backlog or register summary)
+    cur.execute("""
+        SELECT 
+            e.entry_date,
+            e.test_id,
+            t.name AS test_name,
+            s.id AS section_id,
+            s.name AS section_name,
+            SUM(e.done) AS sum_done,
+            SUM(CASE WHEN e.positive IS NOT NULL THEN e.positive ELSE 0 END) AS sum_positive
+        FROM daily_entries e
+        JOIN tests t ON e.test_id = t.id
+        JOIN sections s ON t.section_id = s.id
+        WHERE e.entry_date >= ? AND e.entry_date <= ? AND t.is_tracked = 1 AND t.parent_rollup_id IS NULL AND e.done > 0
+        GROUP BY e.entry_date, e.test_id
+    """, (s_str, e_str))
+    daily_tracked_rows = cur.fetchall()
+
+    orders_by_date_test = {}
+    for row in order_rows:
+        o_date = (row["ordered_at"] or "")[:10]
+        o_tid = row["test_id"]
+        orders_by_date_test[(o_date, o_tid)] = orders_by_date_test.get((o_date, o_tid), 0) + 1
+
+    for d_row in daily_tracked_rows:
+        d_date = d_row["entry_date"]
+        d_tid = d_row["test_id"]
+        sec_id = d_row["section_id"]
+        sec_name = d_row["section_name"] or ""
+        test_name = d_row["test_name"] or ""
+        
+        ord_count = orders_by_date_test.get((d_date, d_tid), 0)
+        done_val = d_row["sum_done"] or 0
+        pos_val = d_row["sum_positive"] or 0
+        delta = done_val - ord_count
+        
+        if delta > 0:
+            total_evaluated += delta
+            
+            if sec_id in section_stats:
+                section_stats[sec_id]["evaluated_count"] += delta
+            else:
+                section_stats[sec_id] = {
+                    "section_id": sec_id,
+                    "section_name": sec_name,
+                    "evaluated_count": delta,
+                    "incident_count": 0,
+                    "incidence_rate_percent": 0.0
+                }
+                
+            if d_tid in orderable_tracked_map:
+                orderable_tracked_map[d_tid]["evaluated"] += delta
+                
+            if ord_count == 0:
+                total_incident_cases += pos_val
+                if sec_id in section_stats:
+                    section_stats[sec_id]["incident_count"] += pos_val
+                if d_tid in orderable_tracked_map:
+                    orderable_tracked_map[d_tid]["positive"] += pos_val
+
     # Calculate rates for each test
     surveillance_ledger = []
     for tid, item in orderable_tracked_map.items():
@@ -288,6 +348,21 @@ def calculate_surveillance_metrics(
                 month_entry["total_positives"] += 1
                 if t_name in month_entry:
                     month_entry[t_name] += 1
+
+        if not m_orders:
+            cur.execute("""
+                SELECT t.name as test_name, SUM(CASE WHEN e.positive IS NOT NULL THEN e.positive ELSE 0 END) as pos_sum
+                FROM daily_entries e
+                JOIN tests t ON e.test_id = t.id
+                WHERE e.entry_date >= ? AND e.entry_date <= ? AND t.is_tracked = 1 AND t.parent_rollup_id IS NULL AND e.done > 0
+                GROUP BY t.name
+            """, (m_start, m_end))
+            for d_pos_row in cur.fetchall():
+                p_cnt = d_pos_row["pos_sum"] or 0
+                t_nm = d_pos_row["test_name"]
+                month_entry["total_positives"] += p_cnt
+                if t_nm in month_entry:
+                    month_entry[t_nm] += p_cnt
             
         monthly_trends.append(month_entry)
 
