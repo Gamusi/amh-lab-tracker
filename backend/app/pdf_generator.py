@@ -9,6 +9,8 @@ from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from . import evaluator
 
+from reportlab.pdfgen import canvas
+
 PAGE_WIDTH, PAGE_HEIGHT = A4
 SAFE_MARGIN_X = 56.69
 SAFE_WINDOW_Y = 600.95
@@ -16,6 +18,45 @@ SAFE_WINDOW_Y = 600.95
 FONT_REGULAR = 'Helvetica'
 FONT_BOLD = 'Helvetica-Bold'
 FONT_SYMBOL = 'Helvetica'
+
+class ReportNumberedCanvas(canvas.Canvas):
+    """
+    Two-pass canvas for dynamic total page count and professional 'Page X of Y' rendering.
+    Draws letterhead background and page numbering dynamically across pages.
+    """
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._saved_page_states = []
+        self.letterhead_override = None
+
+    def showPage(self):
+        self._saved_page_states.append(dict(self.__dict__))
+        self._startPage()
+
+    def save(self):
+        num_pages = len(self._saved_page_states)
+        letterhead_path = self.letterhead_override or os.path.abspath(
+            os.path.join(os.path.dirname(__file__), "..", "..", "assets", "branding", "letterhead.png")
+        )
+        for state in self._saved_page_states:
+            self.__dict__.update(state)
+            page_num = self._pageNumber
+
+            # 1. Background image
+            if os.path.exists(letterhead_path):
+                self.saveState()
+                self.drawImage(letterhead_path, 0, 0, width=PAGE_WIDTH, height=PAGE_HEIGHT, mask='auto')
+                self.restoreState()
+
+            # 2. Dynamic footer page numbering (bottom right, above letterhead footer margin)
+            self.saveState()
+            self.setFont(FONT_REGULAR, 7.5)
+            self.setFillColor(colors.HexColor('#64748B'))
+            self.drawRightString(PAGE_WIDTH - SAFE_MARGIN_X, 18, f"Page {page_num} of {num_pages}")
+            self.restoreState()
+
+            canvas.Canvas.showPage(self)
+        canvas.Canvas.save(self)
 
 def _init_fonts():
     global FONT_REGULAR, FONT_BOLD, FONT_SYMBOL
@@ -101,18 +142,57 @@ def _build_department_table(dept_name: str, tests: list, compact: bool = False) 
     result_abnormal_style = ParagraphStyle(name="ResultAbnormalStyle", fontName=FONT_BOLD, fontSize=8.5, leading=10.5, textColor=colors.HexColor('#dc2626'))
     flag_center_style = ParagraphStyle(name="FlagCenterStyle", fontName=FONT_BOLD, fontSize=8.5, leading=10.5, alignment=TA_CENTER)
     
+    # Determine if this department uses Units and Reference ranges
+    has_any_units = False
+    has_any_refs = False
+
+    for t in tests:
+        params = t.get("parameters")
+        if params and len(params) > 0:
+            for p in params:
+                if str(p.get("unit") or "").strip():
+                    has_any_units = True
+                if str(p.get("reference_range") or p.get("reference") or "").strip():
+                    has_any_refs = True
+        else:
+            if str(t.get("unit") or "").strip():
+                has_any_units = True
+            if str(t.get("reference") or t.get("reference_range") or "").strip():
+                has_any_refs = True
+
+    # Column configuration:
+    # Full (Group I): Test(150), Result(75), Unit(60), Flag(55), Reference(140) = 480 pt
+    # No Units, Has Ref (Group III): Test(180), Result(110), Flag(50), Reference(140) = 480 pt
+    # No Units, No Ref (Group II): Test(250), Result(180), Flag(50) = 480 pt
+    # Has Units, No Ref: Test(200), Result(120), Unit(100), Flag(60) = 480 pt
+
+    if has_any_units and has_any_refs:
+        layout_mode = 'FULL' # Group I
+        col_widths = [150, 75, 60, 55, 140]
+        headers = ["Test", "Result", "Unit", "Flag", "Reference"]
+    elif not has_any_units and has_any_refs:
+        layout_mode = 'NO_UNIT' # Group III (Semi-quantitative / Titers)
+        col_widths = [180, 110, 50, 140]
+        headers = ["Test", "Result", "Flag", "Reference / Cutoff"]
+    elif not has_any_units and not has_any_refs:
+        layout_mode = 'QUALITATIVE' # Group II (Descriptive / Qualitative)
+        col_widths = [250, 180, 50]
+        headers = ["Test", "Result", "Flag"]
+    else:
+        layout_mode = 'NO_REF'
+        col_widths = [200, 120, 100, 60]
+        headers = ["Test", "Result", "Unit", "Flag"]
+
+    num_cols = len(col_widths)
+
     if show_dept:
-        data.append([Paragraph(dept_name, dept_title_style), "", "", "", ""])
+        dept_row = [Paragraph(dept_name, dept_title_style)] + [""] * (num_cols - 1)
+        data.append(dept_row)
         
-    data.append([
-        Paragraph("Test", tbl_header_style),
-        Paragraph("Result", tbl_header_style),
-        Paragraph("Unit", tbl_header_style),
-        Paragraph("Flag", tbl_header_style),
-        Paragraph("Reference", tbl_header_style)
-    ])
+    data.append([Paragraph(h, tbl_header_style) for h in headers])
     
     row_pad = 2.0 if compact else 3.5
+    flag_col_idx = 3 if layout_mode == 'FULL' else (2 if layout_mode in ('NO_UNIT', 'QUALITATIVE') else 3)
     style_cmds = [
         ('FONTNAME', (0,0), (-1,-1), FONT_REGULAR),
         ('FONTSIZE', (0,0), (-1,-1), 8),
@@ -120,7 +200,7 @@ def _build_department_table(dept_name: str, tests: list, compact: bool = False) 
         ('TOPPADDING', (0,0), (-1,-1), row_pad),
         ('BOTTOMPADDING', (0,0), (-1,-1), row_pad),
         ('ALIGN', (0,0), (-1,-1), 'LEFT'),
-        ('ALIGN', (3,0), (3,-1), 'CENTER'),
+        ('ALIGN', (flag_col_idx, 0), (flag_col_idx, -1), 'CENTER'),
         ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
     ]
 
@@ -129,7 +209,8 @@ def _build_department_table(dept_name: str, tests: list, compact: bool = False) 
         if params and len(params) > 0:
             # Render Panel Subheader
             panel_name = str(t.get("test_name") or "")
-            data.append([Paragraph(panel_name, panel_title_style), "", "", "", ""])
+            panel_row = [Paragraph(panel_name, panel_title_style)] + [""] * (num_cols - 1)
+            data.append(panel_row)
             panel_row_idx = len(data) - 1
             style_cmds.append(('BACKGROUND', (0, panel_row_idx), (-1, panel_row_idx), colors.HexColor('#f8fafc')))
             style_cmds.append(('SPAN', (0, panel_row_idx), (-1, panel_row_idx)))
@@ -159,13 +240,34 @@ def _build_department_table(dept_name: str, tests: list, compact: bool = False) 
                 is_abnormal = p_flag in ["High", "Low", "Abnormal", "Reactive", "Positive", "H", "L", "H*", "L*", "*", "\u26A0", "[!]"] or evaluator.is_qualitative_abnormal(p_res, p_ref, param_name=p_name)
                 res_para = Paragraph(p_res, result_abnormal_style if is_abnormal else result_style) if p_res else ""
                 
-                data.append([
-                    Paragraph(p_name, param_title_style),
-                    res_para,
-                    Paragraph(p_unit, unit_style) if p_unit else "",
-                    flag_cell,
-                    Paragraph(p_ref, ref_style) if p_ref else ""
-                ])
+                if layout_mode == 'FULL':
+                    data.append([
+                        Paragraph(p_name, param_title_style),
+                        res_para,
+                        Paragraph(p_unit, unit_style) if p_unit else "",
+                        flag_cell,
+                        Paragraph(p_ref, ref_style) if p_ref else ""
+                    ])
+                elif layout_mode == 'NO_UNIT':
+                    data.append([
+                        Paragraph(p_name, param_title_style),
+                        res_para,
+                        flag_cell,
+                        Paragraph(p_ref, ref_style) if p_ref else ""
+                    ])
+                elif layout_mode == 'QUALITATIVE':
+                    data.append([
+                        Paragraph(p_name, param_title_style),
+                        res_para,
+                        flag_cell
+                    ])
+                else:
+                    data.append([
+                        Paragraph(p_name, param_title_style),
+                        res_para,
+                        Paragraph(p_unit, unit_style) if p_unit else "",
+                        flag_cell
+                    ])
 
             if "hiv" in panel_name.lower() and params:
                 hiv_derived = evaluator.derive_hiv_outcome(params)
@@ -179,13 +281,27 @@ def _build_department_table(dept_name: str, tests: list, compact: bool = False) 
                     h_flag_cell = ""
 
                 h_res_para = Paragraph(f"<b>{hiv_derived['display_result']}</b>", result_abnormal_style if h_flag else result_style)
-                data.append([
-                    Paragraph("<b>Final HIV Interpretation:</b>", param_title_style),
-                    h_res_para,
-                    Paragraph("", unit_style),
-                    h_flag_cell,
-                    Paragraph(hiv_derived.get("reference") or "Non-Reactive", ref_style)
-                ])
+                if layout_mode == 'FULL':
+                    data.append([
+                        Paragraph("<b>Final HIV Interpretation:</b>", param_title_style),
+                        h_res_para,
+                        Paragraph("", unit_style),
+                        h_flag_cell,
+                        Paragraph(hiv_derived.get("reference") or "Non-Reactive", ref_style)
+                    ])
+                elif layout_mode == 'NO_UNIT':
+                    data.append([
+                        Paragraph("<b>Final HIV Interpretation:</b>", param_title_style),
+                        h_res_para,
+                        h_flag_cell,
+                        Paragraph(hiv_derived.get("reference") or "Non-Reactive", ref_style)
+                    ])
+                else:
+                    data.append([
+                        Paragraph("<b>Final HIV Interpretation:</b>", param_title_style),
+                        h_res_para,
+                        h_flag_cell
+                    ])
                 summary_row_idx = len(data) - 1
                 style_cmds.append(('BACKGROUND', (0, summary_row_idx), (-1, summary_row_idx), colors.HexColor('#f1f5f9')))
 
@@ -199,10 +315,8 @@ def _build_department_table(dept_name: str, tests: list, compact: bool = False) 
                         textColor=colors.HexColor('#334155'),
                         leftIndent=8
                     )
-                    data.append([
-                        Paragraph(f"<i>Clinical Note: {hiv_derived['advisory']}</i>", adv_style),
-                        "", "", "", ""
-                    ])
+                    adv_row = [Paragraph(f"<i>Clinical Note: {hiv_derived['advisory']}</i>", adv_style)] + [""] * (num_cols - 1)
+                    data.append(adv_row)
                     style_cmds.append(('SPAN', (0, adv_row_idx), (-1, adv_row_idx)))
                     style_cmds.append(('BACKGROUND', (0, adv_row_idx), (-1, adv_row_idx), colors.HexColor('#f8fafc')))
         else:
@@ -231,15 +345,36 @@ def _build_department_table(dept_name: str, tests: list, compact: bool = False) 
             is_abnormal = flag_text in ["High", "Low", "Abnormal", "Reactive", "Positive", "H", "L", "H*", "L*", "*", "\u26A0", "[!]"] or evaluator.is_qualitative_abnormal(res_text, t_ref, param_name=t_name)
             res_para = Paragraph(res_text, result_abnormal_style if is_abnormal else result_style) if res_text else ""
 
-            data.append([
-                Paragraph(t_name, test_title_style),
-                res_para,
-                Paragraph(t_unit, unit_style) if t_unit else "",
-                flag_cell,
-                Paragraph(t_ref, ref_style) if t_ref else ""
-            ])
+            if layout_mode == 'FULL':
+                data.append([
+                    Paragraph(t_name, test_title_style),
+                    res_para,
+                    Paragraph(t_unit, unit_style) if t_unit else "",
+                    flag_cell,
+                    Paragraph(t_ref, ref_style) if t_ref else ""
+                ])
+            elif layout_mode == 'NO_UNIT':
+                data.append([
+                    Paragraph(t_name, test_title_style),
+                    res_para,
+                    flag_cell,
+                    Paragraph(t_ref, ref_style) if t_ref else ""
+                ])
+            elif layout_mode == 'QUALITATIVE':
+                data.append([
+                    Paragraph(t_name, test_title_style),
+                    res_para,
+                    flag_cell
+                ])
+            else:
+                data.append([
+                    Paragraph(t_name, test_title_style),
+                    res_para,
+                    Paragraph(t_unit, unit_style) if t_unit else "",
+                    flag_cell
+                ])
         
-    t_elem = Table(data, colWidths=[150, 75, 60, 55, 140])
+    t_elem = Table(data, colWidths=col_widths)
     
     header_row_idx = 1 if show_dept else 0
     if show_dept:
@@ -787,10 +922,12 @@ def generate_pdf(order_data: dict, results_data: list) -> bytes:
         flowables.append(_build_cbc_footer(order_data, cbc_test))
     
     custom_letterhead = order_data.get("letterhead_path")
-    def page_hook(canvas, document):
-        _draw_background_hook(canvas, document, letterhead_override=custom_letterhead)
+    def make_canvas(*args, **kwargs):
+        c = ReportNumberedCanvas(*args, **kwargs)
+        c.letterhead_override = custom_letterhead
+        return c
 
-    doc.build(flowables, onFirstPage=page_hook, onLaterPages=page_hook)
+    doc.build(flowables, canvasmaker=make_canvas)
     
     return buffer.getvalue()
 
