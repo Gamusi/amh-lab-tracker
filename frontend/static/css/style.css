@@ -432,3 +432,23 @@ input:focus, select:focus {
   border-bottom: 1px solid var(--border-color);
   padding-bottom: 10px;
 }
+
+/* Backlog Register Styles */
+.backlog-row:hover {
+  background-color: #F8FAFC !important;
+}
+
+.backlog-input {
+  font-family: inherit;
+  font-size: 0.9rem;
+  transition: all 0.15s ease-in-out;
+  box-sizing: border-box;
+}
+
+.backlog-input:focus {
+  outline: none;
+  border-color: var(--primary-color) !important;
+  box-shadow: 0 0 0 2px rgba(15, 76, 129, 0.2);
+  background-color: #FFFFFF !important;
+}
+
