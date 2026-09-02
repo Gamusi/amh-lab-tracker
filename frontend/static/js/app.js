@@ -818,7 +818,7 @@ const app = {
           }
         } else if (this.currentView === 'backlog') {
           e.preventDefault();
-          this.saveBacklog();
+          this.saveBacklogData();
           return;
         }
       }
@@ -1316,11 +1316,11 @@ const app = {
         <!-- Sticky Bottom Action Bar -->
         <div style="position: sticky; bottom: 12px; background: #FFFFFF; border: 1px solid var(--border-color); border-radius: 8px; padding: 12px 20px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 4px 12px rgba(0,0,0,0.1); margin-top: 20px; z-index: 100;">
           <div style="font-size: 0.85rem; color: var(--text-muted);">
-            Keyboard tip: Use <kbd style="background: #F1F5F9; border: 1px solid #CBD5E1; padding: 2px 5px; border-radius: 3px;">Enter</kbd> or <kbd style="background: #F1F5F9; border: 1px solid #CBD5E1; padding: 2px 5px; border-radius: 3px;">↓</kbd> / <kbd style="background: #F1F5F9; border: 1px solid #CBD5E1; padding: 2px 5px; border-radius: 3px;">↑</kbd> to navigate rows.
+            Keyboard: Use <kbd>&larr;</kbd> <kbd>&uarr;</kbd> <kbd>&rarr;</kbd> <kbd>&darr;</kbd> to navigate cells, <kbd>Ctrl</kbd> + <kbd>S</kbd> to save.
           </div>
           <div style="display: flex; gap: 10px;">
             <button type="button" class="btn btn-secondary" onclick="app.loadBacklogData(document.getElementById('backlog-date').value)">Reset Changes</button>
-            <button type="button" class="btn btn-primary" onclick="app.saveBacklogData()" style="padding: 8px 24px; font-weight: 600;">
+            <button type="button" id="btn-save-backlog" class="btn btn-primary" onclick="app.saveBacklogData()" style="padding: 8px 24px; font-weight: 600;">
               ${this.icon('save')} Save Backlog Entries
             </button>
           </div>

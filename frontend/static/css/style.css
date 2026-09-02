@@ -452,3 +452,105 @@ input:focus, select:focus {
   background-color: #FFFFFF !important;
 }
 
+/* Keyboard Navigation & Focus Accessibility */
+:focus-visible {
+  outline: 2px solid var(--primary-color);
+  outline-offset: 2px;
+}
+
+button:focus-visible, a:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-visible {
+  outline: 2px solid var(--primary-color);
+  outline-offset: 1px;
+}
+
+.client-list-item {
+  outline: none;
+}
+
+.client-list-item:focus {
+  background-color: #EFF6FF !important;
+  outline: 2px solid var(--primary-color);
+  outline-offset: -2px;
+}
+
+.client-list-item.selected {
+  background-color: #DBEAFE !important;
+  border-left: 3px solid var(--primary-color);
+}
+
+.visit-test-row:focus-within, .add-test-row:focus-within {
+  background-color: #EFF6FF;
+  border-radius: 4px;
+}
+
+/* Keyboard Badges (<kbd>) */
+kbd {
+  display: inline-block;
+  padding: 2px 6px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  background-color: #F1F5F9;
+  color: #334155;
+  border: 1px solid #CBD5E1;
+  border-bottom: 2px solid #94A3B8;
+  border-radius: 4px;
+  box-shadow: 0 1px 1px rgba(0, 0, 0, 0.05);
+  line-height: 1.2;
+  vertical-align: middle;
+}
+
+/* Shortcuts Dialog Grid */
+.shortcuts-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+@media (max-width: 650px) {
+  .shortcuts-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.shortcut-group {
+  background: #F8FAFC;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 12px 14px;
+}
+
+.shortcut-group h4 {
+  font-size: 0.85rem;
+  color: var(--primary-color);
+  margin-top: 0;
+  margin-bottom: 10px;
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 4px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.shortcut-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 0;
+  font-size: 0.82rem;
+  border-bottom: 1px dashed #E2E8F0;
+}
+
+.shortcut-row:last-child {
+  border-bottom: none;
+}
+
+.shortcut-label {
+  color: var(--text-dark);
+}
+
+.shortcut-keys {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
