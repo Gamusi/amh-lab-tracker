@@ -124,3 +124,30 @@ def test_backlog_status_range(mock_db):
     assert "days" in status_data
     assert status_data["total_tests_done"] >= 12
     assert status_data["total_days_logged"] >= 1
+
+def test_backlog_inhouse_auto_totals_done(mock_db):
+    # User types 10 in in_house with done=0
+    save_payload = {
+        "entry_date": "2026-09-02",
+        "entries": [
+            {
+                "test_id": mock_db["cbc_id"],
+                "done": 0,
+                "positive": 0,
+                "in_house": 10,
+                "referral": 0,
+                "outreach": 0,
+                "self_request": 0
+            }
+        ]
+    }
+    save_res = client.post("/api/backlog", json=save_payload)
+    assert save_res.status_code == 200
+    assert save_res.json()["saved_count"] == 1
+
+    res = client.get("/api/backlog?date=2026-09-02")
+    assert res.status_code == 200
+    t_saved = next(t for sec in res.json()["sections"] for t in sec["tests"] if t["test_id"] == mock_db["cbc_id"])
+    assert t_saved["done"] == 10
+    assert t_saved["in_house"] == 10
+

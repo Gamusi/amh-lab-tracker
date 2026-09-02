@@ -17,23 +17,41 @@ def get_daily_log(date_str: str = Query(..., alias="date"), conn: sqlite3.Connec
     cur.execute("SELECT id, name, sort_order FROM sections ORDER BY sort_order, id")
     sections = cur.fetchall()
     
-    # Query all active tests, combining routine daily entries and historical backlog entries
+    # 1. Fetch live completed test orders for this date
     cur.execute("""
         SELECT 
-            t.id as test_id, t.name as test_name, t.section_id, t.is_tracked, t.sort_order,
-            (COALESCE(e.done, 0) + COALESCE(b.done, 0)) as done,
-            CASE 
-                WHEN e.positive IS NOT NULL OR b.positive IS NOT NULL THEN (COALESCE(e.positive, 0) + COALESCE(b.positive, 0))
+            o.test_id,
+            COUNT(DISTINCT o.id) as live_done,
+            COUNT(DISTINCT CASE 
+                WHEN tr.is_positive = 1 OR (tr.clinical_flag IS NOT NULL AND tr.clinical_flag != '' AND tr.clinical_flag != 'Normal') THEN o.id 
                 ELSE NULL 
-            END as positive,
-            COALESCE(b.entered_by_user_id, e.entered_by_user_id) as entered_by_user_id,
-            COALESCE(b.updated_at, e.updated_at) as updated_at
-        FROM tests t
-        LEFT JOIN daily_entries e ON e.test_id = t.id AND e.entry_date = ?
-        LEFT JOIN backlog_entries b ON b.test_id = t.id AND b.entry_date = ?
-        WHERE t.is_active = 1
-        ORDER BY t.section_id, t.sort_order, t.id
-    """, (date_str, date_str))
+            END) as live_pos
+        FROM test_orders o
+        JOIN visits v ON o.visit_id = v.id
+        LEFT JOIN test_results tr ON tr.order_id = o.id
+        WHERE o.status = 'completed'
+          AND v.is_deleted = 0
+          AND DATE(o.ordered_at) = ?
+        GROUP BY o.test_id
+    """, (date_str,))
+    live_map = {r["test_id"]: (r["live_done"], r["live_pos"]) for r in cur.fetchall()}
+
+    # 2. Fetch manual physical register backlog entries for this date
+    cur.execute("""
+        SELECT 
+            b.test_id, b.done, b.positive, b.entered_by_user_id, b.updated_at
+        FROM backlog_entries b
+        WHERE b.entry_date = ?
+    """, (date_str,))
+    backlog_map = {r["test_id"]: r for r in cur.fetchall()}
+
+    # 3. Query all active catalog tests
+    cur.execute("""
+        SELECT id as test_id, name as test_name, section_id, is_tracked, sort_order
+        FROM tests
+        WHERE is_active = 1
+        ORDER BY section_id, sort_order, id
+    """)
     all_tests = cur.fetchall()
 
     # Group tests by section_id
@@ -55,23 +73,37 @@ def get_daily_log(date_str: str = Query(..., alias="date"), conn: sqlite3.Connec
         test_items = []
         
         for t in tests:
-            done = t["done"] if t["done"] is not None else 0
-            pos = t["positive"] if t["positive"] is not None else None
+            tid = t["test_id"]
+            live_done, live_pos = live_map.get(tid, (0, 0))
+            b_item = backlog_map.get(tid)
+            b_done = b_item["done"] if b_item else 0
+            b_pos = b_item["positive"] if b_item else None
+
+            total_test_done = live_done + b_done
             
-            if done > 0 or (pos is not None and pos > 0):
+            total_test_pos = None
+            if t["is_tracked"]:
+                pos_vals = []
+                if live_pos > 0:
+                    pos_vals.append(live_pos)
+                if b_pos is not None:
+                    pos_vals.append(b_pos)
+                total_test_pos = sum(pos_vals) if pos_vals else (0 if total_test_done > 0 else None)
+
+            if total_test_done > 0 or (total_test_pos is not None and total_test_pos > 0):
                 total_rows_today += 1
-                total_done_today += done
-                if pos is not None:
-                    total_positive_today += pos
+                total_done_today += total_test_done
+                if total_test_pos is not None:
+                    total_positive_today += total_test_pos
 
             test_items.append({
-                "test_id": t["test_id"],
+                "test_id": tid,
                 "test_name": t["test_name"],
                 "is_tracked": bool(t["is_tracked"]),
-                "done": done,
-                "positive": pos if t["is_tracked"] else None,
-                "entered_by": t["entered_by_user_id"],
-                "updated_at": t["updated_at"]
+                "done": total_test_done,
+                "positive": total_test_pos if t["is_tracked"] else None,
+                "entered_by": b_item["entered_by_user_id"] if b_item else None,
+                "updated_at": b_item["updated_at"] if b_item else None
             })
         
         result_sections.append({

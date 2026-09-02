@@ -1219,40 +1219,6 @@ const app = {
     }
   }),
 
-  saveDailyLogData: __async(function*() {
-    const dateStr = document.getElementById('log-date').value;
-    const entries = [];
-
-    document.querySelectorAll('.test-done-input').forEach(inp => {
-      const tid = parseInt(inp.getAttribute('data-test-id'), 10);
-      const doneVal = parseInt(inp.value, 10) || 0;
-
-      const posInp = document.querySelector(`.test-pos-input[data-test-id="${tid}"]`);
-      const posVal = posInp ? (parseInt(posInp.value, 10) || 0) : null;
-
-      if (doneVal > 0 || (posVal !== null && posVal > 0)) {
-        entries.push({ test_id: tid, done: doneVal, positive: posVal });
-      }
-    });
-
-    try {
-      const res = yield fetch('/api/daily-log', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ entry_date: dateStr, entries: entries })
-      });
-
-      if (res.ok) {
-        this.showNotificationModal("Success", 'Daily log entries saved successfully!', false);
-        this.loadDailyLogData(dateStr);
-      } else {
-        this.showNotificationModal("Error", 'Failed to save entries.', true);
-      }
-    } catch (e) {
-      this.showNotificationModal("Error", 'Error connecting to server.', true);
-    }
-  }),
-
   // Backlog View
   renderBacklog: __async(function*(container) {
     if (!this._backlogDate) {
@@ -1405,12 +1371,6 @@ const app = {
                 ${t.is_tracked ? '<span style="font-size: 0.75rem; color: var(--text-muted); font-weight: normal;">(Tracked)</span>' : ''}
               </td>
               <td style="text-align: center;">
-                <input type="number" min="0" class="backlog-input backlog-input-done" data-test-id="${tid}" value="${done}" oninput="app.autoBalanceBacklogRow(${tid}, 'done')" onkeydown="app.handleBacklogKeyNav(event, ${tid}, 'done')" style="width: 75px; text-align: center; font-weight: 600; padding: 4px 6px; border: 1px solid var(--border-color); border-radius: 4px;">
-              </td>
-              <td style="text-align: center;">
-                ${posInputHtml}
-              </td>
-              <td style="text-align: center;">
                 <input type="number" min="0" class="backlog-input backlog-input-inhouse" data-test-id="${tid}" value="${inHouse}" oninput="app.autoBalanceBacklogRow(${tid}, 'inhouse')" onkeydown="app.handleBacklogKeyNav(event, ${tid}, 'inhouse')" style="width: 70px; text-align: center; padding: 4px 6px; border: 1px solid #BFDBFE; border-radius: 4px; background: #EFF6FF;">
               </td>
               <td style="text-align: center;">
@@ -1421,6 +1381,12 @@ const app = {
               </td>
               <td style="text-align: center;">
                 <input type="number" min="0" class="backlog-input backlog-input-self" data-test-id="${tid}" value="${selfReq}" oninput="app.autoBalanceBacklogRow(${tid}, 'self')" onkeydown="app.handleBacklogKeyNav(event, ${tid}, 'self')" style="width: 70px; text-align: center; padding: 4px 6px; border: 1px solid var(--border-color); border-radius: 4px;">
+              </td>
+              <td style="text-align: center;">
+                <input type="number" class="backlog-input backlog-input-done" data-test-id="${tid}" value="${done}" readonly tabindex="-1" style="width: 75px; text-align: center; font-weight: 700; padding: 4px 6px; border: 1px solid var(--border-color); border-radius: 4px; background: #F1F5F9; color: var(--text-dark); cursor: default;">
+              </td>
+              <td style="text-align: center;">
+                ${posInputHtml}
               </td>
             </tr>
           `;
@@ -1441,12 +1407,12 @@ const app = {
               <thead>
                 <tr>
                   <th>Test Name</th>
-                  <th style="width: 90px; text-align: center;">Done</th>
-                  <th style="width: 90px; text-align: center;">Pos / Finding</th>
                   <th style="width: 85px; text-align: center;">In-House</th>
                   <th style="width: 85px; text-align: center;">Referral</th>
                   <th style="width: 85px; text-align: center;">Outreach</th>
                   <th style="width: 85px; text-align: center;">Self-Req</th>
+                  <th style="width: 90px; text-align: center;">Total Done</th>
+                  <th style="width: 90px; text-align: center;">Pos / Finding</th>
                 </tr>
               </thead>
               <tbody>
@@ -1473,22 +1439,14 @@ const app = {
 
     if (!doneInp) return;
 
-    let doneVal = parseInt(doneInp.value, 10) || 0;
+    let inHouseVal = inHouseInp ? (parseInt(inHouseInp.value, 10) || 0) : 0;
     let refVal = refInp ? (parseInt(refInp.value, 10) || 0) : 0;
     let outreachVal = outreachInp ? (parseInt(outreachInp.value, 10) || 0) : 0;
     let selfVal = selfInp ? (parseInt(selfInp.value, 10) || 0) : 0;
 
-    if (fieldChanged === 'done') {
-      if (refVal === 0 && outreachVal === 0 && selfVal === 0) {
-        if (inHouseInp) inHouseInp.value = doneVal;
-      } else {
-        if (inHouseInp) inHouseInp.value = Math.max(0, doneVal - (refVal + outreachVal + selfVal));
-      }
-    } else if (fieldChanged === 'ref' || fieldChanged === 'outreach' || fieldChanged === 'self') {
-      if (doneVal > 0 && inHouseInp) {
-        inHouseInp.value = Math.max(0, doneVal - (refVal + outreachVal + selfVal));
-      }
-    }
+    // Total Done is strictly calculated
+    let doneVal = inHouseVal + refVal + outreachVal + selfVal;
+    doneInp.value = doneVal;
 
     if (posInp && doneVal > 0) {
       let pVal = parseInt(posInp.value, 10) || 0;
@@ -1582,7 +1540,7 @@ const app = {
         allInputs[curIdx - 1].select();
       }
     } else if (key === 'ArrowRight' && currentRow) {
-      const rowInputs = Array.from(currentRow.querySelectorAll('.backlog-input')).filter(el => el.offsetParent !== null);
+      const rowInputs = Array.from(currentRow.querySelectorAll('.backlog-input:not([readonly])')).filter(el => el.offsetParent !== null);
       const curIdx = rowInputs.indexOf(currentInput);
       if (curIdx >= 0 && curIdx < rowInputs.length - 1) {
         event.preventDefault();
@@ -1590,7 +1548,7 @@ const app = {
         rowInputs[curIdx + 1].select();
       }
     } else if (key === 'ArrowLeft' && currentRow) {
-      const rowInputs = Array.from(currentRow.querySelectorAll('.backlog-input')).filter(el => el.offsetParent !== null);
+      const rowInputs = Array.from(currentRow.querySelectorAll('.backlog-input:not([readonly])')).filter(el => el.offsetParent !== null);
       const curIdx = rowInputs.indexOf(currentInput);
       if (curIdx > 0) {
         event.preventDefault();
@@ -1642,14 +1600,19 @@ const app = {
       const outreachInp = row.querySelector('.backlog-input-outreach');
       const selfInp = row.querySelector('.backlog-input-self');
 
-      const doneVal = doneInp ? (parseInt(doneInp.value, 10) || 0) : 0;
+      let doneVal = doneInp ? (parseInt(doneInp.value, 10) || 0) : 0;
       const posVal = posInp ? (parseInt(posInp.value, 10) || 0) : null;
-      const inHouseVal = inHouseInp ? (parseInt(inHouseInp.value, 10) || 0) : null;
+      const inHouseVal = inHouseInp ? (parseInt(inHouseInp.value, 10) || 0) : 0;
       const refVal = refInp ? (parseInt(refInp.value, 10) || 0) : 0;
       const outreachVal = outreachInp ? (parseInt(outreachInp.value, 10) || 0) : 0;
       const selfVal = selfInp ? (parseInt(selfInp.value, 10) || 0) : 0;
+      const catSum = inHouseVal + refVal + outreachVal + selfVal;
 
-      if (doneVal > 0 || (posVal !== null && posVal > 0)) {
+      if (doneVal <= 0 && catSum > 0) {
+        doneVal = catSum;
+      }
+
+      if (doneVal > 0 || (posVal !== null && posVal > 0) || catSum > 0) {
         entries.push({
           test_id: tid,
           done: doneVal,

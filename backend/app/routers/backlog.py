@@ -135,21 +135,26 @@ def save_backlog(
         if not test:
             continue
 
-        done_val = max(0, int(item.done or 0))
-        pos_val = None
-        if test["is_tracked"] and item.positive is not None:
-            pos_val = max(0, min(done_val, int(item.positive)))
-
         ref_val = max(0, int(item.referral or 0))
         outreach_val = max(0, int(item.outreach or 0))
         self_val = max(0, int(item.self_request or 0))
+        in_house_input = int(item.in_house) if item.in_house is not None else 0
+        cat_sum = in_house_input + ref_val + outreach_val + self_val
 
-        # Flexible Non-Blocking Category Auto-Balance:
-        other_sum = ref_val + outreach_val + self_val
-        if item.in_house is not None and (int(item.in_house) + other_sum == done_val):
-            in_house_val = max(0, int(item.in_house))
+        done_val = max(0, int(item.done or 0))
+        if done_val == 0 and cat_sum > 0:
+            done_val = cat_sum
+        elif done_val < cat_sum:
+            done_val = cat_sum
+
+        if in_house_input == 0 and done_val > (ref_val + outreach_val + self_val):
+            in_house_val = max(0, done_val - (ref_val + outreach_val + self_val))
         else:
-            in_house_val = max(0, done_val - other_sum)
+            in_house_val = in_house_input
+
+        pos_val = None
+        if test["is_tracked"] and item.positive is not None:
+            pos_val = max(0, min(done_val, int(item.positive)))
 
         cur.execute("""
             INSERT INTO backlog_entries (

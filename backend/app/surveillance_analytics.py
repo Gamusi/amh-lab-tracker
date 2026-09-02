@@ -185,69 +185,50 @@ def calculate_surveillance_metrics(
                 orderable_tracked_map[tid]["positive"] += 1
             ward_stats[w_origin]["positive"] += 1
 
-    # Blend summary entries from daily_entries & backlog_entries (backlog or register summary)
+    # Blend manual summary entries from backlog_entries for tracked tests
     cur.execute("""
         SELECT 
-            e.entry_date,
-            e.test_id,
+            b.test_id,
             t.name AS test_name,
             s.id AS section_id,
             s.name AS section_name,
-            SUM(e.done) AS sum_done,
-            SUM(CASE WHEN e.positive IS NOT NULL THEN e.positive ELSE 0 END) AS sum_positive
-        FROM (
-            SELECT entry_date, test_id, done, positive FROM daily_entries
-            UNION ALL
-            SELECT entry_date, test_id, done, positive FROM backlog_entries
-        ) e
-        JOIN tests t ON e.test_id = t.id
+            SUM(b.done) AS sum_done,
+            SUM(CASE WHEN b.positive IS NOT NULL THEN b.positive ELSE 0 END) AS sum_positive
+        FROM backlog_entries b
+        JOIN tests t ON b.test_id = t.id
         JOIN sections s ON t.section_id = s.id
-        WHERE e.entry_date >= ? AND e.entry_date <= ? AND t.is_tracked = 1 AND t.parent_rollup_id IS NULL AND e.done > 0
-        GROUP BY e.entry_date, e.test_id
+        WHERE b.entry_date >= ? AND b.entry_date <= ? AND t.is_tracked = 1 AND t.parent_rollup_id IS NULL AND b.done > 0
+        GROUP BY b.test_id
     """, (s_str, e_str))
-    daily_tracked_rows = cur.fetchall()
+    backlog_tracked_rows = cur.fetchall()
 
-    orders_by_date_test = {}
-    for row in order_rows:
-        o_date = (row["ordered_at"] or "")[:10]
-        o_tid = row["test_id"]
-        orders_by_date_test[(o_date, o_tid)] = orders_by_date_test.get((o_date, o_tid), 0) + 1
+    for b_row in backlog_tracked_rows:
+        b_tid = b_row["test_id"]
+        sec_id = b_row["section_id"]
+        sec_name = b_row["section_name"] or ""
+        test_name = b_row["test_name"] or ""
+        done_val = b_row["sum_done"] or 0
+        pos_val = b_row["sum_positive"] or 0
 
-    for d_row in daily_tracked_rows:
-        d_date = d_row["entry_date"]
-        d_tid = d_row["test_id"]
-        sec_id = d_row["section_id"]
-        sec_name = d_row["section_name"] or ""
-        test_name = d_row["test_name"] or ""
-        
-        ord_count = orders_by_date_test.get((d_date, d_tid), 0)
-        done_val = d_row["sum_done"] or 0
-        pos_val = d_row["sum_positive"] or 0
-        delta = done_val - ord_count
-        
-        if delta > 0:
-            total_evaluated += delta
-            
+        if done_val > 0:
+            total_evaluated += done_val
+            total_incident_cases += pos_val
+
             if sec_id in section_stats:
-                section_stats[sec_id]["evaluated_count"] += delta
+                section_stats[sec_id]["evaluated_count"] += done_val
+                section_stats[sec_id]["incident_count"] += pos_val
             else:
                 section_stats[sec_id] = {
                     "section_id": sec_id,
                     "section_name": sec_name,
-                    "evaluated_count": delta,
-                    "incident_count": 0,
+                    "evaluated_count": done_val,
+                    "incident_count": pos_val,
                     "incidence_rate_percent": 0.0
                 }
-                
-            if d_tid in orderable_tracked_map:
-                orderable_tracked_map[d_tid]["evaluated"] += delta
-                
-            if ord_count == 0:
-                total_incident_cases += pos_val
-                if sec_id in section_stats:
-                    section_stats[sec_id]["incident_count"] += pos_val
-                if d_tid in orderable_tracked_map:
-                    orderable_tracked_map[d_tid]["positive"] += pos_val
+
+            if b_tid in orderable_tracked_map:
+                orderable_tracked_map[b_tid]["evaluated"] += done_val
+                orderable_tracked_map[b_tid]["positive"] += pos_val
 
     # Calculate rates for each test
     surveillance_ledger = []

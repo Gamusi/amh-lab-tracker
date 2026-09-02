@@ -211,83 +211,60 @@ def calculate_operations_metrics(
                 if tat_val <= sla_benchmark:
                     section_stats[sec_id]["on_time_count"] += 1
 
-    # Blend summary entries from daily_entries & backlog_entries (backlog or register summary)
+    # Blend manual summary entries from backlog_entries (physical register counts)
     cur.execute("""
         SELECT 
-            e.entry_date,
-            e.test_id,
+            b.test_id,
             t.name AS test_name,
             s.id AS section_id,
             s.name AS section_name,
-            SUM(e.done) AS sum_done,
-            SUM(e.in_house) AS sum_in_house,
-            SUM(e.referral) AS sum_referral,
-            SUM(e.outreach) AS sum_outreach,
-            SUM(e.self_request) AS sum_self_request
-        FROM (
-            SELECT entry_date, test_id, done, in_house, referral, outreach, self_request FROM daily_entries
-            UNION ALL
-            SELECT entry_date, test_id, done, in_house, referral, outreach, self_request FROM backlog_entries
-        ) e
-        JOIN tests t ON e.test_id = t.id
+            SUM(b.done) AS sum_done,
+            SUM(b.in_house) AS sum_in_house,
+            SUM(b.referral) AS sum_referral,
+            SUM(b.outreach) AS sum_outreach,
+            SUM(b.self_request) AS sum_self_request
+        FROM backlog_entries b
+        JOIN tests t ON b.test_id = t.id
         JOIN sections s ON t.section_id = s.id
-        WHERE e.entry_date >= ? AND e.entry_date <= ? AND e.done > 0
-        GROUP BY e.entry_date, e.test_id
+        WHERE b.entry_date >= ? AND b.entry_date <= ? AND b.done > 0
+        GROUP BY b.test_id
     """, (s_str, e_str))
-    daily_entry_rows = cur.fetchall()
+    backlog_rows = cur.fetchall()
 
-    orders_by_date_test = {}
-    for row in order_rows:
-        o_date = (row["ordered_at"] or "")[:10]
-        o_tid = row["test_id"]
-        orders_by_date_test[(o_date, o_tid)] = orders_by_date_test.get((o_date, o_tid), 0) + 1
+    for b_row in backlog_rows:
+        b_tid = b_row["test_id"]
+        sec_id = b_row["section_id"]
+        sec_name = b_row["section_name"] or ""
+        test_name = b_row["test_name"] or ""
+        done_val = b_row["sum_done"] or 0
 
-    for d_row in daily_entry_rows:
-        d_date = d_row["entry_date"]
-        d_tid = d_row["test_id"]
-        sec_id = d_row["section_id"]
-        sec_name = d_row["section_name"] or ""
-        test_name = d_row["test_name"] or ""
-        
-        ord_count = orders_by_date_test.get((d_date, d_tid), 0)
-        done_val = d_row["sum_done"] or 0
-        delta = done_val - ord_count
-        
-        if delta > 0:
-            total_done += delta
-            
-            in_house_val = d_row["sum_in_house"] or 0
-            ref_val = d_row["sum_referral"] or 0
-            outreach_val = d_row["sum_outreach"] or 0
-            self_val = d_row["sum_self_request"] or 0
-            
-            if ord_count == 0:
-                category_counts["In-House"] += in_house_val
-                category_counts["Referral"] += ref_val
-                category_counts["Outreach"] += outreach_val
-                category_counts["Self-Request"] += self_val
-            else:
-                category_counts["In-House"] += delta
-            
+        if done_val > 0:
+            total_done += done_val
+
+            category_counts["In-House"] += (b_row["sum_in_house"] or 0)
+            category_counts["Referral"] += (b_row["sum_referral"] or 0)
+            category_counts["Outreach"] += (b_row["sum_outreach"] or 0)
+            category_counts["Self-Request"] += (b_row["sum_self_request"] or 0)
+
             if sec_id in section_stats:
-                section_stats[sec_id]["test_count"] += delta
+                section_stats[sec_id]["test_count"] += done_val
             else:
                 section_stats[sec_id] = {
                     "section_id": sec_id,
                     "section_name": sec_name,
-                    "test_count": delta,
+                    "test_count": done_val,
                     "tats": [],
                     "on_time_count": 0
                 }
-                
-            if d_tid not in test_order_tallies:
-                test_order_tallies[d_tid] = {
-                    "test_id": d_tid,
+
+            if b_tid not in test_order_tallies:
+                test_order_tallies[b_tid] = {
+                    "test_id": b_tid,
                     "test_name": test_name,
                     "section_name": sec_name,
                     "count": 0
                 }
-            test_order_tallies[d_tid]["count"] += delta
+            test_order_tallies[b_tid]["count"] += done_val
 
     # Menu coverage: Query parent / standalone orderable tests only (parent_rollup_id IS NULL)
     cur.execute("""

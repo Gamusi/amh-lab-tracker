@@ -95,12 +95,19 @@ def test_surveillance_analytics_blends_backlog(reporting_db):
 
 def test_daily_log_blends_routine_and_backlog_while_backlog_shows_only_backlog(reporting_db):
     cur = reporting_db["conn"].cursor()
-    # Routine test entered on 2026-09-02 (e.g. from lab reports in daily_entries)
-    cur.execute("""
-        INSERT INTO daily_entries (entry_date, test_id, done, positive, in_house)
-        VALUES ('2026-09-02', 1, 5, 1, 5)
-    """)
-    # Backlog test entered on 2026-09-02 (in backlog_entries)
+    # Routine tests entered on 2026-09-02 (5 completed live orders, 1 positive)
+    cur.execute("INSERT INTO clients (client_number, full_name, sex) VALUES ('CLI-REP-1', 'Rep Client', 'Female')")
+    cid = cur.lastrowid
+    cur.execute("INSERT INTO visits (client_id, ward_of_origin, order_category, created_at) VALUES (?, 'Ward A', 'in-house', '2026-09-02 08:00:00')", (cid,))
+    vid = cur.lastrowid
+
+    for i in range(5):
+        cur.execute("INSERT INTO test_orders (visit_id, test_id, status, ordered_at, order_category) VALUES (?, 1, 'completed', '2026-09-02 08:10:00', 'in-house')", (vid,))
+        oid = cur.lastrowid
+        if i == 0:
+            cur.execute("INSERT INTO test_results (order_id, is_positive, clinical_flag, entered_at) VALUES (?, 1, 'Abnormal', '2026-09-02 08:30:00')", (oid,))
+
+    # Backlog test entered on 2026-09-02 (in backlog_entries: 15 done, 3 positive)
     cur.execute("""
         INSERT INTO backlog_entries (entry_date, test_id, done, positive, in_house)
         VALUES ('2026-09-02', 1, 15, 3, 15)
