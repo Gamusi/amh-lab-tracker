@@ -268,11 +268,20 @@ def create_visit(req: VisitCreate, conn: sqlite3.Connection = Depends(get_db), c
     if not req.test_ids:
         raise HTTPException(status_code=400, detail="At least one test ID must be provided")
         
+    FEMALE_ONLY_TEST_KEYWORDS = ["hcg urine", "hcg blood", "pregnancy"]
+    cur.execute("SELECT sex FROM clients WHERE id = ?", (req.client_id,))
+    client_row = cur.fetchone()
+    client_sex = (client_row["sex"] if client_row and client_row["sex"] else "").strip().lower()
+
     for tid in req.test_ids:
-        cur.execute("SELECT id FROM tests WHERE id = ?", (tid,))
-        if not cur.fetchone():
+        cur.execute("SELECT id, name FROM tests WHERE id = ?", (tid,))
+        t_row = cur.fetchone()
+        if not t_row:
             logger.warning(f"Visit creation failed: test ID {tid} not found")
             raise HTTPException(status_code=404, detail=f"Test ID {tid} not found")
+        t_name_low = t_row["name"].lower()
+        if client_sex == "male" and any(k in t_name_low for k in FEMALE_ONLY_TEST_KEYWORDS):
+            raise HTTPException(status_code=400, detail=f"Cannot order female-specific test '{t_row['name']}' for male client.")
             
     cur.execute("""
         INSERT INTO visits (client_id, clinician_id, ward_of_origin, specimen_type_id)
@@ -330,11 +339,25 @@ def add_orders_to_visit(visit_id: int, req: AddOrdersRequest, conn: sqlite3.Conn
     if not req.test_ids:
         raise HTTPException(status_code=400, detail="At least one test ID must be provided")
         
+    cur.execute("""
+        SELECT c.sex 
+        FROM visits v
+        JOIN clients c ON v.client_id = c.id
+        WHERE v.id = ?
+    """, (visit_id,))
+    v_client = cur.fetchone()
+    client_sex = (v_client["sex"] if v_client and v_client["sex"] else "").strip().lower()
+    FEMALE_ONLY_TEST_KEYWORDS = ["hcg urine", "hcg blood", "pregnancy"]
+
     for tid in req.test_ids:
-        cur.execute("SELECT id FROM tests WHERE id = ?", (tid,))
-        if not cur.fetchone():
+        cur.execute("SELECT id, name FROM tests WHERE id = ?", (tid,))
+        t_row = cur.fetchone()
+        if not t_row:
             logger.warning(f"Add orders failed: test ID {tid} not found")
             raise HTTPException(status_code=404, detail=f"Test ID {tid} not found")
+        t_name_low = t_row["name"].lower()
+        if client_sex == "male" and any(k in t_name_low for k in FEMALE_ONLY_TEST_KEYWORDS):
+            raise HTTPException(status_code=400, detail=f"Cannot order female-specific test '{t_row['name']}' for male client.")
             
         # Enforce Single Order Logic
         cur.execute("""
@@ -413,25 +436,37 @@ def create_order(req: TestOrderCreate, conn: sqlite3.Connection = Depends(get_db
     logger.info(f"User '{current_user['username']}' is creating test order: client_id={req.client_id}, visit_id={req.visit_id}, test_id={req.test_id}")
     cur = conn.cursor()
     
-    cur.execute("SELECT id FROM tests WHERE id = ?", (req.test_id,))
-    if not cur.fetchone():
+    cur.execute("SELECT id, name FROM tests WHERE id = ?", (req.test_id,))
+    t_row = cur.fetchone()
+    if not t_row:
         logger.warning(f"Order creation failed: test ID {req.test_id} not found")
         raise HTTPException(status_code=404, detail="Test not found")
 
     visit_id = req.visit_id
+    FEMALE_ONLY_TEST_KEYWORDS = ["hcg urine", "hcg blood", "pregnancy"]
     if not visit_id:
         if not req.client_id:
             raise HTTPException(status_code=400, detail="Either visit_id or client_id must be provided")
-        cur.execute("SELECT id FROM clients WHERE id = ?", (req.client_id,))
-        if not cur.fetchone():
+        cur.execute("SELECT id, sex FROM clients WHERE id = ?", (req.client_id,))
+        c_row = cur.fetchone()
+        if not c_row:
             logger.warning(f"Order creation failed: client ID {req.client_id} not found")
             raise HTTPException(status_code=404, detail="Client not found")
+        client_sex = (c_row["sex"] if c_row and c_row["sex"] else "").strip().lower()
+        if client_sex == "male" and any(k in t_row["name"].lower() for k in FEMALE_ONLY_TEST_KEYWORDS):
+            raise HTTPException(status_code=400, detail=f"Cannot order female-specific test '{t_row['name']}' for male client.")
         cur.execute("""
             INSERT INTO visits (client_id, ward_of_origin)
             VALUES (?, ?)
         """, (req.client_id, req.ref_doctor_ward))
         visit_id = cur.lastrowid
     else:
+        cur.execute("SELECT c.sex FROM visits v JOIN clients c ON v.client_id = c.id WHERE v.id = ?", (visit_id,))
+        v_client = cur.fetchone()
+        client_sex = (v_client["sex"] if v_client and v_client["sex"] else "").strip().lower()
+        if client_sex == "male" and any(k in t_row["name"].lower() for k in FEMALE_ONLY_TEST_KEYWORDS):
+            raise HTTPException(status_code=400, detail=f"Cannot order female-specific test '{t_row['name']}' for male client.")
+
         # Enforce Single Order Logic
         cur.execute("""
             SELECT o.id, tr.result_value 

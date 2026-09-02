@@ -2906,8 +2906,18 @@ const app = {
     
     if (this.testCatalog) {
       let html = '';
+      let isMale = false;
+      if (this.currentClient && this.currentClient.sex && this.currentClient.sex.toLowerCase() === 'male') {
+        isMale = true;
+      }
+      const femaleKeywords = ['hcg urine', 'hcg blood', 'pregnancy'];
+
       this.testCatalog.forEach(t => {
         if (!t.parent_rollup_id) {
+          const tNameLow = (t.name || '').toLowerCase();
+          if (isMale && femaleKeywords.some(k => tNameLow.includes(k))) {
+            return;
+          }
           html += `
             <label class="add-test-row" data-name="${this.escape(t.name).toLowerCase()}" data-category="${t.section_id}" style="display: block; margin-bottom: 4px; cursor: pointer;">
               <input type="checkbox" name="add-test-cb" value="${t.id}" data-test-name="${this.escape(t.name)}" onchange="app.updateAddModalSelectedTestsSummary()">
@@ -3291,13 +3301,21 @@ const app = {
             } else if (test.default_unit) {
                 unitHtml = `<span style="padding: 8px; background: var(--bg-color); border: 1px solid var(--border-color); border-radius: 4px;">${this.escape(test.default_unit)}</span>`;
             }
+            let placeholderText = "Enter Value" + (test.ref_range ? '. Ref: ' + test.ref_range : '');
+            let clinicalHint = '';
+            if (nameLower.includes('hcg') && nameLower.includes('blood')) {
+              placeholderText = "e.g. 150.0 (Non-pregnant: <5.0, Pregnant: >=25.0 mIU/mL)";
+              clinicalHint = '<small style="display:block; margin-top:4px; color:var(--text-muted); font-size:0.75rem;"><b>Pregnancy Staging:</b> Baseline < 5.0 mIU/mL (Non-pregnant); >= 25.0 mIU/mL (Positive). Normal early gestation exhibits rapid doubling times (every 48-72h).</small>';
+            }
+
             singleContainer.innerHTML = `
               <div class="form-group" style="margin-bottom: 16px;">
                 <label>Result Value:</label>
                 <div style="display: flex; gap: 8px;">
-                    <input type="number" step="any" id="result-entry-value" value="${isEdit ? this.escape(existingVal) : ''}" placeholder="Enter Value${test.ref_range ? '. Ref: ' + this.escape(test.ref_range) : ''}" style="flex: 1; padding: 8px;">
+                    <input type="number" step="any" id="result-entry-value" value="${isEdit ? this.escape(existingVal) : ''}" placeholder="${this.escape(placeholderText)}" style="flex: 1; padding: 8px;">
                     ${unitHtml}
                 </div>
+                ${clinicalHint}
               </div>
             `;
             if (isEdit && existingUnit && document.getElementById('result-entry-unit')) {
