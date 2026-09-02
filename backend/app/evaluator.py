@@ -141,6 +141,11 @@ def is_qualitative_abnormal(result_val: str, ref_val: str = None, param_name: st
                 return False
             if any(t in v_low for t in ["1:80", "1:160", "1:320", "1:640", ">= 1:640", ">=1:640"]) or "positive" in v_low or "reactive" in v_low:
                 return True
+        if any(term in p_low for term in ["afb", "tuberculosis", "sputum smear", "zn"]):
+            if "negative" in v_low or "not seen" in v_low or "no bacilli" in v_low or "not done" in v_low:
+                return False
+            if any(k in v_low for k in ["scanty", "1+", "2+", "3+", "positive", "bacilli seen"]):
+                return True
 
     # Normal exact matches
     normal_exact = {
@@ -150,7 +155,8 @@ def is_qualitative_abnormal(result_val: str, ref_val: str = None, param_name: st
         "no ova, cysts, or trophozoites seen", "hyaline casts (0-1 / lpf)",
         "1-2 / lpf", "3-4 / lpf", "few", "1.0 eu/dl", "normal (1.0 eu/dl)",
         "not done", "< 1:20", "<1:20", "1:20", "1:40",
-        "negative (not detected)", "not detected", "no growth after 48 hours"
+        "negative (not detected)", "not detected", "no growth after 48 hours",
+        "afb negative", "afb negative (no bacilli seen in 100 hpf)"
     }
     if v_low in normal_exact:
         return False
