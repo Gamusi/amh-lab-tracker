@@ -48,9 +48,9 @@ def _init_fonts():
 
 _init_fonts()
 
-def _draw_background_hook(canvas, doc):
+def _draw_background_hook(canvas, doc, letterhead_override=None):
     canvas.saveState()
-    letterhead_path = os.path.abspath(
+    letterhead_path = letterhead_override or os.path.abspath(
         os.path.join(os.path.dirname(__file__), "..", "..", "assets", "branding", "letterhead.png")
     )
     if os.path.exists(letterhead_path):
@@ -786,7 +786,11 @@ def generate_pdf(order_data: dict, results_data: list) -> bytes:
         flowables.extend(_build_cbc_table(order_data, cbc_test))
         flowables.append(_build_cbc_footer(order_data, cbc_test))
     
-    doc.build(flowables, onFirstPage=_draw_background_hook, onLaterPages=_draw_background_hook)
+    custom_letterhead = order_data.get("letterhead_path")
+    def page_hook(canvas, document):
+        _draw_background_hook(canvas, document, letterhead_override=custom_letterhead)
+
+    doc.build(flowables, onFirstPage=page_hook, onLaterPages=page_hook)
     
     return buffer.getvalue()
 
