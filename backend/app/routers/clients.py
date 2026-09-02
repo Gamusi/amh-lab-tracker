@@ -495,7 +495,7 @@ def create_order(req: TestOrderCreate, conn: sqlite3.Connection = Depends(get_db
     logger.info(f"Order created successfully: order_id={oid}")
     return {"status": "ordered", "order_id": oid, "visit_id": visit_id}
 
-def increment_daily_entry(cur: sqlite3.Cursor, entry_date: str, test_id: int, is_positive: bool, user_id: int):
+def increment_daily_entry(cur: sqlite3.Cursor, entry_date: str, test_id: int, is_positive: bool, user_id: int, order_category: str = "in-house"):
     now_str = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
     cur.execute("SELECT id, is_tracked, parent_rollup_id FROM tests WHERE id = ?", (test_id,))
     t_obj = cur.fetchone()
@@ -505,7 +505,13 @@ def increment_daily_entry(cur: sqlite3.Cursor, entry_date: str, test_id: int, is
     is_tr = bool(t_obj["is_tracked"])
     parent_id = t_obj["parent_rollup_id"]
 
-    cur.execute("SELECT done, positive FROM daily_entries WHERE entry_date = ? AND test_id = ?", (entry_date, test_id))
+    cat_lower = (order_category or "in-house").lower()
+    in_house_inc = 1 if ("in-house" in cat_lower or "inhouse" in cat_lower or ("ref" not in cat_lower and "outreach" not in cat_lower and "self" not in cat_lower)) else 0
+    ref_inc = 1 if "ref" in cat_lower else 0
+    outreach_inc = 1 if "outreach" in cat_lower else 0
+    self_inc = 1 if "self" in cat_lower else 0
+
+    cur.execute("SELECT done, positive, in_house, referral, outreach, self_request FROM daily_entries WHERE entry_date = ? AND test_id = ?", (entry_date, test_id))
     existing = cur.fetchone()
 
     if existing:
@@ -514,21 +520,27 @@ def increment_daily_entry(cur: sqlite3.Cursor, entry_date: str, test_id: int, is
         if is_tr:
             curr_pos = new_pos if new_pos is not None else 0
             new_pos = curr_pos + (1 if is_positive else 0)
+
+        new_inhouse = (existing["in_house"] or 0) + in_house_inc
+        new_ref = (existing["referral"] or 0) + ref_inc
+        new_outreach = (existing["outreach"] or 0) + outreach_inc
+        new_self = (existing["self_request"] or 0) + self_inc
+
         cur.execute("""
             UPDATE daily_entries
-            SET done = ?, positive = ?, updated_by_user_id = ?, updated_at = ?
+            SET done = ?, positive = ?, in_house = ?, referral = ?, outreach = ?, self_request = ?, updated_by_user_id = ?, updated_at = ?
             WHERE entry_date = ? AND test_id = ?
-        """, (new_done, new_pos, user_id, now_str, entry_date, test_id))
+        """, (new_done, new_pos, new_inhouse, new_ref, new_outreach, new_self, user_id, now_str, entry_date, test_id))
     else:
         new_pos = (1 if is_positive else 0) if is_tr else None
         cur.execute("""
-            INSERT INTO daily_entries (entry_date, test_id, done, positive, entered_by_user_id, entered_at)
-            VALUES (?, ?, 1, ?, ?, ?)
-        """, (entry_date, test_id, new_pos, user_id, now_str))
+            INSERT INTO daily_entries (entry_date, test_id, done, positive, in_house, referral, outreach, self_request, entered_by_user_id, entered_at)
+            VALUES (?, ?, 1, ?, ?, ?, ?, ?, ?, ?)
+        """, (entry_date, test_id, new_pos, in_house_inc, ref_inc, outreach_inc, self_inc, user_id, now_str))
 
     # HIV Rapid Testing Algorithm Rollup (e.g. Determine -> HTS master count)
     if parent_id:
-        increment_daily_entry(cur, entry_date, parent_id, is_positive, user_id)
+        increment_daily_entry(cur, entry_date, parent_id, is_positive, user_id, order_category)
 
 @router.post("/api/results")
 @router.post("/api/clients/results")
@@ -538,7 +550,7 @@ def enter_result(req: TestResultCreate, conn: sqlite3.Connection = Depends(get_d
         cur = conn.cursor()
         cur.execute("""
             SELECT 
-                o.id as order_id, o.visit_id, o.test_id, o.status,
+                o.id as order_id, o.visit_id, o.test_id, o.status, o.order_category,
                 t.name as test_name, t.is_tracked,
                 c.date_of_birth, c.age_years, c.sex
             FROM test_orders o
@@ -747,7 +759,7 @@ def enter_result(req: TestResultCreate, conn: sqlite3.Connection = Depends(get_d
 
         # Auto-increment DailyEntry counts on initial submission only (prevents edit double-counting)
         if order["status"] == "pending":
-            increment_daily_entry(cur, today_str, order["test_id"], overall_positive, current_user["id"])
+            increment_daily_entry(cur, today_str, order["test_id"], overall_positive, current_user["id"], order["order_category"] or "in-house")
 
         # Sequential Lab Number Assignment on the parent visit
         assigned_lab_number = None

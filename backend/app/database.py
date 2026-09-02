@@ -87,6 +87,10 @@ SCHEMA_SQL = """
         test_id INTEGER NOT NULL REFERENCES tests(id),
         done INTEGER NOT NULL DEFAULT 0,
         positive INTEGER,
+        in_house INTEGER NOT NULL DEFAULT 0,
+        referral INTEGER NOT NULL DEFAULT 0,
+        outreach INTEGER NOT NULL DEFAULT 0,
+        self_request INTEGER NOT NULL DEFAULT 0,
         entered_by_user_id INTEGER REFERENCES users(id),
         entered_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_by_user_id INTEGER REFERENCES users(id),
@@ -253,6 +257,20 @@ def get_connection():
     conn.execute("PRAGMA foreign_keys = ON;")
     conn.execute("PRAGMA journal_mode = WAL;")
     conn.execute("PRAGMA busy_timeout = 5000;")
+
+    # Ensure daily_entries category columns exist
+    try:
+        cur = conn.cursor()
+        cur.execute("PRAGMA table_info(daily_entries)")
+        cols = {r[1] for r in cur.fetchall()}
+        if cols:
+            for c in ["in_house", "referral", "outreach", "self_request"]:
+                if c not in cols:
+                    cur.execute(f"ALTER TABLE daily_entries ADD COLUMN {c} INTEGER NOT NULL DEFAULT 0")
+            conn.commit()
+    except Exception as e:
+        logger.debug(f"Column migration check: {e}")
+
     logger.debug(f"Connected to database at {DB_PATH}")
     return conn
 
@@ -322,7 +340,11 @@ def init_db():
         ("reference_ranges", "plausible_max", "REAL"),
         ("diagnostic_kit_lots", "min_threshold", "INTEGER DEFAULT 25"),
         ("visits", "specimen_type_id", "INTEGER REFERENCES specimen_types(id)"),
-        ("test_orders", "specimen_type_id", "INTEGER REFERENCES specimen_types(id)")
+        ("test_orders", "specimen_type_id", "INTEGER REFERENCES specimen_types(id)"),
+        ("daily_entries", "in_house", "INTEGER NOT NULL DEFAULT 0"),
+        ("daily_entries", "referral", "INTEGER NOT NULL DEFAULT 0"),
+        ("daily_entries", "outreach", "INTEGER NOT NULL DEFAULT 0"),
+        ("daily_entries", "self_request", "INTEGER NOT NULL DEFAULT 0")
     ]
     for table, col, col_def in migrations:
         try:

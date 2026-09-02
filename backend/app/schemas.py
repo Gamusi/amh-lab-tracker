@@ -63,10 +63,27 @@ class DailyEntryItem(BaseModel):
     test_id: int
     done: int = 0
     positive: Optional[int] = None
+    in_house: Optional[int] = 0
+    referral: Optional[int] = 0
+    outreach: Optional[int] = 0
+    self_request: Optional[int] = 0
 
 class DailyLogSaveRequest(BaseModel):
     entry_date: datetime.date # YYYY-MM-DD
     entries: List[DailyEntryItem]
+
+class BacklogEntryItem(BaseModel):
+    test_id: int
+    done: int = 0
+    positive: Optional[int] = None
+    in_house: Optional[int] = None
+    referral: Optional[int] = 0
+    outreach: Optional[int] = 0
+    self_request: Optional[int] = 0
+
+class BacklogSaveRequest(BaseModel):
+    entry_date: datetime.date # YYYY-MM-DD
+    entries: List[BacklogEntryItem]
 
 class DailyEntryResponse(BaseModel):
     id: int
@@ -74,6 +91,10 @@ class DailyEntryResponse(BaseModel):
     test_id: int
     done: int
     positive: Optional[int]
+    in_house: int = 0
+    referral: int = 0
+    outreach: int = 0
+    self_request: int = 0
     entered_by_user_id: Optional[int]
     entered_at: Optional[datetime.datetime]
     updated_by_user_id: Optional[int]
