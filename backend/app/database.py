@@ -98,6 +98,23 @@ SCHEMA_SQL = """
         UNIQUE(entry_date, test_id)
     );
 
+    CREATE TABLE IF NOT EXISTS backlog_entries (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        entry_date DATE NOT NULL,
+        test_id INTEGER NOT NULL REFERENCES tests(id),
+        done INTEGER NOT NULL DEFAULT 0,
+        positive INTEGER,
+        in_house INTEGER NOT NULL DEFAULT 0,
+        referral INTEGER NOT NULL DEFAULT 0,
+        outreach INTEGER NOT NULL DEFAULT 0,
+        self_request INTEGER NOT NULL DEFAULT 0,
+        entered_by_user_id INTEGER REFERENCES users(id),
+        entered_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_by_user_id INTEGER REFERENCES users(id),
+        updated_at DATETIME,
+        UNIQUE(entry_date, test_id)
+    );
+
     CREATE TABLE IF NOT EXISTS audit_log (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         user_id INTEGER REFERENCES users(id),
@@ -258,7 +275,7 @@ def get_connection():
     conn.execute("PRAGMA journal_mode = WAL;")
     conn.execute("PRAGMA busy_timeout = 5000;")
 
-    # Ensure daily_entries category columns exist
+    # Ensure daily_entries category columns and backlog_entries table exist
     try:
         cur = conn.cursor()
         cur.execute("PRAGMA table_info(daily_entries)")
@@ -267,9 +284,28 @@ def get_connection():
             for c in ["in_house", "referral", "outreach", "self_request"]:
                 if c not in cols:
                     cur.execute(f"ALTER TABLE daily_entries ADD COLUMN {c} INTEGER NOT NULL DEFAULT 0")
-            conn.commit()
+        
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS backlog_entries (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                entry_date DATE NOT NULL,
+                test_id INTEGER NOT NULL REFERENCES tests(id),
+                done INTEGER NOT NULL DEFAULT 0,
+                positive INTEGER,
+                in_house INTEGER NOT NULL DEFAULT 0,
+                referral INTEGER NOT NULL DEFAULT 0,
+                outreach INTEGER NOT NULL DEFAULT 0,
+                self_request INTEGER NOT NULL DEFAULT 0,
+                entered_by_user_id INTEGER REFERENCES users(id),
+                entered_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_by_user_id INTEGER REFERENCES users(id),
+                updated_at DATETIME,
+                UNIQUE(entry_date, test_id)
+            );
+        """)
+        conn.commit()
     except Exception as e:
-        logger.debug(f"Column migration check: {e}")
+        logger.debug(f"Column/table migration check: {e}")
 
     logger.debug(f"Connected to database at {DB_PATH}")
     return conn

@@ -17,16 +17,23 @@ def get_daily_log(date_str: str = Query(..., alias="date"), conn: sqlite3.Connec
     cur.execute("SELECT id, name, sort_order FROM sections ORDER BY sort_order, id")
     sections = cur.fetchall()
     
-    # Query all active tests and their daily entries for this date in a single batch query
+    # Query all active tests, combining routine daily entries and historical backlog entries
     cur.execute("""
         SELECT 
             t.id as test_id, t.name as test_name, t.section_id, t.is_tracked, t.sort_order,
-            e.done, e.positive, e.entered_by_user_id, e.updated_at
+            (COALESCE(e.done, 0) + COALESCE(b.done, 0)) as done,
+            CASE 
+                WHEN e.positive IS NOT NULL OR b.positive IS NOT NULL THEN (COALESCE(e.positive, 0) + COALESCE(b.positive, 0))
+                ELSE NULL 
+            END as positive,
+            COALESCE(b.entered_by_user_id, e.entered_by_user_id) as entered_by_user_id,
+            COALESCE(b.updated_at, e.updated_at) as updated_at
         FROM tests t
         LEFT JOIN daily_entries e ON e.test_id = t.id AND e.entry_date = ?
+        LEFT JOIN backlog_entries b ON b.test_id = t.id AND b.entry_date = ?
         WHERE t.is_active = 1
         ORDER BY t.section_id, t.sort_order, t.id
-    """, (date_str,))
+    """, (date_str, date_str))
     all_tests = cur.fetchall()
 
     # Group tests by section_id

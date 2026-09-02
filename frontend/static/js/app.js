@@ -284,7 +284,9 @@ const app = {
     'alert-triangle': `<svg class="lucide" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"></path><line x1="12" x2="12" y1="9" y2="13"></line><line x1="12" x2="12.01" y1="17" y2="17"></line></svg>`,
     'boxes': `<svg class="lucide" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7.5 4.27 9 5.15"></path><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"></path><path d="m3.3 7 8.7 5 8.7-5"></path><path d="M12 22V12"></path></svg>`,
     'refresh-cw': `<svg class="lucide" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"></path><path d="M21 3v5h-5"></path><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"></path><path d="M8 16H3v5"></path></svg>`,
-    'log-out': `<svg class="lucide" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" x2="9" y1="12" y2="12"></line></svg>`
+    'log-out': `<svg class="lucide" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" x2="9" y1="12" y2="12"></line></svg>`,
+    'keyboard': `<svg class="lucide" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="16" x="2" y="4" rx="2" ry="2"></rect><line x1="6" x2="6.01" y1="8" y2="8"></line><line x1="10" x2="10.01" y1="8" y2="8"></line><line x1="14" x2="14.01" y1="8" y2="8"></line><line x1="18" x2="18.01" y1="8" y2="8"></line><line x1="6" x2="6.01" y1="12" y2="12"></line><line x1="10" x2="10.01" y1="12" y2="12"></line><line x1="14" x2="14.01" y1="12" y2="12"></line><line x1="18" x2="18.01" y1="12" y2="12"></line><line x1="8" x2="16" y1="16" y2="16"></line></svg>`,
+    'help-circle': `<svg class="lucide" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><line x1="12" x2="12.01" y1="17" y2="17"></line></svg>`
   },
 
   icon: function(name) {
@@ -295,16 +297,7 @@ const app = {
     yield this.loadTheme();
     yield this.checkAuth();
     this.setupInactivityListeners();
-    
-    document.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') {
-        const el = document.activeElement;
-        if (el && el.type === 'checkbox') {
-          e.preventDefault();
-          el.click();
-        }
-      }
-    });
+    this.setupGlobalKeyboardShortcuts();
   }),
 
   loadTheme: __async(function*() {
@@ -670,8 +663,13 @@ const app = {
       <div class="user-badge">
         ${this.icon('user')} <strong>${this.escape(this.currentUser.full_name)}</strong> (${this.escape(roleLabel)}${this.currentUser.cadre ? ' - ' + this.escape(this.currentUser.cadre) : ''})
       </div>
+      <button class="btn btn-secondary" style="padding: 4px 10px; font-size: 0.8rem;" onclick="app.openShortcutsModal()" title="Keyboard Shortcuts (Alt+H or ?)">${this.icon('keyboard')} Shortcuts</button>
       <button class="btn btn-secondary" style="padding: 4px 12px; font-size: 0.8rem;" onclick="app.handleLogout()">${this.icon('log-out')} Logout</button>
     `;
+  },
+
+  openShortcutsModal: function() {
+    this.openModal('shortcuts-modal');
   },
 
   navigate: function(viewName) {
@@ -684,7 +682,10 @@ const app = {
       tab.classList.remove('active');
     });
 
-    const activeBtn = Array.from(document.querySelectorAll('.nav-tab')).find(b => b.getAttribute('onclick').includes(viewName));
+    const activeBtn = Array.from(document.querySelectorAll('.nav-tab')).find(b => {
+      const onclickAttr = b.getAttribute('onclick');
+      return onclickAttr && onclickAttr.indexOf(viewName) !== -1;
+    });
     if (activeBtn) activeBtn.classList.add('active');
 
     const container = document.getElementById('view-container');
@@ -699,11 +700,16 @@ const app = {
   },
 
   _modalStack: [],
+  _previouslyFocusedElement: null,
 
   openModal: function(modalIdOrElem) {
     const el = typeof modalIdOrElem === 'string' ? document.getElementById(modalIdOrElem) : modalIdOrElem;
     if (!el) return;
     
+    if (this._modalStack.length === 0) {
+      this._previouslyFocusedElement = document.activeElement;
+    }
+
     this._modalStack = this._modalStack.filter(function(m) { return m !== el; });
     this._modalStack.push(el);
     
@@ -711,6 +717,16 @@ const app = {
     const baseOffset = isHighPriority ? 10000 : 1000;
     el.style.zIndex = (baseOffset + (this._modalStack.length * 10)).toString();
     el.style.display = 'flex';
+
+    setTimeout(function() {
+      const focusTarget = el.querySelector('input:not([type="hidden"]):not([disabled]), select:not([disabled]), textarea:not([disabled]), button.btn-primary:not([disabled]), button:not([disabled])');
+      if (focusTarget) {
+        focusTarget.focus();
+        if (typeof focusTarget.select === 'function') {
+          focusTarget.select();
+        }
+      }
+    }, 50);
   },
 
   closeModal: function(modalIdOrElem) {
@@ -719,6 +735,264 @@ const app = {
     
     el.style.display = 'none';
     this._modalStack = this._modalStack.filter(function(m) { return m !== el; });
+
+    if (this._modalStack.length === 0 && this._previouslyFocusedElement && typeof this._previouslyFocusedElement.focus === 'function') {
+      try {
+        this._previouslyFocusedElement.focus();
+      } catch(e) {}
+      this._previouslyFocusedElement = null;
+    }
+  },
+
+  setupGlobalKeyboardShortcuts: function() {
+    document.addEventListener('keydown', (e) => {
+      // 1. Enter key toggle for checkboxes
+      if (e.key === 'Enter') {
+        const el = document.activeElement;
+        if (el && el.type === 'checkbox') {
+          e.preventDefault();
+          el.click();
+          return;
+        }
+      }
+
+      const hasModal = this._modalStack && this._modalStack.length > 0;
+      const topModal = hasModal ? this._modalStack[this._modalStack.length - 1] : null;
+
+      // 2. Escape handling: close topmost modal if dismissable
+      if (e.key === 'Escape') {
+        if (topModal) {
+          if (topModal.id === 'login-modal' && !this.currentUser) return;
+          if (topModal.id === 'reset-password-modal' && this.currentUser && this.currentUser.password_reset_required) return;
+          e.preventDefault();
+          this.closeModal(topModal);
+          return;
+        }
+        const act = document.activeElement;
+        if (act && (act.tagName === 'INPUT' || act.tagName === 'TEXTAREA' || act.tagName === 'SELECT')) {
+          act.blur();
+        }
+        return;
+      }
+
+      // 3. Ctrl+Enter or Cmd+Enter: Submit active form/modal or create visit
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+        if (topModal) {
+          const form = topModal.querySelector('form');
+          if (form) {
+            e.preventDefault();
+            form.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
+            return;
+          }
+          const primaryBtn = topModal.querySelector('.btn-primary, #confirm-ok-btn, #prompt-ok-btn');
+          if (primaryBtn) {
+            e.preventDefault();
+            primaryBtn.click();
+            return;
+          }
+        } else if (this.currentView === 'clients') {
+          const createBtn = document.querySelector('#client-detail-box .btn-success');
+          if (createBtn) {
+            e.preventDefault();
+            createBtn.click();
+            return;
+          }
+        } else if (this.currentView === 'backlog') {
+          const saveBtn = document.getElementById('btn-save-backlog');
+          if (saveBtn) {
+            e.preventDefault();
+            saveBtn.click();
+            return;
+          }
+        }
+      }
+
+      // 4. Ctrl+S or Alt+S: Save current context
+      if ((e.ctrlKey || e.altKey) && (e.key === 's' || e.key === 'S')) {
+        if (topModal) {
+          const form = topModal.querySelector('form');
+          if (form) {
+            e.preventDefault();
+            form.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
+            return;
+          }
+        } else if (this.currentView === 'backlog') {
+          e.preventDefault();
+          this.saveBacklog();
+          return;
+        }
+      }
+
+      // 5. Modal focus trapping (Tab / Shift+Tab)
+      if (topModal && e.key === 'Tab') {
+        const focusables = Array.from(topModal.querySelectorAll('button:not([disabled]), [href], input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])')).filter(function(el) { return el.offsetParent !== null; });
+        if (focusables.length > 0) {
+          const first = focusables[0];
+          const last = focusables[focusables.length - 1];
+          if (e.shiftKey) {
+            if (document.activeElement === first || !topModal.contains(document.activeElement)) {
+              e.preventDefault();
+              last.focus();
+            }
+          } else {
+            if (document.activeElement === last || !topModal.contains(document.activeElement)) {
+              e.preventDefault();
+              first.focus();
+            }
+          }
+        }
+        return;
+      }
+
+      // 6. Global Navigation Alt+1..8 & Help Alt+H / ?
+      const isAlt = e.altKey;
+      const key = e.key;
+
+      if (isAlt && (key >= '1' && key <= '8')) {
+        e.preventDefault();
+        const tabMap = {
+          '1': 'clients',
+          '2': 'daily-log',
+          '3': 'backlog',
+          '4': 'inventory',
+          '5': 'reports',
+          '6': 'trends',
+          '7': 'config',
+          '8': 'audit'
+        };
+        const targetView = tabMap[key];
+        if (targetView) {
+          this.navigate(targetView);
+        }
+        return;
+      }
+
+      if ((isAlt && (key === 'h' || key === 'H')) || key === 'F1') {
+        e.preventDefault();
+        this.openShortcutsModal();
+        return;
+      }
+
+      if (isAlt && (key === 'n' || key === 'N')) {
+        e.preventDefault();
+        if (this.currentView === 'clients') {
+          this.showNewClientModal();
+        } else if (this.currentView === 'inventory') {
+          this.openReceiveStockModal();
+        }
+        return;
+      }
+
+      if (isAlt && (key === 't' || key === 'T')) {
+        if (this.currentView === 'clients') {
+          const search = document.getElementById('visit-test-search');
+          if (search) {
+            e.preventDefault();
+            search.focus();
+            search.select();
+            return;
+          }
+        }
+      }
+
+      if (isAlt && (key === 'a' || key === 'A')) {
+        if (this.currentView === 'daily-log') {
+          const tallyInp = document.getElementById('paper-register-input');
+          if (tallyInp) {
+            e.preventDefault();
+            tallyInp.focus();
+            tallyInp.select();
+            return;
+          }
+        }
+      }
+
+      if (isAlt && (key === 'e' || key === 'E')) {
+        const isPrivileged = this.currentUser && (this.currentUser.role === 'admin' || this.currentUser.role === 'superadmin');
+        if (isPrivileged) {
+          e.preventDefault();
+          this.openBulkExportModal();
+          return;
+        }
+      }
+
+      if (isAlt && (key === 'i' || key === 'I')) {
+        const isPrivileged = this.currentUser && (this.currentUser.role === 'admin' || this.currentUser.role === 'superadmin');
+        if (isPrivileged) {
+          e.preventDefault();
+          this.openBulkImportModal();
+          return;
+        }
+      }
+
+      if (isAlt && (key === 'l' || key === 'L')) {
+        e.preventDefault();
+        this.confirmAction("Logout", "Are you sure you want to sign out?", () => {
+          this.handleLogout();
+        });
+        return;
+      }
+
+      // 7. Non-input single key shortcuts
+      const activeEl = document.activeElement;
+      const isInputActive = activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || activeEl.tagName === 'SELECT');
+
+      if (!isInputActive && !hasModal) {
+        if (key === '?' || (e.shiftKey && key === '/')) {
+          e.preventDefault();
+          this.openShortcutsModal();
+          return;
+        }
+
+        if (key === '/' || (e.ctrlKey && (key === 'k' || key === 'K'))) {
+          e.preventDefault();
+          this.focusPrimarySearch();
+          return;
+        }
+
+        if (key === 'n' || key === 'N') {
+          e.preventDefault();
+          if (this.currentView === 'clients') {
+            this.showNewClientModal();
+          } else if (this.currentView === 'inventory') {
+            this.openReceiveStockModal();
+          }
+          return;
+        }
+
+        // Daily Log date shifting
+        if (this.currentView === 'daily-log') {
+          if (key === '[' || (isAlt && key === 'ArrowLeft')) {
+            e.preventDefault();
+            this.shiftLogDate(-1);
+            return;
+          }
+          if (key === ']' || (isAlt && key === 'ArrowRight')) {
+            e.preventDefault();
+            this.shiftLogDate(1);
+            return;
+          }
+          if (key === 't' || key === 'T') {
+            e.preventDefault();
+            this.shiftLogDate(0);
+            return;
+          }
+        }
+      }
+    });
+  },
+
+  focusPrimarySearch: function() {
+    if (this.currentView === 'clients') {
+      const el = document.getElementById('client-search-input');
+      if (el) { el.focus(); el.select(); }
+    } else if (this.currentView === 'backlog') {
+      const el = document.getElementById('backlog-search');
+      if (el) { el.focus(); el.select(); }
+    } else if (this.currentView === 'inventory') {
+      const el = document.getElementById('inventory-search');
+      if (el) { el.focus(); el.select(); }
+    }
   },
 
   saveOrderPref: function(key, val) {
@@ -775,6 +1049,20 @@ const app = {
     newOk.addEventListener('click', () => {
       app.closeModal(modal);
       if (typeof callback === 'function') callback.call(app);
+    });
+
+    newCancel.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+        e.preventDefault();
+        newOk.focus();
+      }
+    });
+
+    newOk.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+        e.preventDefault();
+        newCancel.focus();
+      }
     });
     
     this.openModal(modal);
@@ -1000,23 +1288,15 @@ const app = {
           </div>
         </div>
 
-        <!-- Quick Jump & Filters Bar -->
+        <!-- Filters Bar -->
         <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; background: #F8FAFC; border: 1px solid var(--border-color); border-radius: 6px; padding: 10px 14px; margin-bottom: 16px;">
-          <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-            <span style="font-size: 0.8rem; font-weight: 600; color: var(--text-muted);">Quick Jump:</span>
-            <button class="btn btn-secondary btn-sm" onclick="app.setBacklogDate('2026-07-01')">01-Jul-2026</button>
-            <button class="btn btn-secondary btn-sm" onclick="app.setBacklogDate('2026-08-01')">01-Aug-2026</button>
-            <button class="btn btn-secondary btn-sm" onclick="app.setBacklogDate('2026-09-01')">01-Sep-2026</button>
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <label for="backlog-section-filter" style="font-size: 0.8rem; color: var(--text-muted); font-weight: 600;">Section:</label>
+            <select id="backlog-section-filter" onchange="app.filterBacklogTable()" style="padding: 4px 8px; font-size: 0.85rem; border: 1px solid var(--border-color); border-radius: 4px;">
+              <option value="all">All Sections</option>
+            </select>
           </div>
-          <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
-            <div style="display: flex; align-items: center; gap: 6px;">
-              <label for="backlog-section-filter" style="font-size: 0.8rem; color: var(--text-muted); font-weight: 600;">Section:</label>
-              <select id="backlog-section-filter" onchange="app.filterBacklogTable()" style="padding: 4px 8px; font-size: 0.85rem; border: 1px solid var(--border-color); border-radius: 4px;">
-                <option value="all">All Sections</option>
-              </select>
-            </div>
-            <input type="text" id="backlog-search" placeholder="Search tests..." onkeyup="app.filterBacklogTable()" style="padding: 4px 8px; font-size: 0.85rem; width: 160px; border: 1px solid var(--border-color); border-radius: 4px;">
-          </div>
+          <input type="text" id="backlog-search" placeholder="Search tests..." onkeyup="app.filterBacklogTable()" style="padding: 4px 8px; font-size: 0.85rem; width: 180px; border: 1px solid var(--border-color); border-radius: 4px;">
         </div>
 
         <!-- Summary KPI Banner -->
@@ -1122,7 +1402,7 @@ const app = {
             <tr class="backlog-row" data-test-id="${tid}" data-section-id="${sec.section_id}" data-test-name="${this.escape(t.test_name).toLowerCase()}">
               <td>
                 <div style="font-weight: 600; color: var(--text-dark);">${this.escape(t.test_name)}</div>
-                ${t.is_tracked ? '<span style="font-size: 0.7rem; background: #FEE2E2; color: #991B1B; padding: 1px 6px; border-radius: 3px; font-weight: 600;">Tracked</span>' : ''}
+                ${t.is_tracked ? '<span style="font-size: 0.75rem; color: var(--text-muted); font-weight: normal;">(Tracked)</span>' : ''}
               </td>
               <td style="text-align: center;">
                 <input type="number" min="0" class="backlog-input backlog-input-done" data-test-id="${tid}" value="${done}" oninput="app.autoBalanceBacklogRow(${tid}, 'done')" onkeydown="app.handleBacklogKeyNav(event, ${tid}, 'done')" style="width: 75px; text-align: center; font-weight: 600; padding: 4px 6px; border: 1px solid var(--border-color); border-radius: 4px;">
@@ -1282,20 +1562,40 @@ const app = {
   },
 
   handleBacklogKeyNav: function(event, testId, fieldName) {
-    if (event.key === 'Enter' || event.key === 'ArrowDown') {
-      if (event.key === 'Enter') event.preventDefault();
-      const allInputs = Array.from(document.querySelectorAll(`.backlog-input-${fieldName}`));
-      const curIdx = allInputs.findIndex(el => parseInt(el.getAttribute('data-test-id'), 10) === testId);
+    const key = event.key;
+    const currentInput = event.target;
+    const currentRow = currentInput ? currentInput.closest('.backlog-row') : null;
+
+    if (key === 'Enter' || key === 'ArrowDown') {
+      if (key === 'Enter') event.preventDefault();
+      const allInputs = Array.from(document.querySelectorAll(`.backlog-input-${fieldName}`)).filter(el => el.offsetParent !== null);
+      const curIdx = allInputs.indexOf(currentInput);
       if (curIdx >= 0 && curIdx < allInputs.length - 1) {
         allInputs[curIdx + 1].focus();
         allInputs[curIdx + 1].select();
       }
-    } else if (event.key === 'ArrowUp') {
-      const allInputs = Array.from(document.querySelectorAll(`.backlog-input-${fieldName}`));
-      const curIdx = allInputs.findIndex(el => parseInt(el.getAttribute('data-test-id'), 10) === testId);
+    } else if (key === 'ArrowUp') {
+      const allInputs = Array.from(document.querySelectorAll(`.backlog-input-${fieldName}`)).filter(el => el.offsetParent !== null);
+      const curIdx = allInputs.indexOf(currentInput);
       if (curIdx > 0) {
         allInputs[curIdx - 1].focus();
         allInputs[curIdx - 1].select();
+      }
+    } else if (key === 'ArrowRight' && currentRow) {
+      const rowInputs = Array.from(currentRow.querySelectorAll('.backlog-input')).filter(el => el.offsetParent !== null);
+      const curIdx = rowInputs.indexOf(currentInput);
+      if (curIdx >= 0 && curIdx < rowInputs.length - 1) {
+        event.preventDefault();
+        rowInputs[curIdx + 1].focus();
+        rowInputs[curIdx + 1].select();
+      }
+    } else if (key === 'ArrowLeft' && currentRow) {
+      const rowInputs = Array.from(currentRow.querySelectorAll('.backlog-input')).filter(el => el.offsetParent !== null);
+      const curIdx = rowInputs.indexOf(currentInput);
+      if (curIdx > 0) {
+        event.preventDefault();
+        rowInputs[curIdx - 1].focus();
+        rowInputs[curIdx - 1].select();
       }
     }
   },
@@ -1383,10 +1683,11 @@ const app = {
 
   openBacklogCoverageModal: function() {
     const today = new Date().toISOString().split('T')[0];
+    const defaultStart = new Date(Date.now() - 30 * 86400000).toISOString().split('T')[0];
     const sInput = document.getElementById('coverage-start-date');
     const eInput = document.getElementById('coverage-end-date');
     
-    if (sInput && !sInput.value) sInput.value = '2026-07-01';
+    if (sInput && !sInput.value) sInput.value = defaultStart;
     if (eInput && !eInput.value) eInput.value = today;
 
     this.openModal('backlog-coverage-modal');
@@ -1423,14 +1724,14 @@ const app = {
 
       let rowsHtml = '';
       data.days.forEach(d => {
-        const badge = d.has_data
-          ? `<span style="background: #DCFCE7; color: #166534; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 600;">✓ Logged (${d.tests_done} tests)</span>`
-          : `<span style="background: #F1F5F9; color: var(--text-muted); padding: 2px 8px; border-radius: 4px; font-size: 0.75rem;">Pending</span>`;
+        const statusText = d.has_data
+          ? `Logged (${d.tests_done} tests)`
+          : `Pending`;
 
         rowsHtml += `
           <tr style="${d.has_data ? 'background: #FAFDFA;' : ''}">
             <td><strong>${d.date}</strong></td>
-            <td>${badge}</td>
+            <td style="color: ${d.has_data ? '#166534' : 'var(--text-muted)'}; font-weight: ${d.has_data ? '600' : 'normal'};">${statusText}</td>
             <td style="text-align: right; font-weight: 500;">${d.tests_done}</td>
             <td style="text-align: right; color: #DC2626;">${d.positives}</td>
             <td style="text-align: right;">${d.in_house}</td>
@@ -2248,7 +2549,7 @@ const app = {
           <div>
             <h3 style="font-size: 0.95rem; color: var(--primary-color); margin-bottom: 10px;">Registered Clients</h3>
             <div class="form-group" style="margin-bottom: 10px;">
-              <input type="text" id="client-search-input" placeholder="Search client name/ID..." oninput="app.searchClients(this.value)">
+              <input type="text" id="client-search-input" placeholder="Search client name/ID... (Press / to focus, ↓ to browse)" oninput="app.searchClients(this.value)" onkeydown="app.handleClientSearchKeyNav(event)">
             </div>
             ${bulkBar}
             <div id="client-list-box" style="background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 6px; max-height: 500px; overflow-y: auto;">
@@ -2267,6 +2568,56 @@ const app = {
     `;
     yield this.searchClients('');
   }),
+
+  handleClientSearchKeyNav: function(event) {
+    if (event.key === 'ArrowDown' || event.key === 'Enter') {
+      const firstItem = document.querySelector('.client-list-item');
+      if (firstItem) {
+        event.preventDefault();
+        firstItem.focus();
+      }
+    }
+  },
+
+  handleClientItemKeyNav: function(event, pid, pnum, pname, psex) {
+    const key = event.key;
+    const target = event.currentTarget;
+    if (key === 'Enter' || key === ' ') {
+      event.preventDefault();
+      this.selectClient(pid, pnum, pname, psex);
+      setTimeout(function() {
+        const testSearch = document.getElementById('visit-test-search');
+        if (testSearch) {
+          testSearch.focus();
+        }
+      }, 150);
+    } else if (key === 'ArrowDown' || key === 'j') {
+      event.preventDefault();
+      const next = target.nextElementSibling;
+      if (next && next.classList.contains('client-list-item')) {
+        next.focus();
+      }
+    } else if (key === 'ArrowUp' || key === 'k') {
+      event.preventDefault();
+      const prev = target.previousElementSibling;
+      if (prev && prev.classList.contains('client-list-item')) {
+        prev.focus();
+      } else {
+        const searchInput = document.getElementById('client-search-input');
+        if (searchInput) {
+          searchInput.focus();
+          searchInput.select();
+        }
+      }
+    } else if (key === 'x' || key === 'X') {
+      const cb = target.querySelector('.client-checkbox');
+      if (cb) {
+        event.preventDefault();
+        cb.checked = !cb.checked;
+        this.onClientSelectionChange();
+      }
+    }
+  },
 
   searchClients: __async(function*(q) {
     try {
@@ -2287,10 +2638,16 @@ const app = {
           <input type="checkbox" class="client-checkbox" value="${p.id}" onclick="event.stopPropagation()" onchange="app.onClientSelectionChange()" style="margin-right: 10px; cursor: pointer;">
         ` : '';
 
+        const isSelected = app.currentClientId === p.id;
         html += `
-          <div style="padding: 10px 14px; border-bottom: 1px solid var(--border-color); cursor: pointer; transition: background 0.2s; display: flex; align-items: center;" 
+          <div class="client-list-item ${isSelected ? 'selected' : ''}" 
+               data-client-id="${p.id}"
+               tabindex="0"
+               role="button"
+               style="padding: 10px 14px; border-bottom: 1px solid var(--border-color); cursor: pointer; transition: background 0.2s; display: flex; align-items: center; background: ${isSelected ? '#DBEAFE' : 'transparent'};" 
                onclick="app.selectClient(${p.id}, '${this.escape(p.client_number)}', '${this.escape(p.full_name)}', '${p.sex}')"
-               onmouseover="this.style.background='#F1F5F9'" onmouseout="this.style.background='transparent'">
+               onkeydown="app.handleClientItemKeyNav(event, ${p.id}, '${this.escape(p.client_number)}', '${this.escape(p.full_name)}', '${p.sex}')"
+               onmouseover="if(!this.classList.contains('selected')) this.style.background='#F1F5F9'" onmouseout="if(!this.classList.contains('selected')) this.style.background='transparent'">
             ${checkboxHtml}
             <div style="flex: 1;">
               <div style="font-weight: 700; color: var(--primary-color);">${this.escape(p.full_name)}</div>
@@ -2658,8 +3015,8 @@ const app = {
       tests.forEach(t => {
         if (!t.parent_rollup_id) {
           html += `
-            <label class="visit-test-row" data-name="${this.escape(t.name).toLowerCase()}" data-category="${t.section_id}" style="display: block; margin-bottom: 4px; cursor: pointer;">
-              <input type="checkbox" name="visit-test-cb" value="${t.id}" data-test-name="${this.escape(t.name)}" onchange="app.updateSelectedTestsSummary()">
+            <label class="visit-test-row" data-name="${this.escape(t.name).toLowerCase()}" data-category="${t.section_id}" style="display: block; margin-bottom: 4px; padding: 3px 6px; border-radius: 4px; cursor: pointer;">
+              <input type="checkbox" name="visit-test-cb" value="${t.id}" data-test-name="${this.escape(t.name)}" onchange="app.updateSelectedTestsSummary()" onkeydown="app.handleVisitTestCheckboxKeyNav(event)">
               ${this.escape(t.name)}
             </label>
           `;
@@ -2668,6 +3025,10 @@ const app = {
       html += '</div>';
 
       container.innerHTML = html;
+      const searchInput = document.getElementById('visit-test-search');
+      if (searchInput) {
+        searchInput.onkeydown = (e) => app.handleVisitTestSearchKeyNav(e);
+      }
       this.filterVisitTests();
       this.updateSelectedTestsSummary();
     } catch (e) {
@@ -2721,6 +3082,51 @@ const app = {
       cb.checked = false;
     });
     this.updateSelectedTestsSummary();
+  },
+
+  handleVisitTestSearchKeyNav: function(event) {
+    if (event.key === 'ArrowDown' || event.key === 'Enter') {
+      const firstVisible = Array.from(document.querySelectorAll('.visit-test-row')).find(function(r) { return r.style.display !== 'none'; });
+      if (firstVisible) {
+        event.preventDefault();
+        const cb = firstVisible.querySelector('input[name="visit-test-cb"]');
+        if (cb) cb.focus();
+      }
+    }
+  },
+
+  handleVisitTestCheckboxKeyNav: function(event) {
+    const key = event.key;
+    const currentCb = event.target;
+    const currentRow = currentCb.closest('.visit-test-row');
+    const allVisibleRows = Array.from(document.querySelectorAll('.visit-test-row')).filter(function(r) { return r.style.display !== 'none'; });
+    const curIdx = allVisibleRows.indexOf(currentRow);
+
+    if (key === 'ArrowDown') {
+      if (curIdx >= 0 && curIdx < allVisibleRows.length - 1) {
+        event.preventDefault();
+        const nextCb = allVisibleRows[curIdx + 1].querySelector('input[name="visit-test-cb"]');
+        if (nextCb) nextCb.focus();
+      }
+    } else if (key === 'ArrowUp') {
+      if (curIdx > 0) {
+        event.preventDefault();
+        const prevCb = allVisibleRows[curIdx - 1].querySelector('input[name="visit-test-cb"]');
+        if (prevCb) prevCb.focus();
+      } else {
+        const searchInput = document.getElementById('visit-test-search');
+        if (searchInput) {
+          event.preventDefault();
+          searchInput.focus();
+          searchInput.select();
+        }
+      }
+    } else if ((event.ctrlKey || event.metaKey) && key === 'Enter') {
+      event.preventDefault();
+      if (this.currentClientId) {
+        this.createVisit(this.currentClientId);
+      }
+    }
   },
 
   filterVisitTests: function() {
@@ -3443,17 +3849,64 @@ const app = {
             return;
           }
           html += `
-            <label class="add-test-row" data-name="${this.escape(t.name).toLowerCase()}" data-category="${t.section_id}" style="display: block; margin-bottom: 4px; cursor: pointer;">
-              <input type="checkbox" name="add-test-cb" value="${t.id}" data-test-name="${this.escape(t.name)}" onchange="app.updateAddModalSelectedTestsSummary()">
+            <label class="add-test-row" data-name="${this.escape(t.name).toLowerCase()}" data-category="${t.section_id}" style="display: block; margin-bottom: 4px; padding: 3px 6px; border-radius: 4px; cursor: pointer;">
+              <input type="checkbox" name="add-test-cb" value="${t.id}" data-test-name="${this.escape(t.name)}" onchange="app.updateAddModalSelectedTestsSummary()" onkeydown="app.handleModalTestCheckboxKeyNav(event)">
               ${this.escape(t.name)}
             </label>
           `;
         }
       });
       container.innerHTML = html;
+      const searchInput = document.getElementById('add-test-search');
+      if (searchInput) {
+        searchInput.onkeydown = (e) => app.handleModalTestSearchKeyNav(e);
+      }
       this.updateAddModalSelectedTestsSummary();
     }
   }),
+
+  handleModalTestSearchKeyNav: function(event) {
+    if (event.key === 'ArrowDown' || event.key === 'Enter') {
+      const firstVisible = Array.from(document.querySelectorAll('.add-test-row')).find(function(r) { return r.style.display !== 'none'; });
+      if (firstVisible) {
+        event.preventDefault();
+        const cb = firstVisible.querySelector('input[name="add-test-cb"]');
+        if (cb) cb.focus();
+      }
+    }
+  },
+
+  handleModalTestCheckboxKeyNav: function(event) {
+    const key = event.key;
+    const currentCb = event.target;
+    const currentRow = currentCb.closest('.add-test-row');
+    const allVisibleRows = Array.from(document.querySelectorAll('.add-test-row')).filter(function(r) { return r.style.display !== 'none'; });
+    const curIdx = allVisibleRows.indexOf(currentRow);
+
+    if (key === 'ArrowDown') {
+      if (curIdx >= 0 && curIdx < allVisibleRows.length - 1) {
+        event.preventDefault();
+        const nextCb = allVisibleRows[curIdx + 1].querySelector('input[name="add-test-cb"]');
+        if (nextCb) nextCb.focus();
+      }
+    } else if (key === 'ArrowUp') {
+      if (curIdx > 0) {
+        event.preventDefault();
+        const prevCb = allVisibleRows[curIdx - 1].querySelector('input[name="add-test-cb"]');
+        if (prevCb) prevCb.focus();
+      } else {
+        const searchInput = document.getElementById('add-test-search');
+        if (searchInput) {
+          event.preventDefault();
+          searchInput.focus();
+          searchInput.select();
+        }
+      }
+    } else if ((event.ctrlKey || event.metaKey) && key === 'Enter') {
+      event.preventDefault();
+      this.submitAddTests();
+    }
+  },
 
   updateAddModalSelectedTestsSummary: function() {
     const checkboxes = document.querySelectorAll('input[name="add-test-cb"]:checked');
@@ -3912,19 +4365,43 @@ const app = {
     
     // Add keyboard navigation
     const form = document.getElementById('result-entry-form');
-    const inputs = Array.from(form.querySelectorAll('input:not([type="hidden"]), select'));
+    const inputs = Array.from(form.querySelectorAll('input:not([type="hidden"]), select, textarea')).filter(function(el) {
+      return el.offsetParent !== null;
+    });
     inputs.forEach((input, index) => {
-        input.onkeydown = (e) => {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                const nextInput = inputs[index + 1];
-                if (nextInput) {
-                    nextInput.focus();
-                } else {
-                    form.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
-                }
-            }
-        };
+      input.onkeydown = (e) => {
+        if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+          e.preventDefault();
+          form.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
+          return;
+        }
+
+        if (e.key === 'Enter') {
+          if (input.tagName === 'TEXTAREA') return;
+          e.preventDefault();
+          const nextInput = inputs[index + 1];
+          if (nextInput) {
+            nextInput.focus();
+            if (typeof nextInput.select === 'function') nextInput.select();
+          } else {
+            form.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
+          }
+        } else if (e.key === 'ArrowDown' && input.tagName !== 'SELECT') {
+          const nextInput = inputs[index + 1];
+          if (nextInput) {
+            e.preventDefault();
+            nextInput.focus();
+            if (typeof nextInput.select === 'function') nextInput.select();
+          }
+        } else if (e.key === 'ArrowUp' && input.tagName !== 'SELECT') {
+          const prevInput = inputs[index - 1];
+          if (prevInput) {
+            e.preventDefault();
+            prevInput.focus();
+            if (typeof prevInput.select === 'function') prevInput.select();
+          }
+        }
+      };
     });
     
     form.onsubmit = __async(function*(e) {
@@ -5133,6 +5610,13 @@ const app = {
       app.closeModal(modal);
       callback(input.value);
     });
+
+    input.onkeydown = (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        newOk.click();
+      }
+    };
     
     this.openModal(modal);
     input.focus();

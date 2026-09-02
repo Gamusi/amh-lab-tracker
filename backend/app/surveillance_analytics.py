@@ -185,7 +185,7 @@ def calculate_surveillance_metrics(
                 orderable_tracked_map[tid]["positive"] += 1
             ward_stats[w_origin]["positive"] += 1
 
-    # Blend summary entries from daily_entries (backlog or register summary)
+    # Blend summary entries from daily_entries & backlog_entries (backlog or register summary)
     cur.execute("""
         SELECT 
             e.entry_date,
@@ -195,7 +195,11 @@ def calculate_surveillance_metrics(
             s.name AS section_name,
             SUM(e.done) AS sum_done,
             SUM(CASE WHEN e.positive IS NOT NULL THEN e.positive ELSE 0 END) AS sum_positive
-        FROM daily_entries e
+        FROM (
+            SELECT entry_date, test_id, done, positive FROM daily_entries
+            UNION ALL
+            SELECT entry_date, test_id, done, positive FROM backlog_entries
+        ) e
         JOIN tests t ON e.test_id = t.id
         JOIN sections s ON t.section_id = s.id
         WHERE e.entry_date >= ? AND e.entry_date <= ? AND t.is_tracked = 1 AND t.parent_rollup_id IS NULL AND e.done > 0
@@ -352,7 +356,11 @@ def calculate_surveillance_metrics(
         if not m_orders:
             cur.execute("""
                 SELECT t.name as test_name, SUM(CASE WHEN e.positive IS NOT NULL THEN e.positive ELSE 0 END) as pos_sum
-                FROM daily_entries e
+                FROM (
+                    SELECT entry_date, test_id, done, positive FROM daily_entries
+                    UNION ALL
+                    SELECT entry_date, test_id, done, positive FROM backlog_entries
+                ) e
                 JOIN tests t ON e.test_id = t.id
                 WHERE e.entry_date >= ? AND e.entry_date <= ? AND t.is_tracked = 1 AND t.parent_rollup_id IS NULL AND e.done > 0
                 GROUP BY t.name

@@ -211,7 +211,7 @@ def calculate_operations_metrics(
                 if tat_val <= sla_benchmark:
                     section_stats[sec_id]["on_time_count"] += 1
 
-    # Blend summary entries from daily_entries (backlog or register summary)
+    # Blend summary entries from daily_entries & backlog_entries (backlog or register summary)
     cur.execute("""
         SELECT 
             e.entry_date,
@@ -224,7 +224,11 @@ def calculate_operations_metrics(
             SUM(e.referral) AS sum_referral,
             SUM(e.outreach) AS sum_outreach,
             SUM(e.self_request) AS sum_self_request
-        FROM daily_entries e
+        FROM (
+            SELECT entry_date, test_id, done, in_house, referral, outreach, self_request FROM daily_entries
+            UNION ALL
+            SELECT entry_date, test_id, done, in_house, referral, outreach, self_request FROM backlog_entries
+        ) e
         JOIN tests t ON e.test_id = t.id
         JOIN sections s ON t.section_id = s.id
         WHERE e.entry_date >= ? AND e.entry_date <= ? AND e.done > 0
@@ -428,7 +432,11 @@ def calculate_operations_metrics(
 
         cur.execute("""
             SELECT s.name as section_name, SUM(e.done) as count_done
-            FROM daily_entries e
+            FROM (
+                SELECT entry_date, test_id, done FROM daily_entries
+                UNION ALL
+                SELECT entry_date, test_id, done FROM backlog_entries
+            ) e
             JOIN tests t ON e.test_id = t.id
             JOIN sections s ON t.section_id = s.id
             WHERE e.entry_date >= ? AND e.entry_date <= ? AND e.done > 0

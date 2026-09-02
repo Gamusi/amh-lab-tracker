@@ -32,7 +32,7 @@ def get_backlog_for_date(
             e.done, e.positive, e.in_house, e.referral, e.outreach, e.self_request,
             e.entered_by_user_id, e.updated_at
         FROM tests t
-        LEFT JOIN daily_entries e ON e.test_id = t.id AND e.entry_date = ?
+        LEFT JOIN backlog_entries e ON e.test_id = t.id AND e.entry_date = ?
         WHERE t.is_active = 1
         ORDER BY t.section_id, t.sort_order, t.id
     """, (date_str,))
@@ -145,7 +145,6 @@ def save_backlog(
         self_val = max(0, int(item.self_request or 0))
 
         # Flexible Non-Blocking Category Auto-Balance:
-        # If in_house is unspecified or breakdown does not sum to done, calculate in_house as remainder
         other_sum = ref_val + outreach_val + self_val
         if item.in_house is not None and (int(item.in_house) + other_sum == done_val):
             in_house_val = max(0, int(item.in_house))
@@ -153,7 +152,7 @@ def save_backlog(
             in_house_val = max(0, done_val - other_sum)
 
         cur.execute("""
-            INSERT INTO daily_entries (
+            INSERT INTO backlog_entries (
                 entry_date, test_id, done, positive, in_house, referral, outreach, self_request,
                 entered_by_user_id, entered_at, updated_by_user_id, updated_at
             )
@@ -214,7 +213,7 @@ def get_backlog_status(
             SUM(referral) as total_referral,
             SUM(outreach) as total_outreach,
             SUM(self_request) as total_self_request
-        FROM daily_entries
+        FROM backlog_entries
         WHERE entry_date >= ? AND entry_date <= ? AND done > 0
         GROUP BY entry_date
         ORDER BY entry_date ASC
@@ -285,7 +284,7 @@ def delete_backlog_for_date(
         raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD.")
 
     cur = conn.cursor()
-    cur.execute("DELETE FROM daily_entries WHERE entry_date = ?", (date_str,))
+    cur.execute("DELETE FROM backlog_entries WHERE entry_date = ?", (date_str,))
     deleted = cur.rowcount
     
     cur.execute("""
