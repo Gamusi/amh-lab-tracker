@@ -82,8 +82,9 @@ def create_test(req: TestCreate, admin_user: dict = Depends(require_admin), conn
 @router.put("/tests/{test_id}", response_model=TestResponse)
 def update_test(test_id: int, req: TestCreate, admin_user: dict = Depends(require_admin), conn: sqlite3.Connection = Depends(get_db)):
     cur = conn.cursor()
-    cur.execute("SELECT id FROM tests WHERE id = ?", (test_id,))
-    if not cur.fetchone():
+    cur.execute("SELECT id, is_active FROM tests WHERE id = ?", (test_id,))
+    test_row = cur.fetchone()
+    if not test_row:
         raise HTTPException(status_code=404, detail="Test not found")
         
     if req.is_tracked is None:
@@ -95,15 +96,15 @@ def update_test(test_id: int, req: TestCreate, admin_user: dict = Depends(requir
 
     cur.execute("""
         UPDATE tests
-        SET name = ?, section_id = ?, is_tracked = ?, result_type = ?, default_unit = ?, options = ?, parent_rollup_id = ?, tracks_stock = ?, consumable_name = ?
+        SET name = ?, section_id = ?, is_tracked = ?, sort_order = ?, result_type = ?, default_unit = ?, options = ?, parent_rollup_id = ?, tracks_stock = ?, consumable_name = ?
         WHERE id = ?
-    """, (req.name, req.section_id, effective_tracked, req.result_type, req.default_unit, req.options, req.parent_rollup_id, tracks_stock_val, req.consumable_name, test_id))
+    """, (req.name, req.section_id, effective_tracked, req.sort_order, req.result_type, req.default_unit, req.options, req.parent_rollup_id, tracks_stock_val, req.consumable_name, test_id))
     
     conn.execute("INSERT INTO audit_log (user_id, action, detail) VALUES (?, ?, ?)", (admin_user["id"], "update_test", f"Updated test ID {test_id} ('{req.name}')"))
     conn.commit()
     return TestResponse(
         id=test_id, name=req.name, section_id=req.section_id, 
-        is_tracked=bool(effective_tracked), sort_order=req.sort_order, is_active=True,
+        is_tracked=bool(effective_tracked), sort_order=req.sort_order, is_active=bool(test_row["is_active"]),
         result_type=req.result_type, default_unit=req.default_unit, options=req.options,
         parent_rollup_id=req.parent_rollup_id, tracks_stock=bool(tracks_stock_val),
         consumable_name=req.consumable_name
