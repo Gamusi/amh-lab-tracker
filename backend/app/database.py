@@ -231,6 +231,9 @@ SCHEMA_SQL = """
     CREATE INDEX IF NOT EXISTS idx_visits_client_id ON visits(client_id);
     CREATE INDEX IF NOT EXISTS idx_test_orders_visit_id ON test_orders(visit_id);
     CREATE INDEX IF NOT EXISTS idx_test_results_order_id ON test_results(order_id);
+    CREATE INDEX IF NOT EXISTS idx_daily_entries_date_test ON daily_entries(entry_date, test_id);
+    CREATE INDEX IF NOT EXISTS idx_stock_tx_lot_id ON diagnostic_kit_transactions(lot_id);
+    CREATE INDEX IF NOT EXISTS idx_audit_log_timestamp ON audit_log(timestamp);
 """
 
 def get_connection():
@@ -245,9 +248,10 @@ def get_connection():
             logger.info(f"Auto-migrated legacy database from {LEGACY_DB} to {DEFAULT_DB}")
         except Exception as e:
             logger.warning(f"Could not copy legacy database: {e}")
-    conn = sqlite3.connect(DB_PATH, check_same_thread=False)
+    conn = sqlite3.connect(DB_PATH, timeout=10.0, check_same_thread=False)
     conn.execute("PRAGMA foreign_keys = ON;")
     conn.execute("PRAGMA journal_mode = WAL;")
+    conn.execute("PRAGMA busy_timeout = 5000;")
     logger.debug(f"Connected to database at {DB_PATH}")
     return conn
 
