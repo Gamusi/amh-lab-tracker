@@ -108,12 +108,29 @@
               </button>
             </div>
           </div>
-          <div id="login-error" style="color: var(--danger-color); font-size: 0.85rem; margin-bottom: 16px; display: none;"></div>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+            <div id="login-error" style="color: var(--danger-color); font-size: 0.85rem; display: none;"></div>
+            <a href="#" onclick="app.showForgotPassword(event)" style="font-size: 0.8rem; color: var(--primary-color); text-decoration: none; margin-left: auto;">Forgot Password?</a>
+          </div>
           <button type="submit" class="btn btn-primary" style="width: 100%; padding: 10px;">Sign In</button>
           <p style="text-align: center; font-size: 0.85rem; margin-top: 16px; color: var(--text-muted);">
             New user? <a href="#" onclick="app.showRegisterForm(event)" style="color: var(--primary-color); font-weight: 600; text-decoration: none;">Register here</a>
           </p>
         </form>
+      </div>
+
+      <!-- Forgot Password Container (hidden by default) -->
+      <div id="forgot-password-container" style="display: none;">
+        <div style="text-align: center; margin-bottom: 20px;">
+          <h2 style="color: var(--primary-color);">Password Reset</h2>
+          <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 4px;">Self-service recovery guidance</p>
+        </div>
+        <div style="background: var(--bg-color); border: 1px solid var(--border-color); border-radius: 6px; padding: 16px; margin-bottom: 20px; font-size: 0.85rem; line-height: 1.5; color: var(--text-dark);">
+          <p style="margin-top: 0; margin-bottom: 10px;"><strong>Need a password reset?</strong></p>
+          <p style="margin-bottom: 10px;">For patient data security and compliance with MoH laboratory standards, passwords must be reset by a <strong>Laboratory Administrator</strong> or <strong>Super Administrator</strong>.</p>
+          <p style="margin-bottom: 0;">Please contact your lab in-charge or system administrator to receive a temporary reset password.</p>
+        </div>
+        <button type="button" class="btn btn-primary" style="width: 100%; padding: 10px;" onclick="app.showLoginForm(event)">Back to Sign In</button>
       </div>
 
       <!-- Register Container (hidden by default) -->

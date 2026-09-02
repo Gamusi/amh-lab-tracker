@@ -492,6 +492,8 @@ const app = {
   showRegisterForm: function(event) {
     if (event) event.preventDefault();
     document.getElementById('login-form-container').style.display = 'none';
+    const forgot = document.getElementById('forgot-password-container');
+    if (forgot) forgot.style.display = 'none';
     document.getElementById('register-form-container').style.display = 'block';
     document.getElementById('register-error').style.display = 'none';
     document.getElementById('register-success').style.display = 'none';
@@ -500,8 +502,18 @@ const app = {
   showLoginForm: function(event) {
     if (event) event.preventDefault();
     document.getElementById('register-form-container').style.display = 'none';
+    const forgot = document.getElementById('forgot-password-container');
+    if (forgot) forgot.style.display = 'none';
     document.getElementById('login-form-container').style.display = 'block';
     document.getElementById('login-error').style.display = 'none';
+  },
+
+  showForgotPassword: function(event) {
+    if (event) event.preventDefault();
+    document.getElementById('login-form-container').style.display = 'none';
+    document.getElementById('register-form-container').style.display = 'none';
+    const forgot = document.getElementById('forgot-password-container');
+    if (forgot) forgot.style.display = 'block';
   },
 
   handleRegister: __async(function*(event) {
