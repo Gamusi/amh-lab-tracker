@@ -2622,10 +2622,14 @@ const app = {
       if (!res.ok) throw new Error("Failed to fetch client");
       const data = yield res.json();
       
-      document.getElementById('edit-client-id').value = data.id;
-      document.getElementById('edit-client-number').value = data.client_number;
-      document.getElementById('edit-client-name').value = data.full_name;
-      document.getElementById('edit-client-sex').value = data.sex;
+      const idEl = document.getElementById('edit-client-id');
+      if (idEl) idEl.value = data.id;
+      const numEl = document.getElementById('edit-client-number');
+      if (numEl) numEl.value = data.client_number || '';
+      const nameEl = document.getElementById('edit-client-name');
+      if (nameEl) nameEl.value = data.full_name || '';
+      const sexEl = document.getElementById('edit-client-sex');
+      if (sexEl) sexEl.value = data.sex || 'Male';
       
       const phoneInput = document.getElementById('edit-client-phone');
       if (phoneInput) phoneInput.value = data.phone || '';
