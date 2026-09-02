@@ -128,7 +128,7 @@ def admin_reset_password(
         "UPDATE users SET password_hash = ?, password_reset_required = 1 WHERE id = ?",
         (new_hash, user_id)
     )
-    now_str = datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%d %H:%M:%S")
+    now_str = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
     cur.execute(
         "INSERT INTO audit_log (user_id, action, detail, timestamp) VALUES (?, 'ADMIN_RESET_PASSWORD', ?, ?)",
         (admin_user["id"], f"Reset password for user {target_user['username']} (ID {user_id})", now_str)

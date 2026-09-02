@@ -13,10 +13,13 @@ def hash_password(password: str) -> str:
     return f"{salt.hex()}${key.hex()}"
 
 def verify_password(plain_password: str, stored_string: str) -> bool:
-    salt_hex, stored_hash_hex = stored_string.split('$')
-    salt = bytes.fromhex(salt_hex)
-    new_key = hashlib.pbkdf2_hmac("sha256", plain_password.encode("utf-8"), salt, 100000)
-    return secrets.compare_digest(new_key.hex(), stored_hash_hex)
+    try:
+        salt_hex, stored_hash_hex = stored_string.split('$')
+        salt = bytes.fromhex(salt_hex)
+        new_key = hashlib.pbkdf2_hmac("sha256", plain_password.encode("utf-8"), salt, 100000)
+        return secrets.compare_digest(new_key.hex(), stored_hash_hex)
+    except Exception:
+        return False
 
 def cleanup_expired_sessions(conn: sqlite3.Connection):
     now_str = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
@@ -58,6 +61,15 @@ def get_current_user(request: Request, conn: sqlite3.Connection = Depends(get_db
     
     if not row["is_active"]:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Account is disabled")
+
+    # Enforce password reset required across non-auth routes
+    path = request.url.path
+    allowed_reset_paths = ("/api/auth/change-password", "/api/auth/logout", "/api/auth/me")
+    if row["password_reset_required"] and not any(path.startswith(p) for p in allowed_reset_paths):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Password reset is required before accessing application resources"
+        )
     
     # Throttle DB writes: only update expires_at if less than 10 minutes (600 seconds) remain on current session
     expires_dt = datetime.datetime.strptime(row["expires_at"], "%Y-%m-%d %H:%M:%S").replace(tzinfo=datetime.timezone.utc)

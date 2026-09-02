@@ -383,7 +383,7 @@ def bulk_delete_orders(req: BulkOrderDeleteRequest, conn: sqlite3.Connection = D
             skipped_ids.append(order_id)
             
     if deleted_ids:
-        now_str = datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%d %H:%M:%S")
+        now_str = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
         cur.execute("INSERT INTO audit_log (user_id, action, detail, timestamp) VALUES (?, 'DELETE_ORDERS_BULK', ?, ?)",
                     (current_user["id"], f"Bulk deleted pending test orders: {deleted_ids}", now_str))
         
@@ -503,9 +503,9 @@ def enter_result(req: TestResultCreate, conn: sqlite3.Connection = Depends(get_d
         cur = conn.cursor()
         cur.execute("""
             SELECT 
-                o.id as order_id, o.visit_id, o.test_id,
+                o.id as order_id, o.visit_id, o.test_id, o.status,
                 t.name as test_name, t.is_tracked,
-                c.date_of_birth, c.sex
+                c.date_of_birth, c.age_years, c.sex
             FROM test_orders o
             JOIN tests t ON o.test_id = t.id
             LEFT JOIN visits v ON o.visit_id = v.id
@@ -516,6 +516,10 @@ def enter_result(req: TestResultCreate, conn: sqlite3.Connection = Depends(get_d
         if not order:
             logger.warning(f"Result entry failed: order ID {req.order_id} not found")
             raise HTTPException(status_code=404, detail="Order not found")
+
+        is_admin = current_user.get("role") in ["admin", "superadmin"]
+        if order["status"] == "completed" and not is_admin:
+            raise HTTPException(status_code=403, detail="Only administrators can modify completed/verified test results.")
 
         now_str = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
         today = datetime.date.today()
@@ -530,12 +534,16 @@ def enter_result(req: TestResultCreate, conn: sqlite3.Connection = Depends(get_d
                 dob = None
         sex = order["sex"] or ""
         test_name = order["test_name"] or ""
-        age = (today.year - dob.year - ((today.month, today.day) < (dob.month, dob.day))) if dob else None
+        if dob:
+            age = (today.year - dob.year - ((today.month, today.day) < (dob.month, dob.day)))
+        elif order["age_years"] is not None:
+            age = int(order["age_years"])
+        else:
+            age = None
 
         overall_positive = False
 
         # Insert main result or parameter results with verified_at and verified_by_user_id
-        is_admin = current_user.get("role") in ["admin", "superadmin"]
         verified_by = current_user["id"] if is_admin else None
         verified_time = now_str if is_admin else None
         order_status = "completed" if is_admin else "entered"
@@ -702,8 +710,9 @@ def enter_result(req: TestResultCreate, conn: sqlite3.Connection = Depends(get_d
                 except Exception as e:
                     logger.warning(f"Stock depletion skipped/failed for {target_kit}: {e}")
 
-        # Auto-increment DailyEntry counts (with HIV algorithm rollup support)
-        increment_daily_entry(cur, today_str, order["test_id"], overall_positive, current_user["id"])
+        # Auto-increment DailyEntry counts on initial submission only (prevents edit double-counting)
+        if order["status"] == "pending":
+            increment_daily_entry(cur, today_str, order["test_id"], overall_positive, current_user["id"])
 
         # Sequential Lab Number Assignment on the parent visit
         assigned_lab_number = None
@@ -932,7 +941,7 @@ def bulk_delete_visits(req: BulkVisitDeleteRequest, conn: sqlite3.Connection = D
     cur = conn.cursor()
     deleted_ids = []
     skipped_ids = []
-    now_str = datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%d %H:%M:%S")
+    now_str = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
     
     for visit_id in req.visit_ids:
         cur.execute("SELECT id, is_deleted FROM visits WHERE id = ?", (visit_id,))
@@ -987,7 +996,7 @@ def delete_visit(visit_id: int, conn: sqlite3.Connection = Depends(get_db), curr
     # Soft delete visit
     cur.execute("UPDATE visits SET is_deleted = 1 WHERE id = ?", (visit_id,))
     
-    now_str = datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%d %H:%M:%S")
+    now_str = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
     cur.execute("INSERT INTO audit_log (user_id, action, detail, timestamp) VALUES (?, 'DELETE_VISIT', ?, ?)",
                 (current_user["id"], f"Soft-deleted visit ID {visit_id} and removed associated test orders", now_str))
     
@@ -1007,7 +1016,7 @@ def verify_order(
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
         
-    now_str = datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%d %H:%M:%S")
+    now_str = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
     cur.execute("UPDATE test_orders SET status = 'completed' WHERE id = ?", (order_id,))
     cur.execute("UPDATE test_results SET verified_by_user_id = ?, verified_at = ? WHERE order_id = ?", (admin_user["id"], now_str, order_id))
     cur.execute(
@@ -1035,7 +1044,7 @@ def verify_visit(
     if not orders:
         raise HTTPException(status_code=404, detail="No test orders found for this visit")
 
-    now_str = datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%d %H:%M:%S")
+    now_str = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
     order_ids = [o["id"] for o in orders]
     placeholders = ",".join("?" for _ in order_ids)
     

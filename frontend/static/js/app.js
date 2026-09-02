@@ -572,8 +572,8 @@ const app = {
     if (this.currentUser) {
       this.inactivityTimer = setTimeout(() => {
         console.log("Inactivity timeout reached. Logging out...");
-        this.handleLogout();
         this.showNotificationModal("Notice", "Logged out automatically due to inactivity.", true);
+        this.handleLogout();
       }, this.inactivityTimeout);
     }
   },
