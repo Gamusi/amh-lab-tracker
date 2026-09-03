@@ -175,7 +175,9 @@ TESTS = [
     {'name': 'Malaria RDT', 'section': 'Serology & Clinical Immunology', 'is_tracked': 1, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['Positive', 'Negative'], 'parent_name': None, 'sort_order': 0},
     {'name': 'TB LAM (Urine Tuberculosis LAM)', 'section': 'Serology & Clinical Immunology', 'is_tracked': 1, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['Positive', 'Negative'], 'parent_name': None, 'sort_order': 0},
     {'name': 'COVID19RDT', 'section': 'Serology & Clinical Immunology', 'is_tracked': 1, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['Positive', 'Negative'], 'parent_name': None, 'sort_order': 0},
-    {'name': 'CD4 COUNT', 'section': 'Serology & Clinical Immunology', 'is_tracked': 1, 'result_type': 'quantitative', 'default_unit': 'cells/µL', 'secondary_unit': None, 'ref_range': None, 'options': None, 'parent_name': None, 'sort_order': 0},
+    {'name': 'Absolute CD4 Count (Cytometry)', 'section': 'Serology & Clinical Immunology', 'is_tracked': 1, 'result_type': 'quantitative', 'default_unit': 'cells/µL', 'secondary_unit': None, 'ref_range': '500 - 1500 cells/µL', 'options': None, 'parent_name': None, 'sort_order': 0, 'tracks_stock': 1, 'consumable_name': 'CD4 POC Cartridges (PIMA/FACSPresto)', 'clinical_comments': 'Absolute CD4 T-cell count performed via automated POC cytometry. < 200 cells/µL defines Advanced HIV Disease (AHD).'},
+    {'name': 'CD4 Count (Rapid Test Strip)', 'section': 'Serology & Clinical Immunology', 'is_tracked': 1, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['CD4 Count: Below 200 cells/µL', 'CD4 Count: 200 cells/µL or above', 'Invalid'], 'parent_name': None, 'sort_order': 0, 'tracks_stock': 1, 'consumable_name': 'VISITECT CD4 Rapid Test Strips', 'clinical_comments': 'Semi-quantitative lateral-flow CD4 assay. Below 200 cells/µL defines Advanced HIV Disease (AHD).'},
+    {'name': 'CD4 Percentage', 'section': 'Serology & Clinical Immunology', 'is_tracked': 0, 'result_type': 'quantitative', 'default_unit': '%', 'secondary_unit': None, 'ref_range': '>= 25%', 'options': None, 'parent_name': None, 'sort_order': 0, 'clinical_comments': 'Pediatric CD4 immunological monitoring (< 5 years). < 25% defines Pediatric Advanced HIV Disease (AHD).'},
     {'name': 'CrAg (Cryptococcal Antigen)', 'section': 'Serology & Clinical Immunology', 'is_tracked': 1, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['Positive', 'Negative'], 'parent_name': None, 'sort_order': 0},
     {'name': 'HCV Ab (Hepatitis C)', 'section': 'Serology & Clinical Immunology', 'is_tracked': 1, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['Positive', 'Negative'], 'parent_name': None, 'sort_order': 0},
     {'name': 'TPHA (Confirmatory Syphilis Test)', 'section': 'Serology & Clinical Immunology', 'is_tracked': 1, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['Reactive', 'Non-Reactive'], 'parent_name': None, 'sort_order': 0},
@@ -416,6 +418,11 @@ DEFAULT_REFERENCE_RANGES = [
     ("Myoglobin", 0, 999, "Male", 16.0, 76.0, None, None, 2.0, 5000.0, 65.0, 3000.0, "µg/L"),
     ("Myoglobin", 0, 999, "Female", 7.0, 64.0, None, None, 2.0, 5000.0, 65.0, 3000.0, "ng/mL"),
     ("Myoglobin", 0, 999, "Female", 7.0, 64.0, None, None, 2.0, 5000.0, 65.0, 3000.0, "µg/L"),
+
+    # CD4 T-Lymphocyte Monitoring
+    ("Absolute CD4 Count (Cytometry)", 5, 999, None, 500.0, 1500.0, 200.0, None, 0.0, 5000.0, 10.0, 3000.0, "cells/µL"),
+    ("CD4 COUNT", 5, 999, None, 500.0, 1500.0, 200.0, None, 0.0, 5000.0, 10.0, 3000.0, "cells/µL"),
+    ("CD4 Percentage", 0, 4, None, 25.0, 65.0, 25.0, None, 0.0, 100.0, 5.0, 65.0, "%"),
 ]
 
 def seed_reference_ranges(cur):
@@ -549,19 +556,21 @@ def seed_database(conn=None):
         clin_comments = t.get("clinical_comments")
         cur.execute("SELECT id FROM tests WHERE name = ? AND section_id = ?", (t["name"], sec_id))
         r = cur.fetchone()
+        tracks_stock = t.get("tracks_stock", 0)
+        consumable = t.get("consumable_name")
         if not r:
             cur.execute("""
                 INSERT INTO tests (name, section_id, is_tracked, sort_order, result_type,
-                    default_unit, secondary_unit, ref_range, options, clinical_comments)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    default_unit, secondary_unit, ref_range, options, clinical_comments, tracks_stock, consumable_name)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (t["name"], sec_id, t["is_tracked"], t["sort_order"], t["result_type"],
-                  t["default_unit"], t["secondary_unit"], t["ref_range"], opts, clin_comments))
+                  t["default_unit"], t["secondary_unit"], t["ref_range"], opts, clin_comments, tracks_stock, consumable))
             test_id_map[t["name"]] = cur.lastrowid
         else:
             cur.execute("""
-                UPDATE tests SET is_tracked=?, result_type=?, default_unit=?, secondary_unit=?, ref_range=?, options=?, clinical_comments=?
+                UPDATE tests SET is_tracked=?, result_type=?, default_unit=?, secondary_unit=?, ref_range=?, options=?, clinical_comments=?, tracks_stock=?, consumable_name=?
                 WHERE id=?
-            """, (t["is_tracked"], t["result_type"], t["default_unit"], t["secondary_unit"], t["ref_range"], opts, clin_comments, r["id"]))
+            """, (t["is_tracked"], t["result_type"], t["default_unit"], t["secondary_unit"], t["ref_range"], opts, clin_comments, tracks_stock, consumable, r["id"]))
             test_id_map[t["name"]] = r["id"]
 
     conn.commit()
@@ -656,7 +665,8 @@ def seed_database(conn=None):
                     VALUES (?, ?, ?, ?, ?, ?)
                 """, (mal_id, pname, punit, pref, porder, popts))
             else:
-                cur.execute("""
+                cur.execute("UPDATE test_parameters SET sort_order = ?, options = ? WHERE id = ?", (porder, popts, tp_r["id"]))
+
     # Seed Immunohematology parameters
     BLOOD_GROUP_PARAMS = [
         ("Forward Anti-A", None, None, 1, '["Agglutination (+)", "No Agglutination (-)"]'),

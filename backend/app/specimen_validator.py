@@ -67,6 +67,11 @@ TEST_SPECIMEN_MAP = {
     "sickling test": [SPECIMEN_EDTA],
     "reticulocyte count": [SPECIMEN_EDTA],
     "cd4 count": [SPECIMEN_EDTA, SPECIMEN_CAPILLARY],
+    "absolute cd4 count (cytometry)": [SPECIMEN_EDTA, SPECIMEN_CAPILLARY],
+    "cd4 count (rapid test strip)": [SPECIMEN_EDTA, SPECIMEN_CAPILLARY],
+    "cd4_quant": [SPECIMEN_EDTA, SPECIMEN_CAPILLARY],
+    "cd4_rdt": [SPECIMEN_EDTA, SPECIMEN_CAPILLARY],
+    "cd4 percentage": [SPECIMEN_EDTA, SPECIMEN_CAPILLARY],
     "blood smear for malaria parasites": [SPECIMEN_EDTA, SPECIMEN_CAPILLARY],
     "blood smear": [SPECIMEN_EDTA, SPECIMEN_CAPILLARY],
     "malaria microscopy": [SPECIMEN_EDTA, SPECIMEN_CAPILLARY],
@@ -327,3 +332,9 @@ def validate_test_specimen_selection(
             test_best_specimen[t_name] = matched[0]
 
     return len(errors) == 0, errors, test_best_specimen
+
+
+def validate_specimen_for_test(test_name: str, specimen_name: str, section_name: Optional[str] = None) -> bool:
+    """Validate if a specific specimen is accredited/compatible for a given test."""
+    compatible = get_compatible_specimens_for_test(test_name, section_name)
+    return any(_is_compatible_specimen(c, specimen_name) for c in compatible)
