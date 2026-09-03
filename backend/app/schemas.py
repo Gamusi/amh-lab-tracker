@@ -461,3 +461,61 @@ class CrossmatchResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+class CultureAstItem(BaseModel):
+    id: Optional[int] = None
+    antimicrobial_class: str
+    agent_name: str
+    measurement_type: str = "zone_mm" # 'zone_mm' or 'mic_ug_ml'
+    measurement_value: Optional[float] = None
+    raw_sir: str # 'S', 'I', 'R'
+    overridden_sir: Optional[str] = None
+    override_reason: Optional[str] = None
+    clinical_note: Optional[str] = None
+
+class CultureIsolateItem(BaseModel):
+    id: Optional[int] = None
+    isolate_number: int = 1
+    organism_name: str
+    colony_morphology: Optional[str] = None
+    is_pathogen: bool = True
+    is_contaminant: bool = False
+    ast_results: Optional[List[CultureAstItem]] = None
+
+class CultureOrderSaveRequest(BaseModel):
+    phase: int = 1 # 1: Micro, 2: Colony count, 3: ID, 4: AST/Final
+    preliminary_micro: Optional[str] = None
+    colony_count_cfu: Optional[str] = None
+    growth_category: Optional[str] = None
+    incubation_hours: Optional[int] = 24
+    media_used: Optional[str] = None
+    clinical_notes: Optional[str] = None
+    is_emergency_callback_done: Optional[bool] = False
+    emergency_callback_recipient: Optional[str] = None
+    is_esbl_positive: Optional[bool] = False
+    is_mrsa_positive: Optional[bool] = False
+    isolates: Optional[List[CultureIsolateItem]] = None
+    edit_reason: Optional[str] = None
+
+class CultureOrderResponse(BaseModel):
+    id: Optional[int] = None
+    order_id: int
+    phase: int = 1
+    preliminary_micro: Optional[str] = None
+    preliminary_micro_date: Optional[str] = None
+    colony_count_cfu: Optional[str] = None
+    growth_category: Optional[str] = None
+    incubation_hours: int = 24
+    media_used: Optional[str] = None
+    clinical_notes: Optional[str] = None
+    is_emergency_callback_done: bool = False
+    emergency_callback_time: Optional[str] = None
+    emergency_callback_recipient: Optional[str] = None
+    alerts: Optional[List[str]] = None
+    isolates: List[CultureIsolateItem] = []
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
