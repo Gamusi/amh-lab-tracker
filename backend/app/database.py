@@ -389,6 +389,16 @@ def init_db():
         except sqlite3.OperationalError:
             pass # Column already exists
 
+    # Ensure standardized test names
+    cursor.execute("UPDATE tests SET name = 'ZN Staining For AFBs' WHERE name LIKE 'ZN FOR AFBs%' OR name LIKE 'ZN Staining%'")
+    cursor.execute("UPDATE tests SET name = 'Blood smear for Malaria Parasites' WHERE name LIKE 'Blood smear Mps%'")
+    cursor.execute("""
+        UPDATE test_parameters
+        SET options = '["Not Done", "Not Seen (No Parasites)", "Plasmodium falciparum", "Plasmodium vivax", "Plasmodium malariae", "Plasmodium ovale", "Mixed infection (P. falciparum + P. malariae)", "Mixed infection (P. falciparum + P. vivax)"]'
+        WHERE parameter_name LIKE '%Thin Smear%' OR parameter_name LIKE '%Species Identification%'
+    """)
+    conn.commit()
+
     # Pre-seed CBC test parameters if CBC exists in tests
     CBC_PARAMS = [
         ("Total WBC Count (White Blood Cells)", "10³/µL", "4.0 - 9.0", 1),

@@ -182,8 +182,8 @@ TESTS = [
     {'name': 'ASO Titer (Anti-Streptolysin O)', 'section': 'Serology & Clinical Immunology', 'is_tracked': 0, 'result_type': 'quantitative', 'default_unit': 'IU/mL', 'secondary_unit': None, 'ref_range': None, 'options': None, 'parent_name': None, 'sort_order': 0},
     {'name': 'FBS (Fasting Blood Sugar)', 'section': 'Clinical Biochemistry', 'is_tracked': 1, 'result_type': 'quantitative', 'default_unit': 'mmol/L', 'secondary_unit': 'mg/dL', 'ref_range': '3.9 - 5.5 mmol/L (70 - 100 mg/dL)', 'options': None, 'parent_name': None, 'sort_order': 0},
     {'name': 'RBS (Random Blood Sugar)', 'section': 'Clinical Biochemistry', 'is_tracked': 1, 'result_type': 'quantitative', 'default_unit': 'mmol/L', 'secondary_unit': 'mg/dL', 'ref_range': '4.0 - 7.8 mmol/L (72 - 140 mg/dL)', 'options': None, 'parent_name': None, 'sort_order': 0},
-    {'name': 'Blood smear Mps (Malaria Microscopy)', 'section': 'Parasitology & Stool Diagnostics', 'is_tracked': 1, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['No malaria parasites seen', '1+ (1-10 parasites per 100 thick-film fields)', '2+ (11-100 parasites per 100 thick-film fields)', '3+ (1-10 parasites per single thick-film field)', '4+ (>10 parasites per single thick-film field)'], 'parent_name': None, 'sort_order': 0},
-    {'name': 'ZN FOR AFBs (Tuberculosis Sputum Smear)', 'section': 'Microbiology & Tuberculosis', 'is_tracked': 1, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': 'AFB Negative (No bacilli seen in 100 HPF)', 'options': ['AFB Negative', 'Scanty (1-9 AFBs per 100 HPF)', '1+ (10-99 AFBs per 100 HPF)', '2+ (1-10 AFBs per HPF)', '3+ (>10 AFBs per HPF)'], 'parent_name': None, 'sort_order': 0},
+    {'name': 'Blood smear for Malaria Parasites', 'section': 'Parasitology & Stool Diagnostics', 'is_tracked': 1, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['No malaria parasites seen', '1+ (1-10 parasites per 100 thick-film fields)', '2+ (11-100 parasites per 100 thick-film fields)', '3+ (1-10 parasites per single thick-film field)', '4+ (>10 parasites per single thick-film field)'], 'parent_name': None, 'sort_order': 0},
+    {'name': 'ZN Staining For AFBs', 'section': 'Microbiology & Tuberculosis', 'is_tracked': 1, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': 'AFB Negative (No bacilli seen in 100 HPF)', 'options': ['AFB Negative', 'Scanty (1-9 AFBs per 100 HPF)', '1+ (10-99 AFBs per 100 HPF)', '2+ (1-10 AFBs per HPF)', '3+ (>10 AFBs per HPF)'], 'parent_name': None, 'sort_order': 0},
     {'name': 'Gram Stain', 'section': 'Microbiology & Tuberculosis', 'is_tracked': 1, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['No bacteria seen', 'Gram-positive cocci in pairs/chains', 'Gram-positive cocci in clusters', 'Gram-negative rods', 'Gram-negative intracellular diplococci', 'Gram-positive rods'], 'parent_name': None, 'sort_order': 0},
     {'name': 'Urine Culture & Sensitivity (C&S)', 'section': 'Microbiology & Tuberculosis', 'is_tracked': 1, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['No growth after 48 hours', 'Significant growth of E. coli', 'Significant growth of Klebsiella spp', 'Significant growth of S. aureus', 'Significant growth of Proteus spp'], 'parent_name': None, 'sort_order': 0},
     {'name': 'Blood group (ABO & Rh typing)', 'section': 'Blood Transfusion & Immunohematology', 'is_tracked': 0, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['A Rh(D) Positive', 'A Rh(D) Negative', 'B Rh(D) Positive', 'B Rh(D) Negative', 'AB Rh(D) Positive', 'AB Rh(D) Negative', 'O Rh(D) Positive', 'O Rh(D) Negative'], 'parent_name': None, 'sort_order': 0},
@@ -634,15 +634,15 @@ def seed_database(conn=None):
                     WHERE id = ?
                 """, (punit, pref, porder, popts, tp_r["id"]))
 
-    # Seed Malaria Microscopy parameters under Blood smear Mps
-    cur.execute("SELECT id FROM tests WHERE name LIKE '%Malaria Microscopy%' OR name LIKE '%Blood smear Mps%'")
+    # Seed Malaria Microscopy parameters under Blood smear for Malaria Parasites
+    cur.execute("SELECT id FROM tests WHERE name LIKE '%Blood smear%' OR name LIKE '%Malaria Microscopy%'")
     mal_row = cur.fetchone()
     if mal_row:
         mal_id = mal_row["id"]
         MALARIA_PARAMS = [
             ("Examination Method / Film Done", None, None, 1, '["Thick Film", "Thin Film", "Both (Thick & Thin Film)"]'),
             ("Parasite Density (Thick Film)", None, None, 2, '["No malaria parasites seen", "1+ (1-10 parasites per 100 thick-film fields)", "2+ (11-100 parasites per 100 thick-film fields)", "3+ (1-10 parasites per single thick-film field)", "4+ (>10 parasites per single thick-film field)", "Not Done"]'),
-            ("Species Identification (Thin Smear)", None, None, 3, '["Not Seen (No Parasites)", "Plasmodium falciparum", "Plasmodium vivax", "Plasmodium malariae", "Plasmodium ovale", "Mixed infection (P. falciparum + P. malariae)", "Mixed infection (P. falciparum + P. vivax)", "Not Done"]'),
+            ("Species Identification (Thin Smear)", None, None, 3, '["Not Done", "Not Seen (No Parasites)", "Plasmodium falciparum", "Plasmodium vivax", "Plasmodium malariae", "Plasmodium ovale", "Mixed infection (P. falciparum + P. malariae)", "Mixed infection (P. falciparum + P. vivax)"]'),
         ]
         for pname, punit, pref, porder, popts in MALARIA_PARAMS:
             cur.execute("SELECT id FROM test_parameters WHERE test_id = ? AND parameter_name = ?", (mal_id, pname))

@@ -164,10 +164,13 @@ def test_malaria_microscopy_parameters_seeding(db_connection):
     seed_database(conn=db_connection)
     cur = db_connection.cursor()
 
-    cur.execute("SELECT id FROM tests WHERE name LIKE '%Blood smear Mps%' OR name LIKE '%Malaria Microscopy%'")
+    cur.execute("SELECT id FROM tests WHERE name = 'Blood smear for Malaria Parasites'")
     mal_row = cur.fetchone()
     assert mal_row is not None
     mal_id = mal_row["id"]
+
+    cur.execute("SELECT id FROM tests WHERE name = 'ZN Staining For AFBs'")
+    assert cur.fetchone() is not None
 
     cur.execute("SELECT parameter_name, options FROM test_parameters WHERE test_id = ? ORDER BY sort_order", (mal_id,))
     params = cur.fetchall()
@@ -183,6 +186,7 @@ def test_malaria_microscopy_parameters_seeding(db_connection):
     assert "4+ (>10 parasites per single thick-film field)" in density_opts
 
     species_opts = json.loads(params[2]["options"])
+    assert species_opts[0] == "Not Done"
     assert "Plasmodium falciparum" in species_opts
     assert "Plasmodium vivax" in species_opts
 

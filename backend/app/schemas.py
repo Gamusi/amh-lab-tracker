@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import Optional, List
+from typing import Optional, List, Dict
 import datetime
 
 class UserBase(BaseModel):
@@ -182,12 +182,19 @@ class SpecimenTypeResponse(SpecimenTypeBase):
     class Config:
         from_attributes = True
 
+class TestOrderItemCreate(BaseModel):
+    test_id: int
+    specimen_type_id: int
+
 class VisitCreate(BaseModel):
     client_id: int
     clinician_id: int
     ward_of_origin: str
-    specimen_type_id: int
-    test_ids: List[int]
+    specimen_type_id: Optional[int] = None
+    specimen_type_ids: Optional[List[int]] = None
+    test_ids: Optional[List[int]] = None
+    test_specimen_map: Optional[Dict[str, int]] = None
+    test_orders: Optional[List[TestOrderItemCreate]] = None
     sample_id: Optional[str] = None
     order_category: Optional[str] = 'in-house' 
 

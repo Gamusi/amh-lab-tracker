@@ -713,8 +713,8 @@ const app = {
     this._modalStack.push(el);
     
     const isHighPriority = el.id === 'notification-modal' || el.id === 'confirm-modal' || el.id === 'prompt-modal';
-    const baseOffset = isHighPriority ? 10000 : 1000;
-    el.style.zIndex = (baseOffset + (this._modalStack.length * 10)).toString();
+    const baseOffset = isHighPriority ? 10000 : 2000;
+    el.style.zIndex = (baseOffset + (this._modalStack.length * 50)).toString();
     el.style.display = 'flex';
 
     setTimeout(function() {
@@ -2591,7 +2591,6 @@ const app = {
   selectClient: __async(function*(pid, pnum, pname, psex) {
     this.currentClientId = pid;
     this.currentClientData = { id: pid, client_number: pnum, full_name: pname, sex: psex };
-    const savedCat = this.getOrderPref('category', 'in-house');
     const box = document.getElementById('client-detail-box');
     box.innerHTML = `
       <div>
@@ -2606,34 +2605,28 @@ const app = {
           <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 12px;">
             <div class="form-group">
               <label>Ward of Origin:</label>
-              <select id="visit-ward" onchange="app.saveOrderPref('ward', this.value)">
+              <select id="visit-ward" onchange="app.saveClientVisitPrefs(${pid})">
                 <option value="">Loading wards...</option>
               </select>
             </div>
             <div class="form-group">
               <label>Requested By (Clinician):</label>
-              <select id="visit-clinician" onchange="app.saveOrderPref('clinician', this.value)">
+              <select id="visit-clinician" onchange="app.saveClientVisitPrefs(${pid})">
                 <option value="">Loading...</option>
               </select>
             </div>
             <div class="form-group">
-              <label>Specimen:</label>
-              <select id="visit-specimen" onchange="app.saveOrderPref('specimen', this.value)" style="width: 100%; padding: 8px;">
-                <option value="">Loading specimens...</option>
-              </select>
-            </div>
-            <div class="form-group">
               <label>Test Category:</label>
-              <select id="visit-order-category" onchange="app.saveOrderPref('category', this.value)" style="width: 100%; padding: 8px;">
-                <option value="in-house" ${savedCat === 'in-house' ? 'selected' : ''}>In-house</option>
-                <option value="referral" ${savedCat === 'referral' ? 'selected' : ''}>Referral</option>
-                <option value="outreach" ${savedCat === 'outreach' ? 'selected' : ''}>Outreach</option>
+              <select id="visit-order-category" onchange="app.saveClientVisitPrefs(${pid})" style="width: 100%; padding: 8px;">
+                <option value="in-house" selected>In-house</option>
+                <option value="referral">Referral</option>
+                <option value="outreach">Outreach</option>
               </select>
             </div>
             <div class="form-group">
               <label>Lab Section:</label>
-              <select id="visit-test-section" onchange="app.saveOrderPref('section', this.value); app.filterVisitTests()" style="width: 100%; padding: 8px;">
-                <option value="all">All Sections</option>
+              <select id="visit-test-section" onchange="app.filterVisitTests()" style="width: 100%; padding: 8px;">
+                <option value="all" selected>All Sections</option>
               </select>
             </div>
           </div>
@@ -2643,13 +2636,13 @@ const app = {
               <span id="visit-selected-count" style="font-size: 0.8rem; font-weight: 600; color: var(--primary-color);">0 tests selected</span>
             </div>
             
-            <!-- Selected Tests Summary Bar -->
-            <div id="visit-selected-summary-bar" style="display: none; padding: 8px 12px; background: #fff; border: 1px solid #93C5FD; border-radius: 4px; margin-bottom: 8px;">
-              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-                <span style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); font-weight: 600;">Currently Selected Tests</span>
-                <button type="button" onclick="app.clearAllSelectedTests()" style="font-size: 0.75rem; color: var(--danger-color); background: none; border: none; cursor: pointer; padding: 0; text-decoration: underline;">Clear All</button>
+            <!-- Selected Tests Summary Bar with Per-Test Specimen Dropdowns -->
+            <div id="visit-selected-summary-bar" style="display: none; padding: 10px 14px; background: #fff; border: 1px solid #93C5FD; border-radius: 6px; margin-bottom: 10px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                <span style="font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; color: #1E40AF; font-weight: 700;">Ordered Tests &amp; Specimen Selection</span>
+                <button type="button" onclick="app.clearAllSelectedTests()" style="font-size: 0.75rem; color: var(--danger-color); background: none; border: none; cursor: pointer; padding: 0; text-decoration: underline; font-weight: 600;">Clear All</button>
               </div>
-              <div id="visit-selected-chips-container" style="display: flex; flex-wrap: wrap; gap: 6px;"></div>
+              <div id="visit-selected-chips-container" style="display: flex; flex-direction: column; gap: 6px;"></div>
             </div>
 
             <input type="text" id="visit-test-search" placeholder="Search tests..." onkeyup="app.filterVisitTests()" style="width: 100%; padding: 8px; margin-bottom: 8px; box-sizing: border-box;">
@@ -2683,9 +2676,49 @@ const app = {
     yield this.loadClinicians();
     yield this.loadSpecimens();
     yield this.loadTestOptionsMulti();
+    this.restoreClientVisitPrefs(pid);
     yield this.loadPendingTests(pid);
     yield this.loadHistoricalVisits(pid);
   }),
+
+  saveClientVisitPrefs: function(pid) {
+    if (!pid) return;
+    try {
+      const wardEl = document.getElementById('visit-ward');
+      const clinEl = document.getElementById('visit-clinician');
+      const catEl = document.getElementById('visit-order-category');
+      const prefs = {
+        ward: (wardEl && wardEl.value) ? wardEl.value : '',
+        clinician: (clinEl && clinEl.value) ? clinEl.value : '',
+        orderCat: (catEl && catEl.value) ? catEl.value : 'in-house'
+      };
+      localStorage.setItem('mlis_client_' + pid + '_visit_pref', JSON.stringify(prefs));
+    } catch(e) {}
+  },
+
+  restoreClientVisitPrefs: function(pid) {
+    if (!pid) return;
+    try {
+      const raw = localStorage.getItem('mlis_client_' + pid + '_visit_pref');
+      if (raw) {
+        const p = JSON.parse(raw);
+        if (p.ward) {
+          const wardEl = document.getElementById('visit-ward');
+          if (wardEl) wardEl.value = p.ward;
+        }
+        if (p.clinician) {
+          const clinEl = document.getElementById('visit-clinician');
+          if (clinEl) clinEl.value = p.clinician;
+        }
+        if (p.orderCat) {
+          const catEl = document.getElementById('visit-order-category');
+          if (catEl) catEl.value = p.orderCat;
+        }
+      }
+    } catch(e) {
+      console.error('Error restoring client visit prefs', e);
+    }
+  },
 
   loadTestOptions: __async(function*() {
     try {
@@ -2792,10 +2825,6 @@ const app = {
           sel.innerHTML += `<option value="${this.escape(w.name)}">${this.escape(w.name)}</option>`;
         });
       }
-      const savedWard = this.getOrderPref('ward', '');
-      if (savedWard && Array.from(sel.options).some(o => o.value === savedWard)) {
-        sel.value = savedWard;
-      }
     } catch (e) {
       console.error('Error loading wards', e);
     }
@@ -2812,10 +2841,6 @@ const app = {
       clinicians.forEach(c => {
         sel.innerHTML += `<option value="${c.id}">${this.escape(c.name)}</option>`;
       });
-      const savedClinician = this.getOrderPref('clinician', '');
-      if (savedClinician && Array.from(sel.options).some(o => o.value === savedClinician)) {
-        sel.value = savedClinician;
-      }
     } catch (e) {
       console.error('Error loading clinicians', e);
     }
@@ -2826,22 +2851,11 @@ const app = {
       const res = yield fetch('/api/config/specimens');
       if (!res.ok) throw new Error('API returned ' + res.status);
       const specimens = yield res.json();
-      const sel = document.getElementById('visit-specimen');
-      if (!sel) return;
-      sel.innerHTML = '<option value="">(None / Unspecified)</option>';
-      for (let i = 0; i < specimens.length; i++) {
-        const s = specimens[i];
-        sel.innerHTML += '<option value="' + s.id + '">' + this.escape(s.name) + '</option>';
-      }
-      const savedSpecimen = this.getOrderPref('specimen', '');
-      if (savedSpecimen && Array.from(sel.options).some(o => o.value === savedSpecimen)) {
-        sel.value = savedSpecimen;
-      }
+      this.specimensList = specimens;
     } catch (e) {
       console.error('Error loading specimens', e);
     }
   }),
-
 
   loadTestOptionsMulti: __async(function*() {
     try {
@@ -2869,10 +2883,6 @@ const app = {
           catHtml += `<option value="${s.id}">${this.escape(s.name)}</option>`;
         });
         catSelect.innerHTML = catHtml;
-        const savedSection = this.getOrderPref('section', 'all');
-        if (savedSection && Array.from(catSelect.options).some(o => o.value === savedSection)) {
-          catSelect.value = savedSection;
-        }
       }
       
       tests.forEach(t => {
@@ -2918,18 +2928,76 @@ const app = {
     }
     
     barEl.style.display = 'block';
-    let chipsHtml = '';
+    
+    const currentSelections = {};
+    document.querySelectorAll('.visit-test-specimen-select').forEach(sel => {
+      const tid = sel.getAttribute('data-test-id');
+      if (tid) currentSelections[tid] = sel.value;
+    });
+
+    let listHtml = '';
     checkboxes.forEach(cb => {
       const testId = cb.value;
-      const testName = cb.getAttribute('data-test-name') || (cb.parentElement ? cb.parentElement.textContent.trim() : 'Test #' + testId);
-      chipsHtml += `
-        <span style="display: inline-flex; align-items: center; gap: 4px; background: #DBEAFE; color: #1E40AF; border: 1px solid #BFDBFE; border-radius: 4px; padding: 2px 8px; font-size: 0.8rem; font-weight: 500;">
-          ${this.escape(testName)}
-          <button type="button" onclick="app.deselectTest(${testId})" style="background: none; border: none; color: #1E40AF; font-weight: bold; cursor: pointer; padding: 0 2px; font-size: 1rem; line-height: 1;" title="Remove">&times;</button>
-        </span>
+      const testObj = (this.testCatalog || []).find(t => String(t.id) === String(testId));
+      const testName = testObj ? testObj.name : (cb.getAttribute('data-test-name') || 'Test #' + testId);
+      const compatList = (testObj && testObj.compatible_specimens && testObj.compatible_specimens.length > 0)
+        ? testObj.compatible_specimens
+        : ['Serum (Red Top)'];
+
+      let optsHtml = '';
+      if (this.specimensList && this.specimensList.length > 0) {
+        const matchedSpecs = [];
+        compatList.forEach(cName => {
+          const found = this.specimensList.find(s => {
+            const sn = s.name.toLowerCase();
+            const cn = cName.toLowerCase();
+            if (sn === cn) return true;
+            if (cn.includes('edta') && sn.includes('edta')) return true;
+            if (cn.includes('citrate') && sn.includes('citrate')) return true;
+            if (cn.includes('urine') && sn.includes('urine')) return true;
+            if ((cn.includes('stool') || cn.includes('feces')) && (sn.includes('stool') || sn.includes('feces'))) return true;
+            if (cn.includes('sputum') && sn.includes('sputum')) return true;
+            if (cn.includes('serum') && sn.includes('serum')) return true;
+            if (cn.includes('fluoride') && (sn.includes('fluoride') || sn.includes('oxalate'))) return true;
+            if (cn.includes('heparin') && sn.includes('heparin')) return true;
+            if (cn.includes('capillary') && (sn.includes('capillary') || sn.includes('fingerstick'))) return true;
+            if (cn.includes('swab') && sn.includes('swab')) return true;
+            if (cn.includes('csf') && (sn.includes('csf') || sn.includes('cerebrospinal'))) return true;
+            return false;
+          });
+          if (found && matchedSpecs.indexOf(found) === -1) {
+            matchedSpecs.push(found);
+          }
+        });
+
+        const available = matchedSpecs.length > 0 ? matchedSpecs : this.specimensList;
+        const prevVal = currentSelections[testId];
+
+        available.forEach((s, idx) => {
+          const isSel = prevVal ? String(prevVal) === String(s.id) : (idx === 0);
+          const containerDesc = s.container ? ` (${s.container.split('(')[0].trim()})` : '';
+          optsHtml += `<option value="${s.id}" ${isSel ? 'selected' : ''}>${this.escape(s.name)}${this.escape(containerDesc)}</option>`;
+        });
+      }
+
+      listHtml += `
+        <div style="display: grid; grid-template-columns: 1fr auto auto; gap: 10px; align-items: center; padding: 8px 12px; background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 6px;" class="selected-test-order-row" data-test-id="${testId}">
+          <div style="font-size: 0.88rem; font-weight: 600; color: #1E293B;">
+            ${this.escape(testName)}
+          </div>
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <label style="font-size: 0.78rem; font-weight: 600; color: #64748B; margin: 0;">Specimen:</label>
+            <select class="visit-test-specimen-select" data-test-id="${testId}" style="padding: 5px 10px; font-size: 0.82rem; border: 1px solid #CBD5E1; border-radius: 4px; background: #fff; font-weight: 500; min-width: 220px;">
+              ${optsHtml}
+            </select>
+          </div>
+          <div>
+            <button type="button" onclick="app.deselectTest(${testId})" style="background: none; border: none; color: #EF4444; font-size: 1.2rem; font-weight: bold; cursor: pointer; padding: 0 4px; line-height: 1;" title="Remove test">&times;</button>
+          </div>
+        </div>
       `;
     });
-    chipsEl.innerHTML = chipsHtml;
+    chipsEl.innerHTML = listHtml;
   },
 
   deselectTest: function(testId) {
@@ -3010,11 +3078,7 @@ const app = {
   createVisit: __async(function*(pid) {
     const ward = document.getElementById('visit-ward') ? document.getElementById('visit-ward').value.trim() : '';
     const clinician = document.getElementById('visit-clinician') ? document.getElementById('visit-clinician').value : '';
-    const specimenEl = document.getElementById('visit-specimen');
-    const specimenId = (specimenEl && specimenEl.value) ? parseInt(specimenEl.value, 10) : null;
     const orderCat = document.getElementById('visit-order-category') ? document.getElementById('visit-order-category').value : 'in-house';
-    const checkboxes = document.querySelectorAll('input[name="visit-test-cb"]:checked');
-    const selectedTests = Array.from(checkboxes).map(cb => parseInt(cb.value, 10));
     
     if (!ward) {
       this.showNotificationModal("Validation Error", 'Ward of origin is required.', true);
@@ -3024,12 +3088,31 @@ const app = {
       this.showNotificationModal("Validation Error", 'Requesting clinician is required.', true);
       return;
     }
-    if (!specimenId) {
-      this.showNotificationModal("Validation Error", 'Specimen is required.', true);
+    
+    const specimenSelects = document.querySelectorAll('.visit-test-specimen-select');
+    if (specimenSelects.length === 0) {
+      this.showNotificationModal("Validation Error", 'Please select at least one test to order.', true);
       return;
     }
-    if (selectedTests.length === 0) {
-      this.showNotificationModal("Validation Error", 'Select at least one test.', true);
+
+    const testOrders = [];
+    const testIds = [];
+    const specimenTypeIds = [];
+    let hasMissingSpecimen = false;
+
+    specimenSelects.forEach(sel => {
+      const tid = parseInt(sel.getAttribute('data-test-id'), 10);
+      const sid = parseInt(sel.value, 10);
+      if (isNaN(sid) || !sid) {
+        hasMissingSpecimen = true;
+      }
+      testOrders.push({ test_id: tid, specimen_type_id: sid });
+      testIds.push(tid);
+      if (specimenTypeIds.indexOf(sid) === -1) specimenTypeIds.push(sid);
+    });
+
+    if (hasMissingSpecimen) {
+      this.showNotificationModal("Specimen Required", "Please ensure an accredited specimen is selected for every test.", true);
       return;
     }
     
@@ -3038,8 +3121,10 @@ const app = {
         client_id: pid,
         ward_of_origin: ward,
         clinician_id: parseInt(clinician, 10),
-        specimen_type_id: specimenId,
-        test_ids: selectedTests,
+        specimen_type_id: specimenTypeIds[0],
+        specimen_type_ids: specimenTypeIds,
+        test_ids: testIds,
+        test_orders: testOrders,
         order_category: orderCat
       };
       
@@ -3049,11 +3134,7 @@ const app = {
         body: JSON.stringify(payload)
       });
       if (res.ok) {
-        this.saveOrderPref('ward', ward);
-        this.saveOrderPref('clinician', clinician);
-        if (specimenId) this.saveOrderPref('specimen', specimenId.toString());
-        this.saveOrderPref('category', orderCat);
-
+        this.saveClientVisitPrefs(pid);
         this.showNotificationModal("Success", 'Visit and orders created successfully!', false);
         this.clearAllSelectedTests();
         yield this.loadPendingTests(pid);
@@ -3188,6 +3269,19 @@ const app = {
       if (visits.length === 0) {
         container.innerHTML = '<div style="color:var(--text-muted);">No historical visits found.</div>';
         return;
+      }
+
+      if (!localStorage.getItem('mlis_client_' + pid + '_visit_pref') && visits.length > 0) {
+        const lastV = visits[0];
+        if (lastV.ward_of_origin) {
+          const wardEl = document.getElementById('visit-ward');
+          if (wardEl && !wardEl.value) wardEl.value = lastV.ward_of_origin;
+        }
+        if (lastV.clinician_id) {
+          const clinEl = document.getElementById('visit-clinician');
+          if (clinEl && !clinEl.value) clinEl.value = String(lastV.clinician_id);
+        }
+        this.saveClientVisitPrefs(pid);
       }
       
       const isAdmin = this.currentUser && (this.currentUser.role === 'admin' || this.currentUser.role === 'superadmin');
@@ -3546,6 +3640,7 @@ const app = {
           oHtml += '<thead><tr style="border-bottom:2px solid #e2e8f0; color:var(--text-muted); text-align:left; background:#f8fafc;"><th style="padding:8px 10px;">Test Name</th><th style="padding:8px 10px;">Section</th><th style="padding:8px 10px;">Ref. Range</th><th style="padding:8px 10px;">Result Value</th><th style="padding:8px 10px;">Technician / Time</th><th style="padding:8px 10px;">Status</th><th style="padding:8px 10px; text-align:right;">Actions</th></tr></thead><tbody>';
           data.orders.forEach(o => {
             const hasResult = o.results && o.results.length > 0;
+            let resVal = '<span style="color:var(--text-muted);">—</span>';
             if (hasResult) {
               if (o.results.length > 1) {
                 resVal = '<div style="display:flex; flex-direction:column; gap:2px; font-size:0.82rem;">' + o.results.map(r => {
@@ -3856,7 +3951,6 @@ const app = {
         this.clearAllAddModalSelectedTests();
         this.showNotificationModal("Success", "Tests added to visit successfully.", false);
         this.closeModal('add-test-modal');
-        yield this.openEditVisitModal(visitId);
         if (this.currentClientId) {
           yield this.loadPendingTests(this.currentClientId);
           yield this.loadHistoricalVisits(this.currentClientId);
@@ -4184,12 +4278,12 @@ const app = {
             paramsList.forEach(p => {
               let unitDisplay = '';
               if (p.unit && p.secondary_unit) {
-                unitDisplay = `<select class="modal-param-unit" style="padding: 2px 4px; font-size: 0.8rem; border: 1px solid var(--border-color); border-radius: 4px;">
+                unitDisplay = `<select class="modal-param-unit" style="padding: 6px 8px; font-size: 0.85rem; border: 1px solid var(--border-color); border-radius: 4px; background: #fff; font-weight: 500;">
                   <option value="${this.escape(p.unit)}">${this.escape(p.unit)}</option>
                   <option value="${this.escape(p.secondary_unit)}">${this.escape(p.secondary_unit)}</option>
                 </select>`;
               } else if (p.unit) {
-                unitDisplay = `<span class="modal-param-unit" data-unit="${this.escape(p.unit)}" style="font-size: 0.8rem; color: var(--text-muted);">${this.escape(p.unit)}</span>`;
+                unitDisplay = `<span class="modal-param-unit" data-unit="${this.escape(p.unit)}" style="font-size: 0.85rem; font-weight: 600; color: var(--text-muted); min-width: 48px;">${this.escape(p.unit)}</span>`;
               }
 
               let valInputHtml = '';
@@ -4200,25 +4294,23 @@ const app = {
               }
               if (pOpts && pOpts.length > 0) {
                 let optsHtml = pOpts.map(o => `<option value="${this.escape(o)}">${this.escape(o)}</option>`).join('');
-                valInputHtml = `<select class="modal-param-val" style="width: 100%; padding: 6px 8px; border: 1px solid var(--border-color); border-radius: 4px; font-size: 0.85rem;">${optsHtml}</select>`;
+                valInputHtml = `<select class="modal-param-val" style="width: 100%; padding: 7px 10px; border: 1px solid var(--border-color); border-radius: 4px; font-size: 0.88rem;">${optsHtml}</select>`;
               } else {
-                let pHolder = "Value";
-                if (p.ref_range) {
-                  pHolder = "Ref: " + p.ref_range;
-                }
-                valInputHtml = `<input type="text" class="modal-param-val" placeholder="${this.escape(pHolder)}" style="width: 100%; padding: 6px 8px; border: 1px solid var(--border-color); border-radius: 4px; box-sizing: border-box; font-size: 0.85rem;">`;
+                valInputHtml = `<input type="text" class="modal-param-val" placeholder="Result" style="width: 100%; padding: 7px 10px; border: 1px solid var(--border-color); border-radius: 4px; box-sizing: border-box; font-size: 0.88rem;">`;
               }
 
               html += `
-                 <div style="display: grid; grid-template-columns: 1.8fr 1.1fr 1.1fr; gap: 8px; align-items: center; padding: 6px 0; border-bottom: 1px solid #edf2f7;" class="modal-param-row" data-param-id="${p.id}" data-param-name="${this.escape(p.parameter_name)}">
-                   <div><strong style="font-size: 0.85rem; color: var(--text-dark);">${this.escape(p.parameter_name)}</strong></div>
-                   <div>${valInputHtml}</div>
-                   <div style="display: flex; gap: 4px; align-items: center;">
-                     ${unitDisplay}
-                     ${p.ref_range ? `<span style="font-size: 0.75rem; color: var(--text-muted); white-space: nowrap;">(${this.escape(p.ref_range)})</span>` : ''}
-                   </div>
-                 </div>
-               `;
+                <div style="display: grid; grid-template-columns: 2fr 1.3fr; gap: 14px; align-items: center; padding: 8px 4px; border-bottom: 1px solid #edf2f7;" class="modal-param-row" data-param-id="${p.id}" data-param-name="${this.escape(p.parameter_name)}">
+                  <div style="display: flex; flex-direction: column; gap: 2px;">
+                    <strong style="font-size: 0.88rem; color: var(--text-dark);">${this.escape(p.parameter_name)}</strong>
+                    ${p.ref_range ? `<span style="font-size: 0.75rem; color: var(--text-muted); line-height: 1.2;">Ref: ${this.escape(p.ref_range)}</span>` : ''}
+                  </div>
+                  <div style="display: flex; gap: 6px; align-items: center;">
+                    <div style="flex: 1;">${valInputHtml}</div>
+                    ${unitDisplay}
+                  </div>
+                </div>
+              `;
             });
             paramsContainer.innerHTML = html;
           }

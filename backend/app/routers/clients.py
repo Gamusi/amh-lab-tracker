@@ -6,6 +6,7 @@ from ..database import get_db
 from ..auth import get_current_user, require_admin
 from ..schemas import VisitCreate, TestResultCreate, AddOrdersRequest, ClientUpdate, BulkOrderDeleteRequest, BulkVisitDeleteRequest
 from ..biochem_validator import validate_biochem_parameter, validate_panel_consistency
+from ..specimen_validator import validate_test_specimen_selection, get_compatible_specimens_for_test
 from ..evaluator import derive_hiv_outcome
 from .stock import deplete_kit_stock
 
@@ -235,7 +236,8 @@ def update_client(client_id: int, req: ClientUpdate, conn: sqlite3.Connection = 
 
 @router.post("/api/visits")
 def create_visit(req: VisitCreate, conn: sqlite3.Connection = Depends(get_db), current_user: dict = Depends(get_current_user)):
-    logger.info(f"User '{current_user['username']}' is creating visit for client ID {req.client_id} with {len(req.test_ids)} tests")
+    num_tests = len(req.test_orders) if req.test_orders else (len(req.test_ids) if req.test_ids else 0)
+    logger.info(f"User '{current_user['username']}' is creating visit for client ID {req.client_id} with {num_tests} tests")
     cur = conn.cursor()
     
     cur.execute("SELECT id FROM clients WHERE id = ?", (req.client_id,))
@@ -256,44 +258,127 @@ def create_visit(req: VisitCreate, conn: sqlite3.Connection = Depends(get_db), c
         logger.warning(f"Visit creation failed: clinician ID {req.clinician_id} not found")
         raise HTTPException(status_code=400, detail="Clinician not found")
 
-    if not req.specimen_type_id:
-        logger.warning("Visit creation failed: specimen_type_id is required")
-        raise HTTPException(status_code=400, detail="Specimen is required")
+    # Build list of (test_id, specimen_type_id)
+    ordered_items = []
+    if req.test_orders:
+        for item in req.test_orders:
+            ordered_items.append((item.test_id, item.specimen_type_id))
+    elif req.test_specimen_map and req.test_ids:
+        for tid in req.test_ids:
+            s_id = req.test_specimen_map.get(str(tid)) or req.test_specimen_map.get(tid)
+            if s_id:
+                ordered_items.append((tid, s_id))
 
-    cur.execute("SELECT id FROM specimen_types WHERE id = ?", (req.specimen_type_id,))
-    if not cur.fetchone():
-        logger.warning(f"Visit creation failed: specimen_type_id {req.specimen_type_id} not found")
-        raise HTTPException(status_code=400, detail="Specimen type not found")
-        
-    if not req.test_ids:
-        raise HTTPException(status_code=400, detail="At least one test ID must be provided")
-        
+    if not ordered_items and req.test_ids:
+        spec_ids = []
+        if req.specimen_type_ids:
+            spec_ids = [s for s in req.specimen_type_ids if s]
+        elif req.specimen_type_id:
+            spec_ids = [req.specimen_type_id]
+
+        if not spec_ids:
+            logger.warning("Visit creation failed: at least one specimen is required")
+            raise HTTPException(status_code=400, detail="Specimen is required")
+
+        s_placeholders = ",".join("?" for _ in spec_ids)
+        cur.execute(f"SELECT id, name FROM specimen_types WHERE id IN ({s_placeholders})", spec_ids)
+        spec_rows = cur.fetchall()
+        if not spec_rows:
+            raise HTTPException(status_code=400, detail="Specimen type not found")
+
+        spec_id_map = {r["name"]: r["id"] for r in spec_rows}
+        spec_name_list = [r["name"] for r in spec_rows]
+
+        t_placeholders = ",".join("?" for _ in req.test_ids)
+        cur.execute(f"""
+            SELECT t.id, t.name, s.name as section 
+            FROM tests t
+            LEFT JOIN sections s ON t.section_id = s.id
+            WHERE t.id IN ({t_placeholders})
+        """, req.test_ids)
+        test_rows = [dict(r) for r in cur.fetchall()]
+
+        if len(test_rows) != len(set(req.test_ids)):
+            raise HTTPException(status_code=404, detail="One or more ordered test IDs not found")
+
+        from ..specimen_validator import validate_test_specimen_selection
+        is_valid, errors, test_to_spec = validate_test_specimen_selection(test_rows, spec_name_list)
+        if not is_valid:
+            raise HTTPException(status_code=400, detail="Specimen Error: " + " | ".join(errors))
+
+        for t_row in test_rows:
+            tid = t_row["id"]
+            matched_name = test_to_spec.get(t_row["name"])
+            matched_id = spec_id_map.get(matched_name, spec_ids[0])
+            ordered_items.append((tid, matched_id))
+
+    if not ordered_items:
+        raise HTTPException(status_code=400, detail="At least one test must be ordered.")
+
+    # Validate that every ordered test has a specimen_type_id
+    for tid, s_id in ordered_items:
+        if not s_id:
+            raise HTTPException(status_code=400, detail=f"Specimen is strictly required for test ID {tid}.")
+
+    all_spec_ids = list({s_id for _, s_id in ordered_items if s_id})
+    s_placeholders = ",".join("?" for _ in all_spec_ids)
+    cur.execute(f"SELECT id, name FROM specimen_types WHERE id IN ({s_placeholders})", all_spec_ids)
+    spec_rows = cur.fetchall()
+    spec_db_map = {r["id"]: r["name"] for r in spec_rows}
+    
+    for _, s_id in ordered_items:
+        if s_id not in spec_db_map:
+            raise HTTPException(status_code=400, detail=f"Specimen ID {s_id} not found in database.")
+
+    all_test_ids = list({tid for tid, _ in ordered_items})
+    t_placeholders = ",".join("?" for _ in all_test_ids)
+    cur.execute(f"""
+        SELECT t.id, t.name, s.name as section 
+        FROM tests t
+        LEFT JOIN sections s ON t.section_id = s.id
+        WHERE t.id IN ({t_placeholders})
+    """, all_test_ids)
+    test_db_map = {r["id"]: dict(r) for r in cur.fetchall()}
+
+    if len(test_db_map) != len(all_test_ids):
+        raise HTTPException(status_code=404, detail="One or more ordered test IDs not found.")
+
     FEMALE_ONLY_TEST_KEYWORDS = ["hcg urine", "hcg blood", "pregnancy"]
     cur.execute("SELECT sex FROM clients WHERE id = ?", (req.client_id,))
     client_row = cur.fetchone()
     client_sex = (client_row["sex"] if client_row and client_row["sex"] else "").strip().lower()
 
-    for tid in req.test_ids:
-        cur.execute("SELECT id, name FROM tests WHERE id = ?", (tid,))
-        t_row = cur.fetchone()
-        if not t_row:
-            logger.warning(f"Visit creation failed: test ID {tid} not found")
-            raise HTTPException(status_code=404, detail=f"Test ID {tid} not found")
-        t_name_low = t_row["name"].lower()
+    # Enforce strict test-to-specimen compatibility for every ordered test
+    from ..specimen_validator import _is_compatible_specimen, get_compatible_specimens_for_test
+    specimen_errors = []
+    for tid, s_id in ordered_items:
+        t_info = test_db_map[tid]
+        t_name = t_info["name"]
+        t_name_low = t_name.lower()
         if client_sex == "male" and any(k in t_name_low for k in FEMALE_ONLY_TEST_KEYWORDS):
-            raise HTTPException(status_code=400, detail=f"Cannot order female-specific test '{t_row['name']}' for male client.")
-            
+            raise HTTPException(status_code=400, detail=f"Cannot order female-specific test '{t_name}' for male client.")
+
+        s_name = spec_db_map[s_id]
+        compat = get_compatible_specimens_for_test(t_name, t_info.get("section"))
+        is_matched = any(_is_compatible_specimen(c, s_name) for c in compat)
+        if not is_matched:
+            specimen_errors.append(f"Test '{t_name}' requires [{', '.join(compat)}], but '{s_name}' was selected.")
+
+    if specimen_errors:
+        raise HTTPException(status_code=400, detail="Specimen Error: " + " | ".join(specimen_errors))
+
+    primary_specimen_id = ordered_items[0][1]
     cur.execute("""
         INSERT INTO visits (client_id, clinician_id, ward_of_origin, specimen_type_id)
         VALUES (?, ?, ?, ?)
-    """, (req.client_id, req.clinician_id, req.ward_of_origin.strip(), req.specimen_type_id))
+    """, (req.client_id, req.clinician_id, req.ward_of_origin.strip(), primary_specimen_id))
     visit_id = cur.lastrowid
     
-    for tid in req.test_ids:
+    for tid, s_id in ordered_items:
         cur.execute("""
             INSERT INTO test_orders (visit_id, test_id, sample_id, specimen_type_id, ordered_by_user_id, status, order_category)
             VALUES (?, ?, ?, ?, ?, 'pending', ?)
-        """, (visit_id, tid, req.sample_id, req.specimen_type_id, current_user["id"], req.order_category))
+        """, (visit_id, tid, req.sample_id, s_id, current_user["id"], req.order_category))
         
     conn.commit()
     logger.info(f"Visit created successfully: visit_id={visit_id}")
@@ -378,11 +463,27 @@ def add_orders_to_visit(visit_id: int, req: AddOrdersRequest, conn: sqlite3.Conn
             
     added_order_ids = []
     order_cat = req.order_category if hasattr(req, 'order_category') and req.order_category else 'in-house'
+    
+    cur.execute("SELECT specimen_type_id FROM visits WHERE id = ?", (visit_id,))
+    v_spec = cur.fetchone()
+    v_spec_id = v_spec["specimen_type_id"] if v_spec else None
+
     for tid in req.test_ids:
+        cur.execute("SELECT t.id, t.name, s.name as section FROM tests t LEFT JOIN sections s ON t.section_id = s.id WHERE t.id = ?", (tid,))
+        t_row = cur.fetchone()
+        spec_id_to_use = v_spec_id
+        if t_row:
+            compat = get_compatible_specimens_for_test(t_row["name"], t_row["section"])
+            if compat:
+                c_placeholders = ",".join("?" for _ in compat)
+                cur.execute(f"SELECT id FROM specimen_types WHERE name IN ({c_placeholders}) LIMIT 1", compat)
+                c_row = cur.fetchone()
+                if c_row:
+                    spec_id_to_use = c_row["id"]
         cur.execute("""
-            INSERT INTO test_orders (visit_id, test_id, sample_id, ordered_by_user_id, status, order_category)
-            VALUES (?, ?, ?, ?, 'pending', ?)
-        """, (visit_id, tid, req.sample_id, current_user["id"], order_cat))
+            INSERT INTO test_orders (visit_id, test_id, sample_id, specimen_type_id, ordered_by_user_id, status, order_category)
+            VALUES (?, ?, ?, ?, ?, 'pending', ?)
+        """, (visit_id, tid, req.sample_id, spec_id_to_use, current_user["id"], order_cat))
         added_order_ids.append(cur.lastrowid)
         
     conn.commit()
@@ -550,7 +651,7 @@ def enter_result(req: TestResultCreate, conn: sqlite3.Connection = Depends(get_d
         cur = conn.cursor()
         cur.execute("""
             SELECT 
-                o.id as order_id, o.visit_id, o.test_id, o.status, o.order_category,
+                o.id as order_id, o.visit_id, o.test_id, o.status, o.order_category, o.specimen_type_id,
                 t.name as test_name, t.is_tracked,
                 c.date_of_birth, c.age_years, c.sex
             FROM test_orders o
@@ -563,6 +664,18 @@ def enter_result(req: TestResultCreate, conn: sqlite3.Connection = Depends(get_d
         if not order:
             logger.warning(f"Result entry failed: order ID {req.order_id} not found")
             raise HTTPException(status_code=404, detail="Order not found")
+
+        if not order["specimen_type_id"]:
+            # Auto-resolve from visit if available
+            cur.execute("SELECT specimen_type_id FROM visits WHERE id = ?", (order["visit_id"],))
+            v_spec = cur.fetchone()
+            if v_spec and v_spec["specimen_type_id"]:
+                cur.execute("UPDATE test_orders SET specimen_type_id = ? WHERE id = ?", (v_spec["specimen_type_id"], req.order_id))
+            else:
+                cur.execute("SELECT id FROM specimen_types WHERE is_active = 1 ORDER BY sort_order ASC, id ASC LIMIT 1")
+                d_spec = cur.fetchone()
+                if d_spec:
+                    cur.execute("UPDATE test_orders SET specimen_type_id = ? WHERE id = ?", (d_spec["id"], req.order_id))
 
         is_admin = current_user.get("role") in ["admin", "superadmin"]
         if order["status"] == "completed" and not is_admin:
@@ -919,7 +1032,7 @@ def get_client_visits(client_id: int, conn: sqlite3.Connection = Depends(get_db)
     cur = conn.cursor()
     cur.execute("""
         SELECT 
-            v.id as visit_id, v.ward_of_origin, v.lab_number, v.created_at,
+            v.id as visit_id, v.ward_of_origin, v.clinician_id, v.lab_number, v.created_at,
             cl.name as clinician_name,
             (SELECT COUNT(*) FROM test_orders o WHERE o.visit_id = v.id AND o.status = 'entered') as unverified_count,
             (SELECT COUNT(*) FROM test_orders o WHERE o.visit_id = v.id AND o.status = 'completed') as completed_count

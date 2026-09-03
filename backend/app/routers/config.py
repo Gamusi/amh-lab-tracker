@@ -10,6 +10,8 @@ from ..schemas import (
     SpecimenTypeResponse
 )
 from ..auth import get_current_user, require_admin
+from ..specimen_validator import get_compatible_specimens_for_test, validate_test_specimen_selection
+from pydantic import BaseModel
 
 router = APIRouter(prefix="/api/config", tags=["Configuration"])
 
@@ -28,8 +30,49 @@ def get_sections(conn: sqlite3.Connection = Depends(get_db), current_user: dict 
 @router.get("/tests")
 def get_tests(conn: sqlite3.Connection = Depends(get_db), current_user: dict = Depends(get_current_user)):
     cur = conn.cursor()
-    cur.execute("SELECT id, name, section_id, is_tracked, parent_rollup_id, ref_range, panic_value_low, panic_value_high, is_active, sort_order, result_type, default_unit, secondary_unit, options, tracks_stock, consumable_name, clinical_comments FROM tests WHERE is_active = 1 ORDER BY section_id, sort_order, id")
-    return [dict(r) for r in cur.fetchall()]
+    cur.execute("""
+        SELECT t.id, t.name, t.section_id, s.name as section_name, t.is_tracked, t.parent_rollup_id, 
+               t.ref_range, t.panic_value_low, t.panic_value_high, t.is_active, t.sort_order, 
+               t.result_type, t.default_unit, t.secondary_unit, t.options, t.tracks_stock, 
+               t.consumable_name, t.clinical_comments 
+        FROM tests t
+        LEFT JOIN sections s ON t.section_id = s.id
+        WHERE t.is_active = 1 
+        ORDER BY t.section_id, t.sort_order, t.id
+    """)
+    rows = cur.fetchall()
+    res = []
+    for r in rows:
+        d = dict(r)
+        d["compatible_specimens"] = get_compatible_specimens_for_test(d["name"], d.get("section_name"))
+        res.append(d)
+    return res
+
+class SpecimenValidateRequest(BaseModel):
+    test_ids: List[int]
+    specimen_type_ids: List[int]
+
+@router.post("/specimens/validate")
+def validate_order_specimens(req: SpecimenValidateRequest, conn: sqlite3.Connection = Depends(get_db), current_user: dict = Depends(get_current_user)):
+    cur = conn.cursor()
+    tests = []
+    if req.test_ids:
+        placeholders = ",".join("?" for _ in req.test_ids)
+        cur.execute(f"SELECT t.id, t.name, s.name as section FROM tests t LEFT JOIN sections s ON t.section_id = s.id WHERE t.id IN ({placeholders})", req.test_ids)
+        tests = [dict(r) for r in cur.fetchall()]
+        
+    specimen_names = []
+    if req.specimen_type_ids:
+        s_placeholders = ",".join("?" for _ in req.specimen_type_ids)
+        cur.execute(f"SELECT name FROM specimen_types WHERE id IN ({s_placeholders})", req.specimen_type_ids)
+        specimen_names = [r["name"] for r in cur.fetchall()]
+
+    is_valid, errors, mapping = validate_test_specimen_selection(tests, specimen_names)
+    return {
+        "is_valid": is_valid,
+        "errors": errors,
+        "test_to_specimen": mapping
+    }
 
 @router.get("/tests/{test_id}/parameters")
 def get_test_parameters(test_id: int, conn: sqlite3.Connection = Depends(get_db), current_user: dict = Depends(get_current_user)):

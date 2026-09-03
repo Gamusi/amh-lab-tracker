@@ -2,7 +2,7 @@ import os
 import io
 from reportlab.lib.pagesizes import A4
 from reportlab.platypus import SimpleDocTemplate, Spacer, Table, TableStyle, KeepTogether, Paragraph
-from reportlab.lib.styles import ParagraphStyle
+from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.enums import TA_CENTER
 from reportlab.lib import colors
 from reportlab.pdfbase import pdfmetrics
@@ -118,24 +118,26 @@ def _build_metadata_table(order_data: dict) -> Table:
     requested_by = order_data.get("requested_by") or order_data.get("ordered_by", "")
     date_val = order_data.get("ordered_date") or order_data.get("date", "")
     ward = order_data.get("ward_of_origin", "")
-    specimen = order_data.get("specimen", "")
-    
+    specimen = str(order_data.get("specimen") or "")
+
+    lbl_style = ParagraphStyle(name="MetaLbl", fontName=FONT_BOLD, fontSize=8.5, leading=10.5)
+    val_style = ParagraphStyle(name="MetaVal", fontName=FONT_REGULAR, fontSize=8.5, leading=10.5)
+
     data = [
-        ["Client Name:", str(order_data.get("full_name") or ""), "Lab No:", str(lab_no)],
-        ["Age:", str(order_data.get("age") or ""), "Sex:", str(order_data.get("sex") or "")],
-        ["Requested by:", str(requested_by), "Date:", str(date_val)],
-        ["Ward / OPD:", str(ward), "Specimen:", str(specimen)]
+        [Paragraph("Client Name:", lbl_style), Paragraph(str(order_data.get("full_name") or ""), val_style), Paragraph("Lab No:", lbl_style), Paragraph(str(lab_no), val_style)],
+        [Paragraph("Age:", lbl_style), Paragraph(str(order_data.get("age") or ""), val_style), Paragraph("Sex:", lbl_style), Paragraph(str(order_data.get("sex") or ""), val_style)],
+        [Paragraph("Requested by:", lbl_style), Paragraph(str(requested_by), val_style), Paragraph("Date:", lbl_style), Paragraph(str(date_val), val_style)],
+        [Paragraph("Ward / OPD:", lbl_style), Paragraph(str(ward), val_style), Paragraph("Specimen (s):", lbl_style), Paragraph(str(specimen), val_style)]
     ]
     
-    t = Table(data, colWidths=[90, 150, 80, 160])
+    t = Table(data, colWidths=[90, 150, 85, 155])
     t.setStyle(TableStyle([
-        ('FONTNAME', (0,0), (-1,-1), FONT_REGULAR),
-        ('FONTSIZE', (0,0), (-1,-1), 8.5),
-        ('FONTNAME', (0,0), (0,-1), FONT_BOLD), # Left labels
-        ('FONTNAME', (2,0), (2,-1), FONT_BOLD), # Right labels
         ('ALIGN', (0,0), (-1,-1), 'LEFT'),
+        ('VALIGN', (0,0), (-1,-1), 'TOP'),
         ('BOTTOMPADDING', (0,0), (-1,-1), 2),
         ('TOPPADDING', (0,0), (-1,-1), 2),
+        ('LEFTPADDING', (0,0), (-1,-1), 1),
+        ('RIGHTPADDING', (0,0), (-1,-1), 1),
     ]))
     return t
 
@@ -586,7 +588,7 @@ def _build_cbc_patient_header(order_data: dict) -> Table:
         sex = "F"
     lab_no = str(order_data.get("lab_number") or "")
     ward = str(order_data.get("ward_of_origin") or "OPD")
-    specimen = str(order_data.get("specimen") or "Blood")
+    specimen = "EDTA Whole Blood"
     
     data = [
         ["Client No :", client_no, "Name :", name, "Lab No :", lab_no],
@@ -594,7 +596,7 @@ def _build_cbc_patient_header(order_data: dict) -> Table:
         ["Ref. By   :", ref_by, "Sex  :", sex, "Specimen :", specimen]
     ]
     
-    t = Table(data, colWidths=[70, 95, 45, 135, 70, 65])
+    t = Table(data, colWidths=[70, 85, 45, 120, 65, 95])
     t.setStyle(TableStyle([
         ('FONTNAME', (0,0), (-1,-1), 'Courier'),
         ('FONTSIZE', (0,0), (-1,-1), 8.5),

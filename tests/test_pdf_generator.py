@@ -15,6 +15,11 @@ def test_generate_pdf_creates_bytes():
     assert isinstance(pdf_bytes, bytes)
     assert pdf_bytes.startswith(b'%PDF-')
 
+def _get_cell_text(cell):
+    if hasattr(cell, 'text'):
+        return cell.text
+    return str(cell)
+
 def test_build_metadata_table_legacy_fallback():
     order_data = {
         "client_number": "AMH-26-8-001", 
@@ -27,15 +32,15 @@ def test_build_metadata_table_legacy_fallback():
     }
     table = _build_metadata_table(order_data)
     assert isinstance(table, Table)
-    assert table._cellvalues[0][1] == "LUCY KEMIGISHA"
-    assert table._cellvalues[0][3] == "AMH-26-8-001"
-    assert table._cellvalues[1][1] == "32"
-    assert table._cellvalues[1][3] == "F"
-    assert table._cellvalues[2][0] == "Requested by:"
-    assert table._cellvalues[2][1] == "Dr. Matia"
-    assert table._cellvalues[2][2] == "Date:"
-    assert table._cellvalues[2][3] == "17/08/2026"
-    assert table._cellvalues[3][0] == "Ward / OPD:"
+    assert _get_cell_text(table._cellvalues[0][1]) == "LUCY KEMIGISHA"
+    assert _get_cell_text(table._cellvalues[0][3]) == "AMH-26-8-001"
+    assert _get_cell_text(table._cellvalues[1][1]) == "32"
+    assert _get_cell_text(table._cellvalues[1][3]) == "F"
+    assert _get_cell_text(table._cellvalues[2][0]) == "Requested by:"
+    assert _get_cell_text(table._cellvalues[2][1]) == "Dr. Matia"
+    assert _get_cell_text(table._cellvalues[2][2]) == "Date:"
+    assert _get_cell_text(table._cellvalues[2][3]) == "17/08/2026"
+    assert _get_cell_text(table._cellvalues[3][0]) == "Ward / OPD:"
 
 def test_build_metadata_table_compliance():
     order_data = {
@@ -50,22 +55,22 @@ def test_build_metadata_table_compliance():
     }
     table = _build_metadata_table(order_data)
     assert isinstance(table, Table)
-    assert table._cellvalues[0][0] == "Client Name:"
-    assert table._cellvalues[0][1] == "SARAH NAMUBIRU"
-    assert table._cellvalues[0][2] == "Lab No:"
-    assert table._cellvalues[0][3] == "amh-26-08-001"
-    assert table._cellvalues[1][0] == "Age:"
-    assert table._cellvalues[1][1] == "28"
-    assert table._cellvalues[1][2] == "Sex:"
-    assert table._cellvalues[1][3] == "F"
-    assert table._cellvalues[2][0] == "Requested by:"
-    assert table._cellvalues[2][1] == "Dr. Sarah"
-    assert table._cellvalues[2][2] == "Date:"
-    assert table._cellvalues[2][3] == "18/08/2026"
-    assert table._cellvalues[3][0] == "Ward / OPD:"
-    assert table._cellvalues[3][1] == "Maternity"
-    assert table._cellvalues[3][2] == "Specimen:"
-    assert table._cellvalues[3][3] == "Whole Blood (EDTA)"
+    assert _get_cell_text(table._cellvalues[0][0]) == "Client Name:"
+    assert _get_cell_text(table._cellvalues[0][1]) == "SARAH NAMUBIRU"
+    assert _get_cell_text(table._cellvalues[0][2]) == "Lab No:"
+    assert _get_cell_text(table._cellvalues[0][3]) == "amh-26-08-001"
+    assert _get_cell_text(table._cellvalues[1][0]) == "Age:"
+    assert _get_cell_text(table._cellvalues[1][1]) == "28"
+    assert _get_cell_text(table._cellvalues[1][2]) == "Sex:"
+    assert _get_cell_text(table._cellvalues[1][3]) == "F"
+    assert _get_cell_text(table._cellvalues[2][0]) == "Requested by:"
+    assert _get_cell_text(table._cellvalues[2][1]) == "Dr. Sarah"
+    assert _get_cell_text(table._cellvalues[2][2]) == "Date:"
+    assert _get_cell_text(table._cellvalues[2][3]) == "18/08/2026"
+    assert _get_cell_text(table._cellvalues[3][0]) == "Ward / OPD:"
+    assert _get_cell_text(table._cellvalues[3][1]) == "Maternity"
+    assert _get_cell_text(table._cellvalues[3][2]) == "Specimen (s):"
+    assert _get_cell_text(table._cellvalues[3][3]) == "Whole Blood (EDTA)"
 
 def test_build_signatures_table():
     order_data = {
