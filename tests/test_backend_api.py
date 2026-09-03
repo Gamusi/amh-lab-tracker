@@ -102,7 +102,7 @@ def test_create_visit_success(mock_db):
     assert v_row is not None
     assert v_row["client_id"] == client_id
     assert v_row["clinician_id"] == clinician_id
-    assert v_row["ward_of_origin"] == "Maternity"
+    assert v_row["ward_of_origin"] == "MATERNITY"
     assert v_row["specimen_type_id"] == mock_db["specimen_id"]
     assert v_row["lab_number"] is None  # Initialized as NULL before result entry
     
@@ -318,7 +318,7 @@ def test_wards_crud_endpoints(mock_db):
     res = client.post("/api/config/wards", json={"name": "Maternity"})
     assert res.status_code == 200
     w1 = res.json()
-    assert w1["name"] == "Maternity"
+    assert w1["name"] == "MATERNITY"
     assert w1["is_active"] is True
     assert "id" in w1
 
@@ -326,7 +326,7 @@ def test_wards_crud_endpoints(mock_db):
     res = client.post("/api/config/wards", json={"name": "Emergency"})
     assert res.status_code == 200
     w2 = res.json()
-    assert w2["name"] == "Emergency"
+    assert w2["name"] == "EMERGENCY"
 
     # Validation: Duplicate name
     res = client.post("/api/config/wards", json={"name": "maternity"})
@@ -341,12 +341,12 @@ def test_wards_crud_endpoints(mock_db):
     res = client.get("/api/config/wards")
     assert res.status_code == 200
     ward_names = [w["name"] for w in res.json()]
-    assert ward_names == ["Emergency", "Maternity"]
+    assert ward_names == ["EMERGENCY", "MATERNITY"]
 
     # 4. PUT update ward name
     res = client.put(f"/api/config/wards/{w1['id']}", json={"name": "Maternity Ward"})
     assert res.status_code == 200
-    assert res.json()["name"] == "Maternity Ward"
+    assert res.json()["name"] == "MATERNITY WARD"
 
     # PUT validation: duplicate name
     res = client.put(f"/api/config/wards/{w1['id']}", json={"name": "Emergency"})
@@ -361,7 +361,7 @@ def test_wards_crud_endpoints(mock_db):
     res = client.get("/api/config/wards?active_only=true")
     assert res.status_code == 200
     active_names = [w["name"] for w in res.json()]
-    assert active_names == ["Maternity Ward"]
+    assert active_names == ["MATERNITY WARD"]
 
     # 6. Not found cases
     res = client.put("/api/config/wards/99999", json={"name": "Ghost Ward"})
@@ -381,7 +381,7 @@ def test_clinicians_crud_endpoints(mock_db):
     res = client.post("/api/config/clinicians", json={"name": "Dr. Sarah"})
     assert res.status_code == 200
     c1 = res.json()
-    assert c1["name"] == "Dr. Sarah"
+    assert c1["name"] == "DR. SARAH"
     assert c1["is_active"] is True
 
     # Duplicate name validation
@@ -396,7 +396,7 @@ def test_clinicians_crud_endpoints(mock_db):
     # 3. PUT update clinician
     res = client.put(f"/api/config/clinicians/{c1['id']}", json={"name": "Dr. Sarah Namubiru"})
     assert res.status_code == 200
-    assert res.json()["name"] == "Dr. Sarah Namubiru"
+    assert res.json()["name"] == "DR. SARAH NAMUBIRU"
 
     # 4. DELETE soft-delete clinician
     res = client.delete(f"/api/config/clinicians/{c1['id']}")
@@ -407,7 +407,7 @@ def test_clinicians_crud_endpoints(mock_db):
     res = client.get("/api/config/clinicians?active_only=true")
     assert res.status_code == 200
     active_names = [c["name"] for c in res.json()]
-    assert "Dr. Sarah Namubiru" not in active_names
+    assert "DR. SARAH NAMUBIRU" not in active_names
 
     # 5. Not found cases
     res = client.put("/api/config/clinicians/99999", json={"name": "Ghost"})
@@ -637,7 +637,7 @@ def test_update_client_details(mock_db):
     })
     assert res.status_code == 200
     updated = res.json()
-    assert updated["full_name"] == "Updated Name"
+    assert updated["full_name"] == "UPDATED NAME"
     assert updated["sex"] == "Female"
     assert updated["phone"] == "0711111111"
     assert updated["age_category"] == "Adult"

@@ -144,7 +144,7 @@ def test_import_clients_round_trip(test_db):
     cur.execute("SELECT * FROM clients WHERE client_number = 'AMH-IMP-01'")
     c1 = cur.fetchone()
     assert c1 is not None
-    assert c1["full_name"] == "Test Client One"
+    assert c1["full_name"] == "TEST CLIENT ONE"
     assert c1["sex"] == "Male"
 
     # Test Update existing on second import
@@ -157,7 +157,7 @@ def test_import_clients_round_trip(test_db):
     
     cur.execute("SELECT * FROM clients WHERE client_number = 'AMH-IMP-01'")
     c1_upd = cur.fetchone()
-    assert c1_upd["full_name"] == "Test Client One Renamed"
+    assert c1_upd["full_name"] == "TEST CLIENT ONE RENAMED"
     assert c1_upd["phone"] == "0799999999"
 
 def test_import_results_round_trip(test_db):
@@ -272,6 +272,6 @@ def test_import_xlsx_round_trip(test_db):
     cur.execute("SELECT * FROM clients WHERE client_number = 'AMH-XIMP-01'")
     row = cur.fetchone()
     assert row is not None
-    assert row["full_name"] == "Imported via Excel"
+    assert row["full_name"] == "IMPORTED VIA EXCEL"
     assert row["sex"] == "Female"
 
