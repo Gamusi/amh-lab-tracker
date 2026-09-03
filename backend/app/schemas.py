@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from typing import Optional, List, Dict
 import datetime
 
@@ -7,6 +7,11 @@ class UserBase(BaseModel):
     full_name: str
     role: str = "staff"
     cadre: Optional[str] = None
+
+    @field_validator("full_name")
+    @classmethod
+    def uppercase_full_name(cls, v: str) -> str:
+        return v.strip().upper() if v else v
 
 class UserCreate(UserBase):
     password: str
@@ -139,12 +144,22 @@ class UserUpdate(BaseModel):
 class ClinicianBase(BaseModel):
     name: str
 
+    @field_validator("name")
+    @classmethod
+    def uppercase_name(cls, v: str) -> str:
+        return v.strip().upper() if v else v
+
 class ClinicianCreate(ClinicianBase):
     pass
 
 class ClinicianUpdate(BaseModel):
     name: Optional[str] = None
     is_active: Optional[bool] = None
+
+    @field_validator("name")
+    @classmethod
+    def uppercase_name(cls, v: Optional[str]) -> Optional[str]:
+        return v.strip().upper() if v else v
 
 class ClinicianResponse(ClinicianBase):
     id: int
@@ -158,6 +173,11 @@ class ClientUpdate(BaseModel):
     age_category: Optional[str] = None
     sex: Optional[str] = None
     phone: Optional[str] = None
+
+    @field_validator("full_name")
+    @classmethod
+    def uppercase_full_name(cls, v: Optional[str]) -> Optional[str]:
+        return v.strip().upper() if v else v
 
 
 class ResultEdit(BaseModel):
@@ -199,6 +219,11 @@ class VisitCreate(BaseModel):
     sample_id: Optional[str] = None
     order_category: Optional[str] = 'in-house' 
 
+    @field_validator("ward_of_origin")
+    @classmethod
+    def uppercase_ward(cls, v: str) -> str:
+        return v.strip().upper() if v else v
+
 class VisitResponse(BaseModel):
     id: int
     client_id: int
@@ -214,12 +239,22 @@ class VisitResponse(BaseModel):
 class WardBase(BaseModel):
     name: str
 
+    @field_validator("name")
+    @classmethod
+    def uppercase_name(cls, v: str) -> str:
+        return v.strip().upper() if v else v
+
 class WardCreate(WardBase):
     pass
 
 class WardUpdate(BaseModel):
     name: Optional[str] = None
     is_active: Optional[bool] = None
+
+    @field_validator("name")
+    @classmethod
+    def uppercase_name(cls, v: Optional[str]) -> Optional[str]:
+        return v.strip().upper() if v else v
 
 class WardResponse(WardBase):
     id: int

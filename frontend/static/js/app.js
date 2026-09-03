@@ -511,7 +511,7 @@ const app = {
 
   handleRegister: __async(function*(event) {
     event.preventDefault();
-    const fullname = document.getElementById('register-fullname').value;
+    const fullname = document.getElementById('register-fullname').value.trim().toUpperCase();
     const username = document.getElementById('register-username').value;
     const password = document.getElementById('register-password').value;
     const cadre = document.getElementById('register-cadre').value;
@@ -4641,7 +4641,7 @@ const app = {
 
   handleRegisterClientSubmit: __async(function*(e) {
     e.preventDefault();
-    const pname = document.getElementById('client-name').value.trim();
+    const pname = document.getElementById('client-name').value.trim().toUpperCase();
     const psex = document.getElementById('client-sex').value;
     const pcategory = document.getElementById('client-category').value;
     const pageStr = document.getElementById('client-age').value.trim();
@@ -4938,7 +4938,7 @@ const app = {
   submitWardModal: __async(function*(e) {
     e.preventDefault();
     const id = document.getElementById('ward-modal-id').value;
-    const name = document.getElementById('ward-modal-name').value.trim();
+    const name = document.getElementById('ward-modal-name').value.trim().toUpperCase();
     const isActive = document.getElementById('ward-modal-active').value === '1';
     if (!name) return;
     try {
@@ -5021,7 +5021,7 @@ const app = {
 
   submitClinicianModal: __async(function*(event) {
     event.preventDefault();
-    const name = document.getElementById('clinician-modal-name').value;
+    const name = document.getElementById('clinician-modal-name').value.trim().toUpperCase();
     try {
       const res = yield fetch('/api/config/clinicians', {
         method: 'POST',

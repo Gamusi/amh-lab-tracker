@@ -389,6 +389,14 @@ def init_db():
         except sqlite3.OperationalError:
             pass # Column already exists
 
+    # Data normalization migration: ensure all names and wards are uppercase
+    cursor.execute("UPDATE clients SET full_name = UPPER(TRIM(full_name)) WHERE full_name IS NOT NULL AND full_name != UPPER(TRIM(full_name))")
+    cursor.execute("UPDATE clinicians SET name = UPPER(TRIM(name)) WHERE name IS NOT NULL AND name != UPPER(TRIM(name))")
+    cursor.execute("UPDATE users SET full_name = UPPER(TRIM(full_name)) WHERE full_name IS NOT NULL AND full_name != UPPER(TRIM(full_name))")
+    cursor.execute("UPDATE wards SET name = UPPER(TRIM(name)) WHERE name IS NOT NULL AND name != UPPER(TRIM(name))")
+    cursor.execute("UPDATE visits SET ward_of_origin = UPPER(TRIM(ward_of_origin)) WHERE ward_of_origin IS NOT NULL AND ward_of_origin != UPPER(TRIM(ward_of_origin))")
+    conn.commit()
+
     # Ensure standardized test names
     cursor.execute("UPDATE tests SET name = 'ZN Staining For AFBs' WHERE name LIKE 'ZN FOR AFBs%' OR name LIKE 'ZN Staining%'")
     cursor.execute("UPDATE tests SET name = 'Blood smear for Malaria Parasites' WHERE name LIKE 'Blood smear Mps%'")

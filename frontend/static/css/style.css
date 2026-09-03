@@ -399,6 +399,18 @@ input:focus, select:focus {
   margin-bottom: 6px;
 }
 
+#client-name,
+#edit-client-name,
+#clinician-modal-name,
+#register-fullname,
+#admin-user-fullname,
+#ward-modal-name,
+#client-search-input,
+#visit-ward,
+.uppercase-input {
+  text-transform: uppercase;
+}
+
 .kpi-value {
   font-size: 1.6rem;
   font-weight: 700;

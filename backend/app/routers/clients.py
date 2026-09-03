@@ -29,6 +29,11 @@ class ClientCreate(BaseModel):
     sex: str # Male / Female
     phone: Optional[str] = None
 
+    @field_validator("full_name")
+    @classmethod
+    def uppercase_full_name(cls, v: str) -> str:
+        return v.strip().upper() if v else v
+
 class TestOrderCreate(BaseModel):
     client_id: Optional[int] = None
     visit_id: Optional[int] = None

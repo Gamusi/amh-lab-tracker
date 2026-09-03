@@ -79,7 +79,7 @@ def parse_import_payload(raw_content: Any, filename: Optional[str] = None) -> Li
 
 def get_or_create_client(cur: sqlite3.Cursor, record: Dict[str, Any]) -> Tuple[int, str, bool]:
     c_num = record.get("client_number") or record.get("client_no")
-    name = record.get("full_name") or record.get("name") or "Unknown Client"
+    name = str(record.get("full_name") or record.get("name") or "UNKNOWN CLIENT").strip().upper()
     dob = record.get("date_of_birth") or record.get("dob")
     age_yrs = record.get("age_years") or record.get("age")
     age_cat = record.get("age_category")
@@ -207,7 +207,7 @@ def import_results_records(conn: sqlite3.Connection, records: List[Dict[str, Any
             cid, _, _ = get_or_create_client(cur, rec)
             
             # Resolve Clinician
-            clinician_name = (rec.get("clinician_name") or rec.get("clinician") or "").strip()
+            clinician_name = (rec.get("clinician_name") or rec.get("clinician") or "").strip().upper()
             clinician_id = None
             if clinician_name:
                 c_key = clinician_name.lower()
@@ -223,7 +223,7 @@ def import_results_records(conn: sqlite3.Connection, records: List[Dict[str, Any
                         
             # Resolve Visit
             lab_number = (rec.get("lab_number") or rec.get("lab_no") or "").strip() or None
-            ward = (rec.get("ward_of_origin") or rec.get("ward") or "OPD").strip() or "OPD"
+            ward = (rec.get("ward_of_origin") or rec.get("ward") or "OPD").strip().upper() or "OPD"
             order_category = rec.get("order_category") or "in-house"
             visit_date = rec.get("visit_date") or rec.get("created_at") or datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             
