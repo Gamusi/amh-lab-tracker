@@ -4,10 +4,11 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
 from ..database import get_db
 from ..auth import get_current_user, require_admin
-from ..schemas import VisitCreate, TestResultCreate, AddOrdersRequest, ClientUpdate, BulkOrderDeleteRequest, BulkVisitDeleteRequest, BulkClientDeleteRequest
+from ..schemas import VisitCreate, TestResultCreate, AddOrdersRequest, ClientUpdate, BulkOrderDeleteRequest, BulkVisitDeleteRequest, BulkClientDeleteRequest, CrossmatchCreate, CrossmatchResponse
 from ..biochem_validator import validate_biochem_parameter, validate_panel_consistency
 from ..specimen_validator import validate_test_specimen_selection, get_compatible_specimens_for_test
 from ..evaluator import derive_hiv_outcome
+from ..transfusion_validator import evaluate_blood_group, check_biological_compatibility, evaluate_crossmatch, get_dat_interpretation, get_iat_interpretation
 from .stock import deplete_kit_stock
 
 logger = logging.getLogger("amh_clients")
@@ -792,6 +793,67 @@ def enter_result(req: TestResultCreate, conn: sqlite3.Connection = Depends(get_d
                 if hiv_kit_data:
                     hiv_outcome = derive_hiv_outcome(hiv_kit_data)
                     overall_positive = (hiv_outcome.get("conclusive_status") == "Positive")
+
+            # Immunohematology evaluations
+            if "blood group" in test_name.lower():
+                param_dict = {p_name: pr.result_value for pr, p_name, _ in param_info_list if pr.result_value}
+                anti_a = param_dict.get("Forward Anti-A")
+                anti_b = param_dict.get("Forward Anti-B")
+                anti_d = param_dict.get("Forward Anti-D")
+                a1_cells = param_dict.get("Reverse A1-cells")
+                b_cells = param_dict.get("Reverse B-cells")
+                if anti_a and anti_b and anti_d and a1_cells and b_cells:
+                    bg_eval = evaluate_blood_group(anti_a, anti_b, anti_d, a1_cells, b_cells)
+                    cur.execute("SELECT id FROM test_parameters WHERE test_id = ? AND parameter_name = 'Consolidated Blood Group'", (order["test_id"],))
+                    cbg_p = cur.fetchone()
+                    if cbg_p:
+                        c_flag = "\u26A0" if not bg_eval["is_concordant"] else ""
+                        cur.execute("SELECT id FROM test_results WHERE order_id = ? AND parameter_id = ?", (req.order_id, cbg_p["id"]))
+                        ex_cbg = cur.fetchone()
+                        if ex_cbg:
+                            cur.execute("""
+                                UPDATE test_results
+                                SET result_value = ?, clinical_flag = ?, is_positive = ?, verified_by_user_id = ?, verified_at = ?
+                                WHERE id = ?
+                            """, (bg_eval["consolidated_group"], c_flag, not bg_eval["is_concordant"], verified_by, verified_time, ex_cbg["id"]))
+                        else:
+                            cur.execute("""
+                                INSERT INTO test_results (order_id, parameter_id, result_value, clinical_flag, is_positive, entered_by_user_id, entered_at, verified_by_user_id, verified_at)
+                                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                            """, (req.order_id, cbg_p["id"], bg_eval["consolidated_group"], c_flag, not bg_eval["is_concordant"], current_user["id"], now_str, verified_by, verified_time))
+
+                    # Also update parent order summary result
+                    cur.execute("SELECT id FROM test_results WHERE order_id = ? AND parameter_id IS NULL", (req.order_id,))
+                    p_res = cur.fetchone()
+                    c_flag = "\u26A0" if not bg_eval["is_concordant"] else ""
+                    if p_res:
+                        cur.execute("""
+                            UPDATE test_results
+                            SET result_value = ?, clinical_flag = ?, is_positive = ?
+                            WHERE id = ?
+                        """, (bg_eval["consolidated_group"], c_flag, not bg_eval["is_concordant"], p_res["id"]))
+                    else:
+                        cur.execute("""
+                            INSERT INTO test_results (order_id, parameter_id, result_value, clinical_flag, is_positive, entered_by_user_id, entered_at)
+                            VALUES (?, NULL, ?, ?, ?, ?, ?)
+                        """, (req.order_id, bg_eval["consolidated_group"], c_flag, not bg_eval["is_concordant"], current_user["id"], now_str))
+
+                    if not bg_eval["is_concordant"]:
+                        overall_positive = True
+
+            elif "direct coombs" in test_name.lower():
+                param_dict = {p_name: pr.result_value for pr, p_name, _ in param_info_list if pr.result_value}
+                status_val = param_dict.get("DAT Qualitative Status") or req.result_value
+                dat_eval = get_dat_interpretation(status_val, param_dict.get("Reaction Strength"), param_dict.get("Reagent Specificity"))
+                if dat_eval["clinical_flag"]:
+                    overall_positive = True
+
+            elif "indirect coombs" in test_name.lower():
+                param_dict = {p_name: pr.result_value for pr, p_name, _ in param_info_list if pr.result_value}
+                status_val = param_dict.get("IAT Qualitative Status") or req.result_value
+                iat_eval = get_iat_interpretation(status_val)
+                if iat_eval["clinical_flag"]:
+                    overall_positive = True
         else:
             try:
                 eval_dict = validate_biochem_parameter(cur, test_name, req.result_value, age=age, sex=sex, unit=req.result_unit)
@@ -1292,4 +1354,176 @@ def verify_visit(
     )
     conn.commit()
     return {"status": "verified", "visit_id": visit_id, "verified_count": len(order_ids)}
+
+@router.post("/api/clients/orders/{order_id}/crossmatch")
+def record_donor_crossmatch(
+    order_id: int,
+    req: CrossmatchCreate,
+    conn: sqlite3.Connection = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT 
+            o.id as order_id, o.visit_id, o.test_id, o.status,
+            t.name as test_name,
+            c.id as client_id, c.full_name
+        FROM test_orders o
+        JOIN tests t ON o.test_id = t.id
+        JOIN visits v ON o.visit_id = v.id
+        JOIN clients c ON v.client_id = c.id
+        WHERE o.id = ?
+    """, (order_id,))
+    order = cur.fetchone()
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    is_admin = current_user.get("role") in ["admin", "superadmin"]
+
+    # Look up client's known blood group from visits/test_results
+    cur.execute("""
+        SELECT tr.result_value
+        FROM test_results tr
+        JOIN test_orders o ON tr.order_id = o.id
+        JOIN visits v ON o.visit_id = v.id
+        JOIN tests t ON o.test_id = t.id
+        WHERE v.client_id = ? AND LOWER(t.name) LIKE '%blood group%'
+        AND tr.result_value IS NOT NULL AND tr.result_value NOT LIKE '%Discrepancy%'
+        ORDER BY tr.id DESC LIMIT 1
+    """, (order["client_id"],))
+    bg_row = cur.fetchone()
+    client_group = bg_row["result_value"] if bg_row else None
+
+    eval_res = evaluate_crossmatch(
+        client_name=order["full_name"],
+        client_group=client_group,
+        donor_unit_id=req.donor_unit_id.strip().upper(),
+        donor_group=req.donor_blood_group,
+        product_type=req.product_type,
+        expiry_date=req.expiry_date,
+        phase_is=req.phase_is,
+        phase_thermophase=req.phase_thermophase,
+        phase_ahg=req.phase_ahg
+    )
+
+    if not eval_res["is_valid"]:
+        raise HTTPException(status_code=400, detail=eval_res["error"])
+
+    now_str = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+    is_incompatible = (eval_res["compatibility_status"] == "INCOMPATIBLE")
+
+    cur.execute("""
+        INSERT INTO donor_crossmatches (
+            order_id, donor_unit_id, donor_blood_group, product_type, expiry_date,
+            phase_is, phase_thermophase, phase_ahg, compatibility_status,
+            release_status, clinical_summary, is_locked, entered_by_user_id, verified_by_user_id, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        order_id,
+        req.donor_unit_id.strip().upper(),
+        req.donor_blood_group,
+        req.product_type,
+        req.expiry_date,
+        req.phase_is,
+        req.phase_thermophase,
+        req.phase_ahg,
+        eval_res["compatibility_status"],
+        eval_res["release_status"],
+        eval_res["clinical_summary"],
+        1 if is_incompatible else 0,
+        current_user["id"],
+        current_user["id"] if is_admin else None,
+        now_str
+    ))
+    cm_id = cur.lastrowid
+
+    # Update order status and summary result in test_results
+    order_status = "completed" if is_admin else "entered"
+    cur.execute("UPDATE test_orders SET status = ? WHERE id = ?", (order_status, order_id))
+
+    summary_val = f"Unit {req.donor_unit_id.strip().upper()}: {eval_res['compatibility_status']} ({eval_res['release_status']})"
+    flag_val = "\u26A0" if is_incompatible else ""
+
+    cur.execute("SELECT id FROM test_results WHERE order_id = ? AND parameter_id IS NULL", (order_id,))
+    res_row = cur.fetchone()
+    if res_row:
+        cur.execute("""
+            UPDATE test_results
+            SET result_value = ?, clinical_flag = ?, is_positive = ?,
+                verified_by_user_id = ?, verified_at = ?
+            WHERE id = ?
+        """, (summary_val, flag_val, is_incompatible, current_user["id"] if is_admin else None, now_str if is_admin else None, res_row["id"]))
+    else:
+        cur.execute("""
+            INSERT INTO test_results (order_id, parameter_id, result_value, clinical_flag, is_positive, entered_by_user_id, entered_at, verified_by_user_id, verified_at)
+            VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?)
+        """, (order_id, summary_val, flag_val, is_incompatible, current_user["id"], now_str, current_user["id"] if is_admin else None, now_str if is_admin else None))
+
+    # Audit log
+    cur.execute("""
+        INSERT INTO audit_log (user_id, action, detail, timestamp)
+        VALUES (?, 'RECORD_CROSSMATCH', ?, ?)
+    """, (current_user["id"], f"order_id={order_id} donor_unit={req.donor_unit_id.strip().upper()} status={eval_res['compatibility_status']}", now_str))
+
+    conn.commit()
+
+    return {
+        "id": cm_id,
+        "order_id": order_id,
+        "donor_unit_id": req.donor_unit_id.strip().upper(),
+        "donor_blood_group": req.donor_blood_group,
+        "product_type": req.product_type,
+        "expiry_date": req.expiry_date,
+        "phase_is": req.phase_is,
+        "phase_thermophase": req.phase_thermophase,
+        "phase_ahg": req.phase_ahg,
+        "compatibility_status": eval_res["compatibility_status"],
+        "release_status": eval_res["release_status"],
+        "clinical_summary": eval_res["clinical_summary"],
+        "is_locked": 1 if is_incompatible else 0,
+        "entered_by_user_id": current_user["id"],
+        "verified_by_user_id": current_user["id"] if is_admin else None,
+        "created_at": now_str
+    }
+
+@router.get("/api/clients/orders/{order_id}/crossmatches")
+def get_donor_crossmatches(
+    order_id: int,
+    conn: sqlite3.Connection = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT * FROM donor_crossmatches
+        WHERE order_id = ?
+        ORDER BY id ASC
+    """, (order_id,))
+    rows = cur.fetchall()
+    return [dict(r) for r in rows]
+
+@router.delete("/api/clients/crossmatches/{crossmatch_id}")
+def delete_donor_crossmatch(
+    crossmatch_id: int,
+    conn: sqlite3.Connection = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM donor_crossmatches WHERE id = ?", (crossmatch_id,))
+    row = cur.fetchone()
+    if not row:
+        raise HTTPException(status_code=404, detail="Crossmatch record not found")
+
+    is_admin = current_user.get("role") in ["admin", "superadmin"]
+    if row["is_locked"] and not is_admin:
+        raise HTTPException(status_code=403, detail="Incompatible units are locked for safety and cannot be removed without supervisor authorization.")
+
+    cur.execute("DELETE FROM donor_crossmatches WHERE id = ?", (crossmatch_id,))
+    now_str = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+    cur.execute("""
+        INSERT INTO audit_log (user_id, action, detail, timestamp)
+        VALUES (?, 'DELETE_CROSSMATCH', ?, ?)
+    """, (current_user["id"], f"crossmatch_id={crossmatch_id} unit_id={row['donor_unit_id']}", now_str))
+    conn.commit()
+    return {"status": "deleted", "id": crossmatch_id}
+
 

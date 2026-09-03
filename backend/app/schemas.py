@@ -431,3 +431,33 @@ class FacilitySettingsResponse(FacilitySettingsBase):
 
     class Config:
         from_attributes = True
+
+class CrossmatchCreate(BaseModel):
+    donor_unit_id: str
+    donor_blood_group: str
+    product_type: str = "Packed Red Blood Cells (PRBC)"
+    expiry_date: str
+    phase_is: str = "Negative"
+    phase_thermophase: str = "Negative"
+    phase_ahg: str = "Negative"
+
+class CrossmatchResponse(BaseModel):
+    id: int
+    order_id: int
+    donor_unit_id: str
+    donor_blood_group: str
+    product_type: str
+    expiry_date: str
+    phase_is: str
+    phase_thermophase: str
+    phase_ahg: str
+    compatibility_status: str
+    release_status: str
+    clinical_summary: str
+    is_locked: bool
+    entered_by_user_id: Optional[int] = None
+    verified_by_user_id: Optional[int] = None
+    created_at: Optional[str] = None
+
+    class Config:
+        from_attributes = True
