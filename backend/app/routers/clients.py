@@ -855,6 +855,14 @@ def enter_result(req: TestResultCreate, conn: sqlite3.Connection = Depends(get_d
                 if iat_eval["clinical_flag"]:
                     overall_positive = True
         else:
+            # Block invalid RDT runs from release as verified client results
+            if ("cd4" in test_name.lower() or "visitect" in test_name.lower()) and req.result_value:
+                if str(req.result_value).strip().lower() == "invalid":
+                    raise HTTPException(
+                        status_code=400,
+                        detail="Invalid RDT cassette run cannot be released as a final client result. Discard cassette, log wastage in inventory, and repeat test with a new cassette."
+                    )
+
             try:
                 eval_dict = validate_biochem_parameter(cur, test_name, req.result_value, age=age, sex=sex, unit=req.result_unit)
             except ValueError as e:
@@ -866,10 +874,23 @@ def enter_result(req: TestResultCreate, conn: sqlite3.Connection = Depends(get_d
 
             if req.result_value:
                 val_lower = str(req.result_value).strip().lower()
-                if val_lower in ["positive", "abnormal", "reactive"] or val_lower.startswith("positive") or val_lower.startswith("reactive"):
+                if "below 200" in val_lower and ("cd4" in test_name.lower() or "visitect" in test_name.lower()):
+                    is_positive = True
+                    clinical_flag = "L*"
+                elif val_lower in ["positive", "abnormal", "reactive"] or val_lower.startswith("positive") or val_lower.startswith("reactive"):
                     is_positive = True
                     if not clinical_flag:
                         clinical_flag = "\u26A0"
+
+            # Check CD4 cytometry quantitative AHD gate (< 200 cells/µL)
+            if "cd4" in test_name.lower() and "rapid" not in test_name.lower() and "strip" not in test_name.lower() and "rdt" not in test_name.lower():
+                try:
+                    num_val = float(str(req.result_value).strip().split()[0])
+                    if num_val < 200.0:
+                        clinical_flag = "L*"
+                        is_positive = True
+                except (ValueError, TypeError):
+                    pass
 
             overall_positive = is_positive
 
