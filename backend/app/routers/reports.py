@@ -5,7 +5,7 @@ from pydantic import BaseModel
 from typing import List, Dict, Any, Optional
 from ..database import get_db
 from ..auth import get_current_user
-from ..pdf_generator import generate_pdf
+from ..pdf_generator import generate_pdf, generate_blood_bag_label
 from .. import evaluator
 from .. import biochem_validator
 from .. import operations_analytics
@@ -487,6 +487,26 @@ def get_visit_report_pdf(visit_id: int, db: sqlite3.Connection = Depends(get_db)
             "flag": p_flag or ""
         })
 
+    cur.execute("""
+        SELECT 
+            dc.*,
+            u_enter.full_name AS entered_by_name,
+            u_ver.full_name AS verified_by_name
+        FROM donor_crossmatches dc
+        JOIN test_orders to_ord ON dc.order_id = to_ord.id
+        LEFT JOIN users u_enter ON dc.entered_by_user_id = u_enter.id
+        LEFT JOIN users u_ver ON dc.verified_by_user_id = u_ver.id
+        WHERE to_ord.visit_id = ?
+        ORDER BY dc.id ASC
+    """, (visit_id,))
+    crossmatch_rows = cur.fetchall()
+    crossmatches_by_order = {}
+    for cm in crossmatch_rows:
+        oid = cm["order_id"]
+        if oid not in crossmatches_by_order:
+            crossmatches_by_order[oid] = []
+        crossmatches_by_order[oid].append(dict(cm))
+
     results_by_section = {}
     ordered_date = None
     technician_name = None
@@ -500,8 +520,9 @@ def get_visit_report_pdf(visit_id: int, db: sqlite3.Connection = Depends(get_db)
         result_value = row["result_value"]
         section_name = row["section_name"]
         order_params = params_by_order.get(order_id, [])
+        order_crossmatches = crossmatches_by_order.get(order_id, [])
 
-        if not result_value and not order_params:
+        if not result_value and not order_params and not order_crossmatches:
             continue
             
         if not ordered_date and row["ordered_at"]:
@@ -552,7 +573,8 @@ def get_visit_report_pdf(visit_id: int, db: sqlite3.Connection = Depends(get_db)
             "flag": t_flag or "",
             "sample_id": row["sample_id"] or "",
             "timestamp": row["entered_at"] or "",
-            "parameters": order_params
+            "parameters": order_params,
+            "crossmatches": order_crossmatches
         }
         
         if section_name not in results_by_section:
@@ -645,4 +667,74 @@ def get_client_report_pdf(client_id: int, db: sqlite3.Connection = Depends(get_d
     if not v_row:
         raise HTTPException(status_code=404, detail="Client or visit not found")
     return get_visit_report_pdf(visit_id=v_row["id"], db=db, current_user=current_user)
+
+@router.get("/crossmatch/{crossmatch_id}/bag-label")
+def get_crossmatch_bag_label(
+    crossmatch_id: int,
+    db: sqlite3.Connection = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    cur = db.cursor()
+    cur.execute("""
+        SELECT 
+            dc.*,
+            c.full_name as client_name, c.client_number,
+            v.lab_number, v.ward_of_origin as ward,
+            u_enter.full_name as technician_name,
+            u_ver.full_name as verified_by_name
+        FROM donor_crossmatches dc
+        JOIN test_orders o ON dc.order_id = o.id
+        JOIN visits v ON o.visit_id = v.id
+        JOIN clients c ON v.client_id = c.id
+        LEFT JOIN users u_enter ON dc.entered_by_user_id = u_enter.id
+        LEFT JOIN users u_ver ON dc.verified_by_user_id = u_ver.id
+        WHERE dc.id = ?
+    """, (crossmatch_id,))
+    row = cur.fetchone()
+    if not row:
+        raise HTTPException(status_code=404, detail="Crossmatch record not found")
+
+    if row["compatibility_status"] != "COMPATIBLE":
+        raise HTTPException(status_code=400, detail="Blood bag release labels can only be generated for COMPATIBLE donor units.")
+
+    cur.execute("""
+        SELECT tr.result_value
+        FROM test_results tr
+        JOIN test_orders o ON tr.order_id = o.id
+        JOIN visits v ON o.visit_id = v.id
+        JOIN tests t ON o.test_id = t.id
+        WHERE v.client_id = (SELECT client_id FROM visits v2 JOIN test_orders o2 ON v2.id = o2.visit_id WHERE o2.id = ?)
+        AND LOWER(t.name) LIKE '%blood group%'
+        AND tr.result_value IS NOT NULL AND tr.result_value NOT LIKE '%Discrepancy%'
+        ORDER BY tr.id DESC LIMIT 1
+    """, (row["order_id"],))
+    bg_r = cur.fetchone()
+    client_bg = bg_r["result_value"] if bg_r else "Documented Group"
+
+    label_data = {
+        "client_name": row["client_name"],
+        "client_number": row["client_number"],
+        "lab_number": row["lab_number"] or row["client_number"],
+        "ward": row["ward"] or "OPD",
+        "donor_unit_id": row["donor_unit_id"],
+        "donor_blood_group": row["donor_blood_group"],
+        "client_blood_group": client_bg,
+        "product_type": row["product_type"],
+        "expiry_date": row["expiry_date"],
+        "compatibility_status": row["compatibility_status"],
+        "release_status": row["release_status"],
+        "technician_name": row["technician_name"] or current_user.get("full_name") or "Lab Technician",
+        "verified_by": row["verified_by_name"] or "Supervisor",
+        "issued_at": datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+    }
+
+    pdf_bytes = generate_blood_bag_label(label_data)
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'inline; filename="blood_bag_label_{row["donor_unit_id"]}.pdf"'
+        }
+    )
+
 

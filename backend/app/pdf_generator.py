@@ -589,6 +589,245 @@ def _build_urinalysis_table(urinalysis_test: dict, compact: bool = False) -> Kee
     ]))
     return KeepTogether([t, Spacer(1, 4 if compact else 10)])
 
+def generate_blood_bag_label(label_data: dict) -> bytes:
+    buffer = io.BytesIO()
+    label_width = 283.46
+    label_height = 212.60
+    margin = 8.0
+
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=(label_width, label_height),
+        leftMargin=margin,
+        rightMargin=margin,
+        topMargin=margin,
+        bottomMargin=margin
+    )
+
+    h_bold = 'Helvetica-Bold'
+    h_reg = 'Helvetica'
+
+    client_name = str(label_data.get("client_name") or "").upper()
+    lab_no = str(label_data.get("lab_number") or label_data.get("client_number") or "")
+    ward = str(label_data.get("ward") or "OPD")
+    client_group = str(label_data.get("client_blood_group") or "")
+
+    donor_id = str(label_data.get("donor_unit_id") or "")
+    donor_group = str(label_data.get("donor_blood_group") or "")
+    product = str(label_data.get("product_type") or "PRBC")
+    exp_date = str(label_data.get("expiry_date") or "")
+
+    tech = str(label_data.get("technician_name") or "")
+    verifier = str(label_data.get("verified_by") or "")
+    issued_at = str(label_data.get("issued_at") or "")
+
+    flowables = []
+
+    header_style = ParagraphStyle(name="LblHdr", fontName=h_bold, fontSize=8, leading=9.5, alignment=TA_CENTER, textColor=colors.HexColor('#0f172a'))
+    flowables.append(Paragraph("M-LIS BLOOD TRANSFUSION SERVICE", header_style))
+    flowables.append(Spacer(1, 2))
+
+    banner_data = [[Paragraph("RELEASED FOR INFUSION", ParagraphStyle(name="Banner", fontName=h_bold, fontSize=9.5, leading=11, alignment=TA_CENTER, textColor=colors.white))]]
+    banner_tbl = Table(banner_data, colWidths=[label_width - 2 * margin])
+    banner_tbl.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#15803d')),
+        ('TOPPADDING', (0,0), (-1,-1), 2),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 2),
+    ]))
+    flowables.append(banner_tbl)
+    flowables.append(Spacer(1, 3))
+
+    cell_style = ParagraphStyle(name="LblCell", fontName=h_reg, fontSize=7, leading=8.5)
+    bold_cell_style = ParagraphStyle(name="LblBoldCell", fontName=h_bold, fontSize=7, leading=8.5)
+
+    info_data = [
+        [Paragraph("Client Name:", bold_cell_style), Paragraph(client_name, bold_cell_style), Paragraph("Lab No:", bold_cell_style), Paragraph(lab_no, bold_cell_style)],
+        [Paragraph("Client ABO/Rh:", bold_cell_style), Paragraph(client_group, cell_style), Paragraph("Ward / OPD:", bold_cell_style), Paragraph(ward, cell_style)],
+        [Paragraph("Donor Unit ID:", bold_cell_style), Paragraph(f"<b>{donor_id}</b>", bold_cell_style), Paragraph("Donor Group:", bold_cell_style), Paragraph(f"<b>{donor_group}</b>", bold_cell_style)],
+        [Paragraph("Product Type:", bold_cell_style), Paragraph(product, cell_style), Paragraph("Unit Expiry:", bold_cell_style), Paragraph(exp_date, bold_cell_style)],
+        [Paragraph("Cross-match:", bold_cell_style), Paragraph("<b>FULL 3-PHASE COMPATIBLE</b>", bold_cell_style), Paragraph("Issued At:", bold_cell_style), Paragraph(issued_at, cell_style)],
+        [Paragraph("Tested By:", bold_cell_style), Paragraph(tech, cell_style), Paragraph("Verified By:", bold_cell_style), Paragraph(verifier, cell_style)],
+    ]
+    info_tbl = Table(info_data, colWidths=[60, 78, 55, 74])
+    info_tbl.setStyle(TableStyle([
+        ('GRID', (0,0), (-1,-1), 0.4, colors.HexColor('#94a3b8')),
+        ('TOPPADDING', (0,0), (-1,-1), 1.5),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 1.5),
+        ('LEFTPADDING', (0,0), (-1,-1), 2),
+        ('RIGHTPADDING', (0,0), (-1,-1), 2),
+        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+    ]))
+    flowables.append(info_tbl)
+    flowables.append(Spacer(1, 2))
+
+    warning_text = "<font size=5.5 color='#b91c1c'><b>SAFETY CHECK:</b> VERIFY CLIENT IDENTITY & DONOR DETAILS PRIOR TO INFUSION. DO NOT INFUSE IF EXPIRED OR SEAL IS BROKEN.</font>"
+    flowables.append(Paragraph(warning_text, ParagraphStyle(name="LblWarn", alignment=TA_CENTER, leading=6.5)))
+
+    doc.build(flowables)
+    return buffer.getvalue()
+
+def _build_transfusion_table(tests: list, compact: bool = False) -> KeepTogether:
+    flowables = []
+
+    hdr_style = ParagraphStyle(name="BtmHdr", fontName=FONT_BOLD, fontSize=9, leading=11)
+    subhdr_style = ParagraphStyle(name="BtmSubHdr", fontName=FONT_BOLD, fontSize=8, leading=10)
+    body_style = ParagraphStyle(name="BtmBody", fontName=FONT_REGULAR, fontSize=7.5, leading=9.5)
+    bold_body_style = ParagraphStyle(name="BtmBoldBody", fontName=FONT_BOLD, fontSize=7.5, leading=9.5)
+    danger_style = ParagraphStyle(name="BtmDanger", fontName=FONT_BOLD, fontSize=7.5, leading=9.5, textColor=colors.HexColor('#dc2626'))
+    success_style = ParagraphStyle(name="BtmSuccess", fontName=FONT_BOLD, fontSize=7.5, leading=9.5, textColor=colors.HexColor('#15803d'))
+    note_style = ParagraphStyle(name="BtmNote", fontName=FONT_REGULAR, fontSize=7, leading=8.5, textColor=colors.HexColor('#475569'))
+
+    banner = Table([[Paragraph("Blood Transfusion & Immunohematology", hdr_style)]], colWidths=[480])
+    banner.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#e2e8f0')),
+        ('TOPPADDING', (0,0), (-1,-1), 3),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 3),
+    ]))
+    flowables.append(banner)
+    flowables.append(Spacer(1, 4))
+
+    for t in tests:
+        t_name = str(t.get("test_name") or "")
+        t_name_lower = t_name.lower()
+        params = t.get("parameters") or []
+        crossmatches = t.get("crossmatches") or []
+
+        if "blood group" in t_name_lower:
+            param_dict = {p.get("name"): p.get("result") for p in params}
+            anti_a = param_dict.get("Forward Anti-A") or "-"
+            anti_b = param_dict.get("Forward Anti-B") or "-"
+            anti_d = param_dict.get("Forward Anti-D") or "-"
+            a1 = param_dict.get("Reverse A1-cells") or "-"
+            b_c = param_dict.get("Reverse B-cells") or "-"
+            consolidated = param_dict.get("Consolidated Blood Group") or t.get("result") or "-"
+
+            is_discrepancy = "discrepancy" in str(consolidated).lower()
+            res_style = danger_style if is_discrepancy else bold_body_style
+
+            bg_data = [
+                [Paragraph("<b>ABO & Rh(D) Blood Grouping</b>", subhdr_style), "", "", "", "", ""],
+                [Paragraph("Forward Typing:", bold_body_style), Paragraph(f"Anti-A: {anti_a}", body_style), Paragraph(f"Anti-B: {anti_b}", body_style), Paragraph(f"Anti-D: {anti_d}", body_style), "", ""],
+                [Paragraph("Reverse Typing:", bold_body_style), Paragraph(f"A1-cells: {a1}", body_style), Paragraph(f"B-cells: {b_c}", body_style), "", "", ""],
+                [Paragraph("Consolidated Group:", bold_body_style), Paragraph(str(consolidated), res_style), "", "", "", ""]
+            ]
+            bg_tbl = Table(bg_data, colWidths=[100, 95, 95, 95, 45, 50])
+            bg_tbl.setStyle(TableStyle([
+                ('SPAN', (0,0), (-1,0)),
+                ('SPAN', (1,3), (-1,3)),
+                ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#f8fafc')),
+                ('GRID', (0,0), (-1,-1), 0.3, colors.HexColor('#cbd5e1')),
+                ('TOPPADDING', (0,0), (-1,-1), 2),
+                ('BOTTOMPADDING', (0,0), (-1,-1), 2),
+            ]))
+            flowables.append(bg_tbl)
+            flowables.append(Spacer(1, 4))
+
+        elif "direct coombs" in t_name_lower or "indirect coombs" in t_name_lower:
+            is_dat = "direct coombs" in t_name_lower
+            title = "Direct Antiglobulin Test (DAT / Direct Coombs)" if is_dat else "Indirect Antiglobulin Test (IAT / Antibody Screen)"
+            status_val = t.get("result") or ""
+            param_dict = {p.get("name"): p.get("result") for p in params}
+            if is_dat:
+                str_val = param_dict.get("Reaction Strength") or ""
+                spec_val = param_dict.get("Reagent Specificity") or ""
+                extra = f" | Strength: {str_val} | Reagent: {spec_val}" if str_val else ""
+            else:
+                extra = ""
+
+            is_pos = "positive" in str(status_val).lower()
+            val_style = danger_style if is_pos else body_style
+
+            coombs_data = [
+                [Paragraph(f"<b>{title}</b>", subhdr_style), Paragraph(f"{status_val}{extra}", val_style)]
+            ]
+
+            if is_pos:
+                if is_dat:
+                    comment = "Clinical Correlation: Direct Coombs Positive indicates in vivo coating of red blood cells (AIHA / HDN / Drug-induced hemolysis)."
+                else:
+                    comment = "CRITICAL ALERT: Indirect Coombs Positive indicates circulating unexpected alloantibodies. Mandatory full 3-phase AHG cross-match required."
+                coombs_data.append([Paragraph(f"<b>Notice:</b> {comment}", danger_style), ""])
+
+            c_tbl = Table(coombs_data, colWidths=[240, 240])
+            c_style = [
+                ('GRID', (0,0), (-1,-1), 0.3, colors.HexColor('#cbd5e1')),
+                ('TOPPADDING', (0,0), (-1,-1), 2.5),
+                ('BOTTOMPADDING', (0,0), (-1,-1), 2.5),
+            ]
+            if is_pos:
+                c_style.append(('SPAN', (0,1), (1,1)))
+                c_style.append(('BACKGROUND', (0,1), (1,1), colors.HexColor('#fef2f2')))
+            c_tbl.setStyle(TableStyle(c_style))
+            flowables.append(c_tbl)
+            flowables.append(Spacer(1, 4))
+
+        if crossmatches:
+            cm_headers = ["Donor Unit ID", "Group", "Product", "Exp. Date", "IS", "37°C", "AHG", "Compatibility", "Release Status"]
+            cm_data = [
+                [Paragraph("<b>Compatibility Testing (Cross-matching) — Unit Traceability</b>", subhdr_style)] + [""] * 8,
+                [Paragraph(f"<b>{h}</b>", subhdr_style) for h in cm_headers]
+            ]
+            for cm in crossmatches:
+                u_id = cm.get("donor_unit_id") or ""
+                u_grp = cm.get("donor_blood_group") or ""
+                u_prod = cm.get("product_type") or "PRBC"
+                u_exp = cm.get("expiry_date") or ""
+                p_is = cm.get("phase_is") or "Neg"
+                p_th = cm.get("phase_thermophase") or "Neg"
+                p_ahg = cm.get("phase_ahg") or "Neg"
+                c_stat = cm.get("compatibility_status") or "COMPATIBLE"
+                r_stat = cm.get("release_status") or "RELEASED"
+
+                is_compat = (c_stat == "COMPATIBLE")
+                st_style = success_style if is_compat else danger_style
+                rel_style = success_style if is_compat else danger_style
+
+                cm_data.append([
+                    Paragraph(u_id, bold_body_style),
+                    Paragraph(u_grp, body_style),
+                    Paragraph(u_prod, body_style),
+                    Paragraph(u_exp, body_style),
+                    Paragraph(p_is, body_style),
+                    Paragraph(p_th, body_style),
+                    Paragraph(p_ahg, body_style),
+                    Paragraph(c_stat, st_style),
+                    Paragraph(r_stat, rel_style)
+                ])
+                sum_text = cm.get("clinical_summary") or ""
+                if sum_text:
+                    s_style = note_style if is_compat else danger_style
+                    cm_data.append([Paragraph(f"Summary: {sum_text}", s_style)] + [""] * 8)
+
+            cm_col_widths = [75, 55, 60, 50, 25, 30, 30, 75, 80]
+            cm_tbl = Table(cm_data, colWidths=cm_col_widths)
+            cm_t_style = [
+                ('SPAN', (0,0), (-1,0)),
+                ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#f8fafc')),
+                ('BACKGROUND', (0,1), (-1,1), colors.HexColor('#f1f5f9')),
+                ('GRID', (0,0), (-1,-1), 0.3, colors.HexColor('#cbd5e1')),
+                ('TOPPADDING', (0,0), (-1,-1), 2),
+                ('BOTTOMPADDING', (0,0), (-1,-1), 2),
+            ]
+            curr_row = 2
+            for cm in crossmatches:
+                curr_row += 1
+                if cm.get("clinical_summary"):
+                    cm_t_style.append(('SPAN', (0, curr_row), (-1, curr_row)))
+                    cm_t_style.append(('BACKGROUND', (0, curr_row), (-1, curr_row), colors.HexColor('#f8fafc')))
+                    curr_row += 1
+
+            cm_tbl.setStyle(TableStyle(cm_t_style))
+            flowables.append(cm_tbl)
+            flowables.append(Spacer(1, 4))
+
+    flowables.append(Paragraph(
+        "Traceability & Safety: Donor segments preserved at 2°C - 6°C for 7 days post-transfusion per ISO 15189 / BTS standards.",
+        note_style
+    ))
+    flowables.append(Spacer(1, 4 if compact else 8))
+
+    return KeepTogether(flowables)
+
 def _build_cbc_patient_header(order_data: dict) -> Table:
     client_no = str(order_data.get("client_number") or order_data.get("client_id") or "")
     date_val = str(order_data.get("ordered_date") or order_data.get("date") or "")
@@ -948,15 +1187,18 @@ def generate_pdf(order_data: dict, results_data: list) -> bytes:
                     first_order["result"] = "Not done"
                     final_tests.append(first_order)
                     
-            tests_to_render = []
-            for t in final_tests:
-                if str(t.get("test_name") or "").lower() == "urinalysis":
-                    urinalysis_test = t
-                else:
-                    tests_to_render.append(t)
-                    
-            if tests_to_render:
-                flowables.append(_build_department_table(dept_name, tests_to_render, compact=is_dense))
+            if "blood transfusion" in dept_name.lower():
+                flowables.append(_build_transfusion_table(final_tests, compact=is_dense))
+            else:
+                tests_to_render = []
+                for t in final_tests:
+                    if str(t.get("test_name") or "").lower() == "urinalysis":
+                        urinalysis_test = t
+                    else:
+                        tests_to_render.append(t)
+                        
+                if tests_to_render:
+                    flowables.append(_build_department_table(dept_name, tests_to_render, compact=is_dense))
                 
         if urinalysis_test:
             flowables.append(_build_urinalysis_table(urinalysis_test, compact=is_dense))
