@@ -161,9 +161,13 @@ python pack_release.py
 
 ---
 
-## Portability & Branding
+## Portability & Facility Branding
 
-The system features dynamic facility branding. Super Administrators can customize the facility name, acronym, letterhead, and contact details directly in the Admin Panel without touching code. Default facility settings can also be pre-configured in `assets/branding/theme.json`.
+The system features dynamic facility branding across the UI, desktop launcher, and PDF diagnostic reports.
+
+- **Admin Customization:** Super Administrators can customize the facility name, acronym, letterhead, and contact details directly in the **Admin Panel -> Facility Settings** without touching code.
+- **Report Letterhead Graphics:** M-LIS supports full-page A4 background graphics (single-page, first page header, middle watermark, and last page footer) for official PDF generation.
+- **Detailed Setup Guide:** See **[assets/branding/README.md](assets/branding/README.md)** for complete specifications, graphic dimensions, file naming, and JSON preset configuration.
 
 ## Developer Guidelines
 

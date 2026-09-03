@@ -74,7 +74,9 @@ def generate_surveillance_pdf(data: dict, current_user: dict) -> bytes:
         leftMargin=36,
         rightMargin=36,
         topMargin=45,
-        bottomMargin=45
+        bottomMargin=45,
+        title="Epidemiological Surveillance Report",
+        author="M-LIS"
     )
     
     styles = {
@@ -132,7 +134,7 @@ def generate_surveillance_pdf(data: dict, current_user: dict) -> bytes:
     header_block.append(meta_table)
     header_block.append(Spacer(1, 8))
 
-    # 3 Clean KPI Cards (No subtext)
+    # 3 Clean KPI Cards
     tot_eval = summary.get("total_evaluated", 0)
     tot_inc = summary.get("total_incident_cases", 0)
     inc_rate = summary.get("overall_incidence_rate", 0.0)
@@ -165,39 +167,95 @@ def generate_surveillance_pdf(data: dict, current_user: dict) -> bytes:
     story.append(KeepTogether(header_block))
 
     # =========================================================================
-    # 1. Section Surveillance Summary
+    # 1. Monthly Incidence & Positivity Trends (On Page 1 Dashboard)
     # =========================================================================
-    sec_rows = [
-        [
-            Paragraph("Section Name", styles["TableHead"]),
-            Paragraph("Tests Evaluated", styles["TableHeadRight"]),
-            Paragraph("Positive / Incident", styles["TableHeadRight"]),
-            Paragraph("Incidence Rate (%)", styles["TableHeadRight"]),
-        ]
-    ]
-    for s in sections:
-        sec_rows.append([
-            Paragraph(s.get("section_name", ""), styles["TableCellBold"]),
-            Paragraph(str(s.get("evaluated_count", 0)), styles["TableCellRight"]),
-            Paragraph(str(s.get("incident_count", 0)), styles["TableCellRight"]),
-            Paragraph(f"{s.get('incidence_rate_percent', 0.0)}%", styles["TableCellRight"]),
-        ])
-    
-    sec_table = Table(sec_rows, colWidths=[203, 110, 110, 100], repeatRows=1)
-    sec_table.setStyle(TableStyle([
+    trend_list = trends_obj.get("trends", [])
+    month_headers = trends_obj.get("month_headers", ["Jul", "Aug", "Sep", "Oct", "Nov", "Dec", "Jan", "Feb", "Mar", "Apr", "May", "Jun"])
+    matrix_rows = trends_obj.get("matrix_rows", [])
+    monthly_totals = trends_obj.get("monthly_totals", [0]*12)
+    grand_total = trends_obj.get("grand_total", 0)
+
+    chart_drawing = _build_surveillance_trend_chart(trend_list, [r["condition_name"] for r in matrix_rows])
+
+    # Transposed Trends Data Table: Condition / Assay in rows, 12 Months in columns + Sum
+    t_head = [Paragraph("Condition / Assay", styles["TableHead"])]
+    for mh in month_headers:
+        t_head.append(Paragraph(mh, styles["TableHeadRight"]))
+    t_head.append(Paragraph("Sum", styles["TableHeadRight"]))
+
+    trend_table_rows = [t_head]
+    col_w_name = 133
+    col_w_m = 30
+    widths = [col_w_name] + [col_w_m] * (len(month_headers) + 1)
+
+    for m_row in matrix_rows:
+        r_cols = [Paragraph(m_row["condition_name"], styles["TableCellBold"])]
+        for cnt in m_row["counts"]:
+            r_cols.append(Paragraph(str(cnt), styles["TableCellRight"]))
+        r_cols.append(Paragraph(str(m_row["total"]), styles["TableCellRight"]))
+        trend_table_rows.append(r_cols)
+
+    if not matrix_rows:
+        trend_table_rows.append([Paragraph("No positive surveillance cases recorded", styles["TableCell"])] + [Paragraph("0", styles["TableCellRight"])] * (len(month_headers) + 1))
+
+    # Grand total bottom row
+    total_cols = [Paragraph("Total Positives", styles["TableCellBold"])]
+    for mt in monthly_totals:
+        total_cols.append(Paragraph(str(mt), styles["TableCellRight"]))
+    total_cols.append(Paragraph(str(grand_total), styles["TableCellRight"]))
+    trend_table_rows.append(total_cols)
+
+    trends_table = Table(trend_table_rows, colWidths=widths, repeatRows=1)
+    trends_table.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#E2E8F0')),
+        ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor('#F1F5F9')),
         ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#CBD5E1')),
-        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#FAFAFA')]),
-        ('PADDING', (0, 0), (-1, -1), 4),
+        ('ROWBACKGROUNDS', (0, 1), (-1, -2), [colors.white, colors.HexColor('#FAFAFA')]),
+        ('PADDING', (0, 0), (-1, -1), 2.5),
         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
     ]))
     
-    story.append(KeepTogether([Paragraph("1. Section Surveillance Summary", styles["SectionHeader"]), sec_table]))
-    story.append(Spacer(1, 10))
+    story.append(KeepTogether([Paragraph("1. Monthly Incidence & Positivity Trends", styles["SectionHeader"]), chart_drawing, Spacer(1, 4), trends_table]))
+    story.append(Spacer(1, 8))
 
     # =========================================================================
-    # 2. Disease & Syndrome Surveillance Ledger
+    # 2. Positive Cases by Ward of Origin (On Page 1 Dashboard)
     # =========================================================================
+    ward_rows = [
+        [
+            Paragraph("Ward of Origin", styles["TableHead"]),
+            Paragraph("Evaluated Tests", styles["TableHeadRight"]),
+            Paragraph("Positive Cases", styles["TableHeadRight"]),
+            Paragraph("Positivity Rate (%)", styles["TableHeadRight"])
+        ]
+    ]
+    if wards:
+        for w in wards[:6]:
+            ward_rows.append([
+                Paragraph(w.get("ward", ""), styles["TableCellBold"]),
+                Paragraph(str(w.get("evaluated", 0)), styles["TableCellRight"]),
+                Paragraph(str(w.get("positive_cases", 0)), styles["TableCellRight"]),
+                Paragraph(f"{w.get('incidence_rate', 0.0)}%", styles["TableCellRight"])
+            ])
+    else:
+        ward_rows.append([Paragraph("No ward records in this period", styles["TableCell"]), Paragraph("0", styles["TableCellRight"]), Paragraph("0", styles["TableCellRight"]), Paragraph("0.0%", styles["TableCellRight"])])
+
+    ward_table = Table(ward_rows, colWidths=[203, 110, 110, 100], repeatRows=1)
+    ward_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#E2E8F0')),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#CBD5E1')),
+        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#FAFAFA')]),
+        ('PADDING', (0, 0), (-1, -1), 3),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+    ]))
+    
+    story.append(KeepTogether([Paragraph("2. Positive Cases by Ward of Origin", styles["SectionHeader"]), ward_table]))
+
+    # =========================================================================
+    # 3. Disease & Syndrome Surveillance Ledger (Page 2)
+    # =========================================================================
+    story.append(PageBreak())
+    
     ledger_rows = [
         [
             Paragraph("Disease / Condition / Assay", styles["TableHead"]),
@@ -229,89 +287,16 @@ def generate_surveillance_pdf(data: dict, current_user: dict) -> bytes:
         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
     ]))
     
-    story.append(KeepTogether([Paragraph("2. Disease & Syndrome Surveillance Ledger", styles["SectionHeader"]), ledger_table]))
-    story.append(Spacer(1, 10))
+    story.append(Paragraph("3. Disease & Syndrome Surveillance Ledger", styles["SectionHeader"]))
+    story.append(ledger_table)
 
     # =========================================================================
-    # 3. Monthly Incidence & Positivity Trends
-    # =========================================================================
-    trend_list = trends_obj.get("trends", [])
-    trend_cond_names = trends_obj.get("conditions", [])
-    
-    chart_drawing = _build_surveillance_trend_chart(trend_list, trend_cond_names)
-
-    # Trends Data Table
-    t_head = [Paragraph("Month", styles["TableHead"])]
-    for cn in trend_cond_names:
-        short_cn = cn.split()[0] if len(cn) > 10 else cn
-        t_head.append(Paragraph(short_cn, styles["TableHeadRight"]))
-    t_head.append(Paragraph("Total Positives", styles["TableHeadRight"]))
-    
-    trend_table_rows = [t_head]
-    col_w_month = 65
-    remaining_w = 523 - col_w_month
-    per_col_w = remaining_w / (len(trend_cond_names) + 1)
-    widths = [col_w_month] + [per_col_w] * (len(trend_cond_names) + 1)
-
-    for tr in trend_list:
-        r_cols = [Paragraph(tr.get("month_label", tr.get("month_key", "")), styles["TableCellBold"])]
-        for cn in trend_cond_names:
-            r_cols.append(Paragraph(str(tr.get(cn, 0)), styles["TableCellRight"]))
-        r_cols.append(Paragraph(str(tr.get("total_positives", 0)), styles["TableCellRight"]))
-        trend_table_rows.append(r_cols)
-
-    trends_table = Table(trend_table_rows, colWidths=widths, repeatRows=1)
-    trends_table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#E2E8F0')),
-        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#CBD5E1')),
-        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#FAFAFA')]),
-        ('PADDING', (0, 0), (-1, -1), 3.5),
-        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-    ]))
-    
-    story.append(KeepTogether([Paragraph("3. Monthly Incidence & Positivity Trends", styles["SectionHeader"]), chart_drawing, Spacer(1, 6), trends_table]))
-    story.append(Spacer(1, 10))
-
-    # =========================================================================
-    # 4. Positive Cases by Ward of Origin
-    # =========================================================================
-    ward_rows = [
-        [
-            Paragraph("Ward of Origin", styles["TableHead"]),
-            Paragraph("Evaluated Tests", styles["TableHeadRight"]),
-            Paragraph("Positive Cases", styles["TableHeadRight"]),
-            Paragraph("Positivity Rate (%)", styles["TableHeadRight"])
-        ]
-    ]
-    if wards:
-        for w in wards:
-            ward_rows.append([
-                Paragraph(w.get("ward", ""), styles["TableCellBold"]),
-                Paragraph(str(w.get("evaluated", 0)), styles["TableCellRight"]),
-                Paragraph(str(w.get("positive_cases", 0)), styles["TableCellRight"]),
-                Paragraph(f"{w.get('incidence_rate', 0.0)}%", styles["TableCellRight"])
-            ])
-    else:
-        ward_rows.append([Paragraph("No ward records in this period", styles["TableCell"]), Paragraph("0", styles["TableCellRight"]), Paragraph("0", styles["TableCellRight"]), Paragraph("0.0%", styles["TableCellRight"])])
-
-    ward_table = Table(ward_rows, colWidths=[203, 110, 110, 100], repeatRows=1)
-    ward_table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#E2E8F0')),
-        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#CBD5E1')),
-        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#FAFAFA')]),
-        ('PADDING', (0, 0), (-1, -1), 3.5),
-        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-    ]))
-    
-    story.append(KeepTogether([Paragraph("4. Positive Cases by Ward of Origin", styles["SectionHeader"]), ward_table]))
-
-    # =========================================================================
-    # 5. Comments (Dedicated Full Page BEFORE Appendix)
+    # 4. Comments & Sign-Off Block
     # =========================================================================
     story.append(PageBreak())
     
     comments_page = []
-    comments_page.append(Paragraph("5. Comments", styles["SectionHeader"]))
+    comments_page.append(Paragraph("4. Comments & Sign-Off", styles["SectionHeader"]))
     comments_page.append(Spacer(1, 6))
     
     notes_rows = [[Paragraph("", styles["Normal"])] for _ in range(16)]
@@ -344,42 +329,6 @@ def generate_surveillance_pdf(data: dict, current_user: dict) -> bytes:
     comments_page.append(sign_table)
 
     story.append(KeepTogether(comments_page))
-
-    # =========================================================================
-    # Appendix: Complete Surveillance Condition Inventory (THE VERY LAST SECTION)
-    # =========================================================================
-    story.append(PageBreak())
-    
-    story.append(Paragraph("Appendix: Complete Surveillance Condition Inventory", styles["SectionHeader"]))
-    story.append(Spacer(1, 4))
-    
-    app_rows = [
-        [
-            Paragraph("Section", styles["TableHead"]),
-            Paragraph("Tracked Condition / Assay", styles["TableHead"]),
-            Paragraph("Evaluated", styles["TableHeadRight"]),
-            Paragraph("Positive / Incident", styles["TableHeadRight"]),
-            Paragraph("Incidence Rate", styles["TableHeadRight"]),
-        ]
-    ]
-    for item in ledger:
-        app_rows.append([
-            Paragraph(item.get("section_name", ""), styles["TableCell"]),
-            Paragraph(item.get("test_name", ""), styles["TableCellBold"]),
-            Paragraph(str(item.get("evaluated", 0)), styles["TableCellRight"]),
-            Paragraph(str(item.get("positive", 0)), styles["TableCellRight"]),
-            Paragraph(f"{item.get('incidence_rate', 0.0)}%", styles["TableCellRight"]),
-        ])
-    
-    app_table = Table(app_rows, colWidths=[150, 193, 60, 60, 60], repeatRows=1)
-    app_table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#E2E8F0')),
-        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#CBD5E1')),
-        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#FAFAFA')]),
-        ('PADDING', (0, 0), (-1, -1), 3),
-        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-    ]))
-    story.append(app_table)
 
     # Build PDF with OperationsNumberedCanvas
     doc.build(story, canvasmaker=OperationsNumberedCanvas)

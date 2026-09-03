@@ -22,7 +22,8 @@ FONT_SYMBOL = 'Helvetica'
 class ReportNumberedCanvas(canvas.Canvas):
     """
     Two-pass canvas for dynamic total page count and professional 'Page X of Y' rendering.
-    Draws letterhead background and page numbering dynamically across pages.
+    Draws letterhead background (single-page full letterhead or multi-page header/watermark/footer)
+    and page numbering dynamically across pages.
     """
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -35,24 +36,38 @@ class ReportNumberedCanvas(canvas.Canvas):
 
     def save(self):
         num_pages = len(self._saved_page_states)
-        letterhead_path = self.letterhead_override or os.path.abspath(
-            os.path.join(os.path.dirname(__file__), "..", "..", "assets", "branding", "letterhead.png")
+        branding_dir = os.path.abspath(
+            os.path.join(os.path.dirname(__file__), "..", "..", "assets", "branding")
         )
+        full_path = self.letterhead_override or os.path.join(branding_dir, "letterhead.png")
+        header_path = os.path.join(branding_dir, "letterhead-header+watermark_only.png")
+        watermark_path = os.path.join(branding_dir, "letterhead-watermark_only.png")
+        footer_path = os.path.join(branding_dir, "letterhead-footer+watermark_only.png")
+
         for state in self._saved_page_states:
             self.__dict__.update(state)
             page_num = self._pageNumber
 
-            # 1. Background image
-            if os.path.exists(letterhead_path):
+            # 1. Background image selection
+            if num_pages == 1 or self.letterhead_override:
+                bg_img = full_path
+            elif page_num == 1:
+                bg_img = header_path if os.path.exists(header_path) else full_path
+            elif page_num == num_pages:
+                bg_img = footer_path if os.path.exists(footer_path) else watermark_path
+            else:
+                bg_img = watermark_path if os.path.exists(watermark_path) else full_path
+
+            if os.path.exists(bg_img):
                 self.saveState()
-                self.drawImage(letterhead_path, 0, 0, width=PAGE_WIDTH, height=PAGE_HEIGHT, mask='auto')
+                self.drawImage(bg_img, 0, 0, width=PAGE_WIDTH, height=PAGE_HEIGHT, mask='auto')
                 self.restoreState()
 
-            # 2. Dynamic footer page numbering (bottom right, above letterhead footer margin)
+            # 2. Dynamic footer page numbering (bottom right, cleanly above footer margin)
             self.saveState()
             self.setFont(FONT_REGULAR, 7.5)
             self.setFillColor(colors.HexColor('#64748B'))
-            self.drawRightString(PAGE_WIDTH - SAFE_MARGIN_X, 18, f"Page {page_num} of {num_pages}")
+            self.drawRightString(PAGE_WIDTH - SAFE_MARGIN_X, 52, f"Page {page_num} of {num_pages}")
             self.restoreState()
 
             canvas.Canvas.showPage(self)

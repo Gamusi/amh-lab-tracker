@@ -267,32 +267,67 @@ def calculate_surveillance_metrics(
             "incidence_rate": rate
         })
 
-    # Financial Year monthly trends calculation (from July of active FY to ref_date)
+    # Financial Year monthly trends calculation (Full 12-Month Financial Year: Jul .. Jun)
     ref_y, ref_m = ref_date.year, ref_date.month
     fy_start_year = ref_y if ref_m >= 7 else ref_y - 1
 
     trend_months = []
     curr_y, curr_m = fy_start_year, 7
-    while True:
+    for _ in range(12):
         m_str = f"{curr_y}-{curr_m:02d}"
-        trend_months.append((curr_y, curr_m, m_str))
-        if curr_y == ref_y and curr_m == ref_m:
-            break
+        m_short = datetime.date(curr_y, curr_m, 1).strftime("%b")
+        trend_months.append((curr_y, curr_m, m_str, m_short))
         curr_m += 1
         if curr_m > 12:
             curr_m = 1
             curr_y += 1
 
-    if len(trend_months) < 2:
-        prev_m = 12 if curr_m == 1 else curr_m - 1
-        prev_y = curr_y - 1 if curr_m == 1 else curr_y
-        trend_months.insert(0, (prev_y, prev_m, f"{prev_y}-{prev_m:02d}"))
+    # Identify all tracked conditions that had positive cases during this Financial Year
+    fy_start_str = f"{trend_months[0][2]}-01"
+    fy_end_str = f"{trend_months[-1][2]}-31"
 
-    # Track top tracked conditions for the trends chart
-    tracked_trend_names = [t["test_name"] for t in surveillance_ledger[:6]] if surveillance_ledger else []
+    cur.execute("""
+        SELECT t.name as test_name,
+               COUNT(DISTINCT to_ord.id) as pos_cnt
+        FROM test_orders to_ord
+        JOIN tests t ON to_ord.test_id = t.id
+        JOIN test_results tr ON tr.order_id = to_ord.id
+        WHERE to_ord.status = 'completed'
+          AND t.is_tracked = 1
+          AND t.parent_rollup_id IS NULL
+          AND DATE(to_ord.ordered_at) >= ? AND DATE(to_ord.ordered_at) <= ?
+          AND (tr.is_positive = 1 OR (tr.clinical_flag IS NOT NULL AND tr.clinical_flag != '' AND tr.clinical_flag != 'Normal'))
+        GROUP BY t.name
+    """, (fy_start_str, fy_end_str))
+    live_fy_pos = dict(cur.fetchall())
 
-    monthly_trends = []
-    for ty, tm, tmonth_str in trend_months:
+    cur.execute("""
+        SELECT t.name as test_name,
+               SUM(CASE WHEN b.positive IS NOT NULL THEN b.positive ELSE 0 END) as pos_sum
+        FROM backlog_entries b
+        JOIN tests t ON b.test_id = t.id
+        WHERE b.entry_date >= ? AND b.entry_date <= ? AND t.is_tracked = 1 AND t.parent_rollup_id IS NULL AND b.done > 0
+        GROUP BY t.name
+    """, (fy_start_str, fy_end_str))
+    backlog_fy_pos = dict(cur.fetchall())
+
+    combined_fy_pos = {}
+    for tn, cnt in live_fy_pos.items():
+        combined_fy_pos[tn] = combined_fy_pos.get(tn, 0) + cnt
+    for tn, cnt in backlog_fy_pos.items():
+        combined_fy_pos[tn] = combined_fy_pos.get(tn, 0) + (cnt or 0)
+
+    # Sort all conditions with positive cases descending by case count, then alphabetically
+    active_conditions = [tn for tn, cnt in sorted(combined_fy_pos.items(), key=lambda x: (x[1], x[0]), reverse=True) if cnt > 0]
+    if not active_conditions and surveillance_ledger:
+        active_conditions = [t["test_name"] for t in sorted(surveillance_ledger, key=lambda x: x["evaluated"], reverse=True)[:6]]
+
+    # Matrix data structure: {cond_name: [m1, m2, ..., m12, total]}
+    condition_matrix = {cn: [0]*12 for cn in active_conditions}
+    monthly_totals = [0]*12
+    monthly_trends_list = []
+
+    for month_idx, (ty, tm, tmonth_str, m_short) in enumerate(trend_months):
         m_start = f"{tmonth_str}-01"
         if tm == 12:
             m_end = f"{ty}-12-31"
@@ -315,9 +350,6 @@ def calculate_surveillance_metrics(
         month_label = datetime.date(ty, tm, 1).strftime("%b %Y")
         month_entry = {"month_key": tmonth_str, "month_label": month_label, "total_positives": 0}
         
-        for tn in tracked_trend_names:
-            month_entry[tn] = 0
-
         for ord_row in m_orders:
             o_id = ord_row["order_id"]
             t_name = ord_row["test_name"]
@@ -331,29 +363,39 @@ def calculate_surveillance_metrics(
 
             if is_order_surveillance_incident(t_name, ord_res):
                 month_entry["total_positives"] += 1
-                if t_name in month_entry:
-                    month_entry[t_name] += 1
+                if t_name in condition_matrix:
+                    condition_matrix[t_name][month_idx] += 1
 
-        if not m_orders:
-            cur.execute("""
-                SELECT t.name as test_name, SUM(CASE WHEN e.positive IS NOT NULL THEN e.positive ELSE 0 END) as pos_sum
-                FROM (
-                    SELECT entry_date, test_id, done, positive FROM daily_entries
-                    UNION ALL
-                    SELECT entry_date, test_id, done, positive FROM backlog_entries
-                ) e
-                JOIN tests t ON e.test_id = t.id
-                WHERE e.entry_date >= ? AND e.entry_date <= ? AND t.is_tracked = 1 AND t.parent_rollup_id IS NULL AND e.done > 0
-                GROUP BY t.name
-            """, (m_start, m_end))
-            for d_pos_row in cur.fetchall():
-                p_cnt = d_pos_row["pos_sum"] or 0
-                t_nm = d_pos_row["test_name"]
-                month_entry["total_positives"] += p_cnt
-                if t_nm in month_entry:
-                    month_entry[t_nm] += p_cnt
+        # Add manual backlog register positive entries
+        cur.execute("""
+            SELECT t.name as test_name, SUM(CASE WHEN b.positive IS NOT NULL THEN b.positive ELSE 0 END) as pos_sum
+            FROM backlog_entries b
+            JOIN tests t ON b.test_id = t.id
+            WHERE b.entry_date >= ? AND b.entry_date <= ? AND t.is_tracked = 1 AND t.parent_rollup_id IS NULL AND b.done > 0
+            GROUP BY t.name
+        """, (m_start, m_end))
+        for b_pos_row in cur.fetchall():
+            p_cnt = b_pos_row["pos_sum"] or 0
+            t_nm = b_pos_row["test_name"]
+            month_entry["total_positives"] += p_cnt
+            if t_nm in condition_matrix:
+                condition_matrix[t_nm][month_idx] += p_cnt
             
-        monthly_trends.append(month_entry)
+        monthly_totals[month_idx] = month_entry["total_positives"]
+        monthly_trends_list.append(month_entry)
+
+    # Calculate row totals for each condition
+    matrix_rows = []
+    for cn in active_conditions:
+        counts = condition_matrix[cn]
+        row_tot = sum(counts)
+        matrix_rows.append({
+            "condition_name": cn,
+            "counts": counts,
+            "total": row_tot
+        })
+
+    fy_grand_total = sum(monthly_totals)
 
     return {
         "period": {
@@ -373,7 +415,11 @@ def calculate_surveillance_metrics(
         "surveillance_ledger": surveillance_ledger,
         "wards_breakdown": wards_breakdown,
         "monthly_trends": {
-            "conditions": tracked_trend_names,
-            "trends": monthly_trends
+            "month_headers": [m[3] for m in trend_months],
+            "conditions": active_conditions,
+            "matrix_rows": matrix_rows,
+            "monthly_totals": monthly_totals,
+            "grand_total": fy_grand_total,
+            "trends": monthly_trends_list
         }
     }

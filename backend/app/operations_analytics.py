@@ -367,29 +367,27 @@ def calculate_operations_metrics(
             "percentage": w_pct
         })
 
-    # Financial Year monthly trends calculation (from July of active FY to ref_date)
+    # Financial Year monthly trends calculation (Full 12-Month Financial Year: Jul .. Jun)
     ref_y, ref_m = ref_date.year, ref_date.month
     fy_start_year = ref_y if ref_m >= 7 else ref_y - 1
 
     trend_months = []
     curr_y, curr_m = fy_start_year, 7
-    while True:
+    for _ in range(12):
         m_str = f"{curr_y}-{curr_m:02d}"
-        trend_months.append((curr_y, curr_m, m_str))
-        if curr_y == ref_y and curr_m == ref_m:
-            break
+        m_short = datetime.date(curr_y, curr_m, 1).strftime("%b")
+        trend_months.append((curr_y, curr_m, m_str, m_short))
         curr_m += 1
         if curr_m > 12:
             curr_m = 1
             curr_y += 1
 
-    if len(trend_months) < 2:
-        prev_m = 12 if curr_m == 1 else curr_m - 1
-        prev_y = curr_y - 1 if curr_m == 1 else curr_y
-        trend_months.insert(0, (prev_y, prev_m, f"{prev_y}-{prev_m:02d}"))
+    section_names = [s["name"] for s in all_sections]
+    section_matrix = {sn: [0]*12 for sn in section_names}
+    monthly_totals = [0]*12
+    monthly_trends_list = []
 
-    monthly_trends = []
-    for ty, tm, tmonth_str in trend_months:
+    for month_idx, (ty, tm, tmonth_str, m_short) in enumerate(trend_months):
         m_start = f"{tmonth_str}-01"
         if tm == 12:
             m_end = f"{ty}-12-31"
@@ -397,40 +395,49 @@ def calculate_operations_metrics(
             m_end = (datetime.date(ty, tm + 1, 1) - datetime.timedelta(days=1)).strftime("%Y-%m-%d")
 
         cur.execute("""
-            SELECT s.id as section_id, s.name as section_name, COUNT(to_ord.id) as count_done
+            SELECT s.name as section_name, COUNT(to_ord.id) as count_done
             FROM test_orders to_ord
             JOIN tests t ON to_ord.test_id = t.id
             JOIN sections s ON t.section_id = s.id
             WHERE to_ord.status = 'completed'
               AND DATE(to_ord.ordered_at) >= ? AND DATE(to_ord.ordered_at) <= ?
-            GROUP BY s.id, s.name
-        """, (m_start, m_end))
-        m_results = {r["section_name"]: r["count_done"] for r in cur.fetchall()}
-
-        cur.execute("""
-            SELECT s.name as section_name, SUM(e.done) as count_done
-            FROM (
-                SELECT entry_date, test_id, done FROM daily_entries
-                UNION ALL
-                SELECT entry_date, test_id, done FROM backlog_entries
-            ) e
-            JOIN tests t ON e.test_id = t.id
-            JOIN sections s ON t.section_id = s.id
-            WHERE e.entry_date >= ? AND e.entry_date <= ? AND e.done > 0
             GROUP BY s.name
         """, (m_start, m_end))
-        m_daily_results = {r["section_name"]: r["count_done"] for r in cur.fetchall()}
+        m_live_results = {r["section_name"]: r["count_done"] for r in cur.fetchall()}
+
+        cur.execute("""
+            SELECT s.name as section_name, SUM(b.done) as count_done
+            FROM backlog_entries b
+            JOIN tests t ON b.test_id = t.id
+            JOIN sections s ON t.section_id = s.id
+            WHERE b.entry_date >= ? AND b.entry_date <= ? AND b.done > 0
+            GROUP BY s.name
+        """, (m_start, m_end))
+        m_backlog_results = {r["section_name"]: r["count_done"] for r in cur.fetchall()}
 
         month_label = datetime.date(ty, tm, 1).strftime("%b %Y")
-        month_entry = {"month_key": tmonth_str, "month_label": month_label, "total": 0}
+        month_entry = {"month_key": tmonth_str, "month_label": month_label, "month_short": m_short, "total": 0}
         
-        for sec in all_sections:
-            sec_name = sec["name"]
-            v = max(m_results.get(sec_name, 0), m_daily_results.get(sec_name, 0))
+        for sec_name in section_names:
+            v = m_live_results.get(sec_name, 0) + (m_backlog_results.get(sec_name, 0) or 0)
+            section_matrix[sec_name][month_idx] = v
             month_entry[sec_name] = v
             month_entry["total"] += v
             
-        monthly_trends.append(month_entry)
+        monthly_totals[month_idx] = month_entry["total"]
+        monthly_trends_list.append(month_entry)
+
+    matrix_rows = []
+    for sn in section_names:
+        counts = section_matrix[sn]
+        row_tot = sum(counts)
+        matrix_rows.append({
+            "section_name": sn,
+            "counts": counts,
+            "total": row_tot
+        })
+
+    fy_grand_total = sum(monthly_totals)
 
     return {
         "period": {
@@ -457,7 +464,11 @@ def calculate_operations_metrics(
         },
         "appendix_menu_activity": appendix_menu_activity,
         "monthly_trends": {
-            "sections": [s["name"] for s in all_sections],
-            "trends": monthly_trends
+            "month_headers": [m[3] for m in trend_months],
+            "sections": section_names,
+            "matrix_rows": matrix_rows,
+            "monthly_totals": monthly_totals,
+            "grand_total": fy_grand_total,
+            "trends": monthly_trends_list
         }
     }

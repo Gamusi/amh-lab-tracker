@@ -140,3 +140,16 @@ def test_operations_category_and_appendix(db_connection):
     outreach = next((c for c in data["categories_breakdown"] if c["category"] == "Outreach"), None)
     assert outreach is not None
     assert outreach["count"] >= 1
+
+def test_operations_multipage_background_images():
+    from backend.app.operations_pdf import OperationsNumberedCanvas
+    import os
+
+    branding_dir = os.path.abspath(
+        os.path.join(os.path.dirname(__file__), "..", "assets", "branding")
+    )
+    assert os.path.exists(os.path.join(branding_dir, "letterhead-header+watermark_only.png"))
+    assert os.path.exists(os.path.join(branding_dir, "letterhead-watermark_only.png"))
+    assert os.path.exists(os.path.join(branding_dir, "letterhead-footer+watermark_only.png"))
+    assert os.path.exists(os.path.join(branding_dir, "letterhead.png"))
+

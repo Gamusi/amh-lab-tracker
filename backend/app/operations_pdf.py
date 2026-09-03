@@ -16,13 +16,54 @@ _init_fonts()
 
 PAGE_WIDTH, PAGE_HEIGHT = A4
 
+def find_branding_assets(branding_dir: str, override: str = None) -> dict:
+    """
+    Finds matching letterhead image files in branding_dir, supporting exact names
+    and fuzzy keyword matching (*header*, *footer*, *watermark*, *letterhead*).
+    """
+    assets = {"full": None, "header": None, "watermark": None, "footer": None}
+    if override and os.path.exists(override):
+        assets["full"] = override
+        return assets
+    if not os.path.isdir(branding_dir):
+        return assets
+
+    files = [f for f in os.listdir(branding_dir) if f.lower().endswith(('.png', '.jpg', '.jpeg'))]
+    for f in files:
+        f_lower = f.lower()
+        full_p = os.path.join(branding_dir, f)
+        if f_lower == "letterhead.png":
+            assets["full"] = full_p
+        elif "header" in f_lower and "watermark" in f_lower:
+            assets["header"] = full_p
+        elif "footer" in f_lower and "watermark" in f_lower:
+            assets["footer"] = full_p
+        elif "watermark" in f_lower and "header" not in f_lower and "footer" not in f_lower:
+            assets["watermark"] = full_p
+
+    for f in files:
+        f_lower = f.lower()
+        full_p = os.path.join(branding_dir, f)
+        if not assets["full"] and ("letterhead" in f_lower or "background" in f_lower):
+            assets["full"] = full_p
+        if not assets["header"] and "header" in f_lower:
+            assets["header"] = full_p
+        if not assets["footer"] and "footer" in f_lower:
+            assets["footer"] = full_p
+        if not assets["watermark"] and "watermark" in f_lower:
+            assets["watermark"] = full_p
+
+    if not assets["full"]:
+        assets["full"] = assets["header"] or assets["watermark"]
+    return assets
+
 class OperationsNumberedCanvas(canvas.Canvas):
     """
-    Two-pass canvas applying page-specific letterhead image cropping:
-    - Page 1: Top Header + Watermark (crops off bottom footer)
-    - Middle Pages: Watermark only (crops off top header and bottom footer)
-    - Last Page: Watermark + Bottom Footer (crops off top header)
-    - Single Page: Full letterhead
+    Two-pass canvas applying page-specific letterhead background images:
+    - Single Page (1 of 1): Full letterhead (letterhead.png)
+    - Page 1 (of N > 1): letterhead-header+watermark_only.png
+    - Middle Pages (2 to N-1): letterhead-watermark_only.png
+    - Last Page (N of N > 1): letterhead-footer+watermark_only.png
     """
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -34,38 +75,39 @@ class OperationsNumberedCanvas(canvas.Canvas):
 
     def save(self):
         num_pages = len(self._saved_page_states)
-        letterhead_path = os.path.abspath(
-            os.path.join(os.path.dirname(__file__), "..", "..", "assets", "branding", "letterhead.png")
+        branding_dir = os.path.abspath(
+            os.path.join(os.path.dirname(__file__), "..", "..", "assets", "branding")
         )
+        b_assets = find_branding_assets(branding_dir)
+        full_path = b_assets["full"]
+        header_path = b_assets["header"]
+        watermark_path = b_assets["watermark"]
+        footer_path = b_assets["footer"]
+
         for state in self._saved_page_states:
             self.__dict__.update(state)
             page_num = self._pageNumber
             
-            # 1. Background image cropping
-            if os.path.exists(letterhead_path):
+            # 1. Background image per page
+            if num_pages == 1:
+                bg_img = full_path or header_path
+            elif page_num == 1:
+                bg_img = header_path or full_path
+            elif page_num == num_pages:
+                bg_img = footer_path or watermark_path or full_path
+            else:
+                bg_img = watermark_path or full_path
+
+            if bg_img and os.path.exists(bg_img):
                 self.saveState()
-                path = self.beginPath()
-                if num_pages == 1:
-                    path.rect(0, 0, PAGE_WIDTH, PAGE_HEIGHT)
-                elif page_num == 1:
-                    # Page 1: Header + Watermark (clip out bottom footer <50)
-                    path.rect(0, 50, PAGE_WIDTH, PAGE_HEIGHT - 50)
-                elif page_num == num_pages:
-                    # Last Page: Watermark + Footer (clip out top header >720)
-                    path.rect(0, 0, PAGE_WIDTH, 720)
-                else:
-                    # Middle Pages: Watermark only (clip out top >720 and bottom <50)
-                    path.rect(0, 50, PAGE_WIDTH, 720 - 50)
-                
-                self.clipPath(path, stroke=0)
-                self.drawImage(letterhead_path, 0, 0, width=PAGE_WIDTH, height=PAGE_HEIGHT, mask='auto')
+                self.drawImage(bg_img, 0, 0, width=PAGE_WIDTH, height=PAGE_HEIGHT, mask='auto')
                 self.restoreState()
             
-            # 2. Clean Page numbering in footer (right aligned only)
+            # 2. Clean Page numbering in bottom-right margin (safely above footer graphics)
             self.saveState()
             self.setFont(FONT_REGULAR, 8)
             self.setFillColor(colors.HexColor('#64748B'))
-            self.drawRightString(PAGE_WIDTH - 36, 20, f"Page {page_num} of {num_pages}")
+            self.drawRightString(PAGE_WIDTH - 36, 52, f"Page {page_num} of {num_pages}")
             self.restoreState()
             
             canvas.Canvas.showPage(self)
@@ -116,7 +158,7 @@ def _build_trend_chart(trends_data: list, sections: list) -> Drawing:
         if tot > 0:
             drawing.add(String(x + (bar_w / 2.0) - (len(str(tot)) * 2.2), y + bar_h + 3, str(tot), fontName=FONT_BOLD, fontSize=7.5, fillColor=colors.HexColor('#0B5FA5')))
         
-        m_lbl = t.get("month_label", t.get("month_key", ""))
+        m_lbl = t.get("month_short", t.get("month_label", "")[:3])
         drawing.add(String(x + (bar_w / 2.0) - (len(m_lbl) * 2.0), 10, m_lbl, fontName=FONT_REGULAR, fontSize=7.5, fillColor=colors.HexColor('#1E293B')))
     
     return drawing
@@ -132,7 +174,9 @@ def generate_operations_pdf(data: dict, current_user: dict) -> bytes:
         leftMargin=36,
         rightMargin=36,
         topMargin=45,
-        bottomMargin=45
+        bottomMargin=45,
+        title="Laboratory Operations & Performance Report",
+        author="M-LIS"
     )
     
     styles = {
@@ -263,41 +307,50 @@ def generate_operations_pdf(data: dict, current_user: dict) -> bytes:
     # 2. Monthly Workload Trends
     # =========================================================================
     trend_list = trends_obj.get("trends", [])
-    trend_sec_names = trends_obj.get("sections", [])
+    month_headers = trends_obj.get("month_headers", ["Jul", "Aug", "Sep", "Oct", "Nov", "Dec", "Jan", "Feb", "Mar", "Apr", "May", "Jun"])
+    matrix_rows = trends_obj.get("matrix_rows", [])
+    monthly_totals = trends_obj.get("monthly_totals", [0]*12)
+    grand_total = trends_obj.get("grand_total", 0)
     
-    chart_drawing = _build_trend_chart(trend_list, trend_sec_names)
+    chart_drawing = _build_trend_chart(trend_list, [r["section_name"] for r in matrix_rows])
 
-    # Trends Data Table
-    t_head = [Paragraph("Month", styles["TableHead"])]
-    for sn in trend_sec_names:
-        short_sn = sn.split()[0] if len(sn) > 12 else sn
-        t_head.append(Paragraph(short_sn, styles["TableHeadRight"]))
-    t_head.append(Paragraph("Total Done", styles["TableHeadRight"]))
+    # Transposed Trends Data Table: Section Name in rows, 12 Months in columns + Sum
+    t_head = [Paragraph("Section Name", styles["TableHead"])]
+    for mh in month_headers:
+        t_head.append(Paragraph(mh, styles["TableHeadRight"]))
+    t_head.append(Paragraph("Sum", styles["TableHeadRight"]))
     
     trend_table_rows = [t_head]
-    col_w_month = 65
-    remaining_w = 523 - col_w_month
-    per_col_w = remaining_w / (len(trend_sec_names) + 1)
-    widths = [col_w_month] + [per_col_w] * (len(trend_sec_names) + 1)
+    col_w_name = 133
+    col_w_m = 30
+    widths = [col_w_name] + [col_w_m] * (len(month_headers) + 1)
 
-    for tr in trend_list:
-        r_cols = [Paragraph(tr.get("month_label", tr.get("month_key", "")), styles["TableCellBold"])]
-        for sn in trend_sec_names:
-            r_cols.append(Paragraph(str(tr.get(sn, 0)), styles["TableCellRight"]))
-        r_cols.append(Paragraph(str(tr.get("total", 0)), styles["TableCellRight"]))
+    for m_row in matrix_rows:
+        r_cols = [Paragraph(m_row["section_name"], styles["TableCellBold"])]
+        for cnt in m_row["counts"]:
+            r_cols.append(Paragraph(str(cnt), styles["TableCellRight"]))
+        r_cols.append(Paragraph(str(m_row["total"]), styles["TableCellRight"]))
         trend_table_rows.append(r_cols)
+
+    # Grand total bottom row
+    total_cols = [Paragraph("Total Workload", styles["TableCellBold"])]
+    for mt in monthly_totals:
+        total_cols.append(Paragraph(str(mt), styles["TableCellRight"]))
+    total_cols.append(Paragraph(str(grand_total), styles["TableCellRight"]))
+    trend_table_rows.append(total_cols)
 
     trends_table = Table(trend_table_rows, colWidths=widths, repeatRows=1)
     trends_table.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#E2E8F0')),
+        ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor('#F1F5F9')),
         ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#CBD5E1')),
-        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#FAFAFA')]),
-        ('PADDING', (0, 0), (-1, -1), 3.5),
+        ('ROWBACKGROUNDS', (0, 1), (-1, -2), [colors.white, colors.HexColor('#FAFAFA')]),
+        ('PADDING', (0, 0), (-1, -1), 2.5),
         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
     ]))
     
-    story.append(KeepTogether([Paragraph("2. Monthly Workload Trends", styles["SectionHeader"]), chart_drawing, Spacer(1, 6), trends_table]))
-    story.append(Spacer(1, 10))
+    story.append(KeepTogether([Paragraph("2. Monthly Workload Trends", styles["SectionHeader"]), chart_drawing, Spacer(1, 4), trends_table]))
+    story.append(Spacer(1, 8))
 
     # =========================================================================
     # 3. Workload by Ward of Origin
