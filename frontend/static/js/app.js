@@ -4407,24 +4407,32 @@ const app = {
          var cVal = document.getElementById('bg-consolidated-val');
          var dAlert = document.getElementById('bg-discordance-alert');
          if (cVal) {
-           if (fwd === rev) {
-             cVal.value = fwd + ' Rh(D) ' + (posD ? 'Positive' : 'Negative');
-             cVal.style.color = '#0f172a';
-             cVal.style.borderColor = '#94a3b8';
-             if (dAlert) dAlert.style.display = 'none';
-           } else {
-             cVal.value = 'Grouping Discrepancy';
-             cVal.style.color = '#b91c1c';
-             cVal.style.borderColor = '#f87171';
-             if (dAlert) dAlert.style.display = 'block';
-           }
-         paramsContainer.querySelectorAll('.bg-eval-trigger').forEach(function(el) {
-         el.onchange = updateBgEval;
-       });
-       var uaParams = [];
-       if (uaParamRes.ok) {
-         uaParams = yield uaParamRes.json();
-       }
+            if (fwd === rev) {
+              cVal.value = fwd + ' Rh(D) ' + (posD ? 'Positive' : 'Negative');
+              cVal.style.color = '#0f172a';
+              cVal.style.borderColor = '#94a3b8';
+              if (dAlert) dAlert.style.display = 'none';
+            } else {
+              cVal.value = 'Grouping Discrepancy';
+              cVal.style.color = '#b91c1c';
+              cVal.style.borderColor = '#f87171';
+              if (dAlert) dAlert.style.display = 'block';
+            }
+          }
+        }
+        paramsContainer.querySelectorAll('.bg-eval-trigger').forEach(function(el) {
+          el.onchange = updateBgEval;
+        });
+        updateBgEval();
+     } else if (nameLower.indexOf('urinalysis') !== -1) {
+        // URINALYSIS FULL MODAL — 3-section panel via API sub-parameters
+        singleContainer.style.display = 'none';
+        paramsContainer.style.display = 'block';
+        var uaParamRes = yield fetch('/api/config/tests/' + testId + '/parameters');
+        var uaParams = [];
+        if (uaParamRes.ok) {
+          uaParams = yield uaParamRes.json();
+        }
        uaParams.sort(function(a, b) { return (a.sort_order || 0) - (b.sort_order || 0); });
 
        var UA_SECTIONS = [
@@ -4503,6 +4511,8 @@ const app = {
 
        widalHtml += '</div></div>';
        singleContainer.innerHTML = widalHtml;
+    } else if (nameLower.indexOf('culture & sensitivity') !== -1 || nameLower.indexOf('c&s') !== -1) {
+       this.initCultureSensitivityModal(orderId, testId, testName);
     } else {
         // Use the new dynamic system
         let options = [];
@@ -7065,6 +7075,265 @@ const app = {
   escape: function(str) {
     if (!str) return '';
     return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  },
+
+  initCultureSensitivityModal: function(orderId, testId, testName) {
+    var singleContainer = document.getElementById('result-entry-single-container');
+    var paramsContainer = document.getElementById('result-entry-params-container');
+    var submitBtn = document.getElementById('result-entry-submit-btn');
+
+    singleContainer.style.display = 'none';
+    paramsContainer.style.display = 'block';
+    if (submitBtn) {
+      submitBtn.textContent = 'Save Culture Record';
+    }
+
+    var selfApp = this;
+    var nameLower = (testName || '').toLowerCase();
+    var isBlood = nameLower.indexOf('blood') !== -1;
+    var isSterile = nameLower.indexOf('csf') !== -1 || nameLower.indexOf('sterile') !== -1;
+
+    var csHtml = '<div style="display:flex; flex-direction:column; gap:14px;">' +
+      '<div style="background:#f8fafc; border:1px solid #cbd5e1; border-radius:6px; padding:10px;">' +
+        '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">' +
+          '<span style="font-weight:700; font-size:0.9rem; color:#0f172a;">Diagnostic Culture Phase:</span>' +
+          '<select id="cs-phase-select" style="padding:5px 8px; border:1px solid #94a3b8; border-radius:4px; font-weight:600; font-size:0.85rem;">' +
+            '<option value="1">Phase 1: Preliminary Microscopy &amp; Smear</option>' +
+            '<option value="2">Phase 2: Macroscopic Culture &amp; Colony Count</option>' +
+            '<option value="3">Phase 3: Organism Identification</option>' +
+            '<option value="4" selected>Phase 4: CLSI AST &amp; Final Interpretation</option>' +
+          '</select>' +
+        '</div>' +
+        '<div id="cs-emergency-bar" style="display:' + (isBlood || isSterile ? 'flex' : 'none') + '; align-items:center; gap:8px; padding:6px 10px; background:#fef2f2; border:1px solid #f87171; border-radius:4px; font-size:0.82rem; color:#b91c1c;">' +
+          '<input type="checkbox" id="cs-callback-done" style="accent-color:#dc2626;">' +
+          '<label for="cs-callback-done" style="font-weight:600;">15-Minute Verbal Callback Communicated to Ward</label>' +
+          '<input type="text" id="cs-callback-recipient" placeholder="Recipient Clinician / Nurse" style="margin-left:auto; padding:3px 6px; font-size:0.8rem; border:1px solid #f87171; border-radius:4px; width:180px;">' +
+        '</div>' +
+      '</div>' +
+
+      '<div style="border:1px solid #cbd5e1; border-radius:6px; padding:10px;">' +
+        '<h5 style="margin:0 0 6px 0; font-size:0.85rem; color:#1e293b; font-weight:700;">Phase 1: Preliminary Microscopic Examination (Gram Stain / Wet Prep)</h5>' +
+        '<textarea id="cs-prelim-micro" rows="2" placeholder="e.g., Moderate pus cells (10-15/hpf), Gram-negative rods seen" style="width:100%; padding:6px; border:1px solid #94a3b8; border-radius:4px; font-size:0.85rem;"></textarea>' +
+      '</div>' +
+
+      '<div style="border:1px solid #cbd5e1; border-radius:6px; padding:10px;">' +
+        '<h5 style="margin:0 0 6px 0; font-size:0.85rem; color:#1e293b; font-weight:700;">Phase 2: Macroscopic Culture &amp; Colony Count Quantification</h5>' +
+        '<div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px;">' +
+          '<div>' +
+            '<label style="font-size:0.75rem; color:#64748b; display:block;">Colony Count (CFU/mL):</label>' +
+            '<select id="cs-colony-count" style="width:100%; padding:5px 6px; border:1px solid #94a3b8; border-radius:4px; font-size:0.82rem;">' +
+              '<option value="< 10^3">&lt; 10^3 CFU/mL (No significant growth)</option>' +
+              '<option value="10^3 - 10^4">10^3 - 10^4 CFU/mL (Suspicious low-count)</option>' +
+              '<option value="10^4 - 10^5">10^4 - 10^5 CFU/mL</option>' +
+              '<option value=">= 10^5" selected>&gt;= 10^5 CFU/mL (Significant bacteriuria)</option>' +
+              '<option value="No Growth">No aerobic growth</option>' +
+            '</select>' +
+          '</div>' +
+          '<div>' +
+            '<label style="font-size:0.75rem; color:#64748b; display:block;">Incubation Duration:</label>' +
+            '<select id="cs-incubation-hours" style="width:100%; padding:5px 6px; border:1px solid #94a3b8; border-radius:4px; font-size:0.82rem;">' +
+              '<option value="24" selected>24 Hours</option>' +
+              '<option value="48">48 Hours</option>' +
+              '<option value="72">72 Hours</option>' +
+              '<option value="120">5 Days (Blood culture)</option>' +
+            '</select>' +
+          '</div>' +
+          '<div>' +
+            '<label style="font-size:0.75rem; color:#64748b; display:block;">Culture Media Used:</label>' +
+            '<input type="text" id="cs-media-used" value="CLED &amp; MacConkey Agar" style="width:100%; padding:5px 6px; border:1px solid #94a3b8; border-radius:4px; font-size:0.82rem;">' +
+          '</div>' +
+        '</div>' +
+      '</div>' +
+
+      '<div style="border:1px solid #cbd5e1; border-radius:6px; padding:10px;">' +
+        '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">' +
+          '<h5 style="margin:0; font-size:0.85rem; color:#1e293b; font-weight:700;">Phase 3 &amp; 4: Organism Identification &amp; CLSI Susceptibility (S-I-R) Grid</h5>' +
+          '<div style="display:flex; gap:8px;">' +
+            '<label style="font-size:0.8rem; display:flex; align-items:center; gap:4px;"><input type="checkbox" id="cs-esbl-flag"> <b>ESBL Phenotype</b></label>' +
+            '<label style="font-size:0.8rem; display:flex; align-items:center; gap:4px;"><input type="checkbox" id="cs-mrsa-flag"> <b>MRSA Phenotype</b></label>' +
+          '</div>' +
+        '</div>' +
+        '<div style="display:grid; grid-template-columns:2fr 3fr; gap:10px; margin-bottom:8px;">' +
+          '<div>' +
+            '<label style="font-size:0.75rem; color:#64748b; display:block;">Identified Organism:</label>' +
+            '<input type="text" id="cs-organism-name" value="Escherichia coli" placeholder="e.g., Escherichia coli" style="width:100%; padding:5px 6px; border:1px solid #94a3b8; border-radius:4px; font-size:0.82rem; font-weight:600;">' +
+          '</div>' +
+          '<div>' +
+            '<label style="font-size:0.75rem; color:#64748b; display:block;">Colony Morphology &amp; Growth Characteristics:</label>' +
+            '<input type="text" id="cs-morphology" value="Yellow lactose-fermenting colonies on CLED" placeholder="Colony appearance" style="width:100%; padding:5px 6px; border:1px solid #94a3b8; border-radius:4px; font-size:0.82rem;">' +
+          '</div>' +
+        '</div>' +
+
+        '<div style="max-height:220px; overflow-y:auto; border:1px solid #cbd5e1; border-radius:4px;">' +
+          '<table style="width:100%; border-collapse:collapse; font-size:0.8rem;">' +
+            '<thead><tr style="background:#f1f5f9; text-align:left; position:sticky; top:0; z-index:1;">' +
+              '<th style="padding:5px 8px;">Class</th>' +
+              '<th style="padding:5px 8px;">Antimicrobial Agent</th>' +
+              '<th style="padding:5px 8px; width:90px;">Zone (mm)</th>' +
+              '<th style="padding:5px 8px; width:90px;">S-I-R</th>' +
+            '</tr></thead>' +
+            '<tbody id="cs-ast-tbody"></tbody>' +
+          '</table>' +
+        '</div>' +
+      '</div>' +
+
+      '<div>' +
+        '<label style="font-size:0.75rem; color:#64748b; display:block;">Clinical Microbiology Interpretation &amp; Diagnostic Notes:</label>' +
+        '<textarea id="cs-clinical-notes" rows="2" placeholder="Clinical notes, consultation guidance..." style="width:100%; padding:6px; border:1px solid #cbd5e1; border-radius:4px; font-size:0.82rem;"></textarea>' +
+      '</div>' +
+    '</div>';
+
+    paramsContainer.innerHTML = csHtml;
+
+    var DEFAULT_AGENTS = [
+      { cls: 'Penicillins', agent: 'Ampicillin', defaultSir: 'R', zone: 12 },
+      { cls: 'Beta-Lactam/Inh.', agent: 'Amoxicillin/Clavulanate', defaultSir: 'S', zone: 19 },
+      { cls: 'Cephalosporins', agent: 'Ceftriaxone', defaultSir: 'I', zone: 16 },
+      { cls: 'Cephalosporins', agent: 'Cefotaxime', defaultSir: 'S', zone: 23 },
+      { cls: 'Cephalosporins', agent: 'Cefepime', defaultSir: 'S', zone: 24 },
+      { cls: 'Carbapenems', agent: 'Meropenem', defaultSir: 'S', zone: 28 },
+      { cls: 'Fluoroquinolones', agent: 'Ciprofloxacin', defaultSir: 'S', zone: 22 },
+      { cls: 'Aminoglycosides', agent: 'Gentamicin', defaultSir: 'R', zone: 10 },
+      { cls: 'Aminoglycosides', agent: 'Amikacin', defaultSir: 'S', zone: 21 },
+      { cls: 'Folate Inhibitors', agent: 'Trimethoprim/Sulfamethoxazole', defaultSir: 'R', zone: 8 },
+      { cls: 'Nitrofurans', agent: 'Nitrofurantoin', defaultSir: 'S', zone: 20 }
+    ];
+
+    function renderAstRows(agents) {
+      var tbody = document.getElementById('cs-ast-tbody');
+      if (!tbody) return;
+      var rowsHtml = '';
+      agents.forEach(function(ag, idx) {
+        rowsHtml += '<tr style="border-bottom:1px solid #f1f5f9;" data-agent-idx="' + idx + '">' +
+          '<td style="padding:4px 8px; color:#475569;">' + ag.cls + '</td>' +
+          '<td style="padding:4px 8px; font-weight:600;">' + ag.agent + '</td>' +
+          '<td style="padding:4px 8px;"><input type="number" class="cs-ast-zone" data-agent="' + ag.agent + '" value="' + (ag.zone || '') + '" style="width:100%; padding:2px 4px; border:1px solid #cbd5e1; border-radius:3px; font-size:0.8rem;"></td>' +
+          '<td style="padding:4px 8px;">' +
+            '<select class="cs-ast-sir" data-agent="' + ag.agent + '" data-class="' + ag.cls + '" style="width:100%; padding:2px 4px; border:1px solid #cbd5e1; border-radius:3px; font-weight:700; font-size:0.8rem;">' +
+              '<option value="S"' + (ag.defaultSir === 'S' ? ' selected' : '') + ' style="color:#15803d;">S</option>' +
+              '<option value="I"' + (ag.defaultSir === 'I' ? ' selected' : '') + ' style="color:#d97706;">I</option>' +
+              '<option value="R"' + (ag.defaultSir === 'R' ? ' selected' : '') + ' style="color:#b91c1c;">R</option>' +
+            '</select>' +
+          '</td>' +
+        '</tr>';
+      });
+      tbody.innerHTML = rowsHtml;
+    }
+
+    renderAstRows(DEFAULT_AGENTS);
+
+    fetch('/api/culture/order/' + orderId)
+      .then(function(res) { return res.json(); })
+      .then(function(data) {
+        if (!data) return;
+        if (data.phase) document.getElementById('cs-phase-select').value = String(data.phase);
+        if (data.preliminary_micro) document.getElementById('cs-prelim-micro').value = data.preliminary_micro;
+        if (data.colony_count_cfu) document.getElementById('cs-colony-count').value = data.colony_count_cfu;
+        if (data.incubation_hours) document.getElementById('cs-incubation-hours').value = String(data.incubation_hours);
+        if (data.media_used) document.getElementById('cs-media-used').value = data.media_used;
+        if (data.clinical_notes) document.getElementById('cs-clinical-notes').value = data.clinical_notes;
+        if (data.is_emergency_callback_done) {
+          document.getElementById('cs-callback-done').checked = true;
+          if (data.emergency_callback_recipient) document.getElementById('cs-callback-recipient').value = data.emergency_callback_recipient;
+        }
+        if (data.isolates && data.isolates.length > 0) {
+          var iso = data.isolates[0];
+          document.getElementById('cs-organism-name').value = iso.organism_name || '';
+          document.getElementById('cs-morphology').value = iso.colony_morphology || '';
+          if (iso.ast_results && iso.ast_results.length > 0) {
+            var mapped = iso.ast_results.map(function(ar) {
+              return {
+                cls: ar.antimicrobial_class,
+                agent: ar.agent_name,
+                defaultSir: ar.overridden_sir || ar.raw_sir,
+                zone: ar.measurement_value
+              };
+            });
+            renderAstRows(mapped);
+          }
+        }
+      })
+      .catch(function() {});
+
+    if (submitBtn) {
+      submitBtn.onclick = function(ev) {
+        ev.preventDefault();
+        var phaseVal = parseInt(document.getElementById('cs-phase-select').value, 10) || 1;
+        var microVal = document.getElementById('cs-prelim-micro').value;
+        var cfuVal = document.getElementById('cs-colony-count').value;
+        var incHours = parseInt(document.getElementById('cs-incubation-hours').value, 10) || 24;
+        var mediaVal = document.getElementById('cs-media-used').value;
+        var notesVal = document.getElementById('cs-clinical-notes').value;
+        var isCallback = document.getElementById('cs-callback-done').checked;
+        var callbackRec = document.getElementById('cs-callback-recipient').value;
+        var orgName = document.getElementById('cs-organism-name').value;
+        var morphVal = document.getElementById('cs-morphology').value;
+        var isEsbl = document.getElementById('cs-esbl-flag').checked;
+        var isMrsa = document.getElementById('cs-mrsa-flag').checked;
+
+        var astRows = [];
+        var astElements = paramsContainer.querySelectorAll('#cs-ast-tbody tr');
+        astElements.forEach(function(tr) {
+          var sirSel = tr.querySelector('.cs-ast-sir');
+          var zoneInp = tr.querySelector('.cs-ast-zone');
+          if (sirSel && zoneInp) {
+            astRows.push({
+              antimicrobial_class: sirSel.getAttribute('data-class') || 'General',
+              agent_name: sirSel.getAttribute('data-agent'),
+              measurement_type: 'zone_mm',
+              measurement_value: parseFloat(zoneInp.value) || null,
+              raw_sir: sirSel.value
+            });
+          }
+        });
+
+        var isolatesPayload = [];
+        if (orgName) {
+          isolatesPayload.push({
+            isolate_number: 1,
+            organism_name: orgName,
+            colony_morphology: morphVal,
+            is_pathogen: true,
+            is_contaminant: false,
+            ast_results: astRows
+          });
+        }
+
+        var savePayload = {
+          phase: phaseVal,
+          preliminary_micro: microVal,
+          colony_count_cfu: cfuVal,
+          incubation_hours: incHours,
+          media_used: mediaVal,
+          clinical_notes: notesVal,
+          is_emergency_callback_done: isCallback,
+          emergency_callback_recipient: callbackRec,
+          is_esbl_positive: isEsbl,
+          is_mrsa_positive: isMrsa,
+          isolates: isolatesPayload
+        };
+
+        fetch('/api/culture/order/' + orderId + '/save', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(savePayload)
+        })
+        .then(function(res) {
+          return res.json().then(function(data) {
+            if (!res.ok) throw new Error(data.detail || 'Save failed');
+            return data;
+          });
+        })
+        .then(function() {
+          selfApp.showNotificationModal('Culture Record Saved', 'Culture &amp; Sensitivity findings updated successfully.', false);
+          selfApp.closeModal('result-entry-modal');
+          if (selfApp.loadVisits) selfApp.loadVisits();
+        })
+        .catch(function(err) {
+          selfApp.showNotificationModal('Save Error', err.message, true);
+        });
+      };
+    }
   }
 };
 
