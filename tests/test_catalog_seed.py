@@ -58,6 +58,17 @@ def test_urinalysis_seed_subparameters():
     assert "Nitrate" in dip_names
     assert "Leukocyte Esterase" in dip_names
 
+def test_culture_and_sensitivity_catalog_entries():
+    from backend.app.seed import TESTS
+    cs_tests = [t for t in TESTS if "Culture & Sensitivity" in t["name"] or "C&S" in t["name"]]
+    names = {t["name"] for t in cs_tests}
+    assert "Urine Culture & Sensitivity (C&S)" in names
+    assert "Blood Culture & Sensitivity (C&S)" in names
+    assert "CSF & Sterile Fluid Culture & Sensitivity (C&S)" in names
+    for t in cs_tests:
+        assert t["result_type"] == "culture_panel"
+
+
 def test_reference_ranges_schema_and_clinical_flag_column(db_connection):
     cur = db_connection.cursor()
     

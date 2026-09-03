@@ -169,6 +169,8 @@ TEST_SPECIMEN_MAP = {
     "stool culture & sensitivity (c&s)": [SPECIMEN_STOOL],
     "blood culture & sensitivity (c&s)": [SPECIMEN_BLOOD_CULTURE],
     "blood culture": [SPECIMEN_BLOOD_CULTURE],
+    "csf & sterile fluid culture & sensitivity (c&s)": [SPECIMEN_CSF, SPECIMEN_SWAB],
+    "csf culture & sensitivity": [SPECIMEN_CSF],
     "high vaginal swab (hvs)": [SPECIMEN_SWAB],
     "urethral swab": [SPECIMEN_SWAB],
 
