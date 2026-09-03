@@ -507,6 +507,57 @@ def get_visit_report_pdf(visit_id: int, db: sqlite3.Connection = Depends(get_db)
             crossmatches_by_order[oid] = []
         crossmatches_by_order[oid].append(dict(cm))
 
+    # Fetch culture_orders for this visit
+    cur.execute("""
+        SELECT co.*, to_ord.id AS ord_id
+        FROM culture_orders co
+        JOIN test_orders to_ord ON co.order_id = to_ord.id
+        WHERE to_ord.visit_id = ?
+    """, (visit_id,))
+    co_rows = cur.fetchall()
+    culture_by_order = {}
+    for co in co_rows:
+        oid = co["ord_id"]
+        co_id = co["id"]
+        # Fetch isolates
+        cur.execute("""
+            SELECT id, isolate_number, organism_name, colony_morphology, is_pathogen, is_contaminant
+            FROM culture_isolates WHERE culture_order_id = ? ORDER BY isolate_number ASC
+        """, (co_id,))
+        iso_rows = cur.fetchall()
+        isolates_list = []
+        alerts_list = []
+        for iso in iso_rows:
+            iso_id = iso["id"]
+            cur.execute("""
+                SELECT antimicrobial_class, agent_name, measurement_type, measurement_value,
+                       raw_sir, overridden_sir, override_reason, clinical_note
+                FROM culture_ast_results WHERE isolate_id = ? ORDER BY antimicrobial_class ASC, agent_name ASC
+            """, (iso_id,))
+            ast_rows = [dict(r) for r in cur.fetchall()]
+            isolates_list.append({
+                "organism_name": iso["organism_name"],
+                "colony_morphology": iso["colony_morphology"],
+                "is_pathogen": bool(iso["is_pathogen"]),
+                "is_contaminant": bool(iso["is_contaminant"]),
+                "ast_results": ast_rows
+            })
+            from ..culture_engine import apply_phenotypic_safety_overrides
+            _, iso_alerts = apply_phenotypic_safety_overrides(iso["organism_name"], ast_rows)
+            alerts_list.extend(iso_alerts)
+
+        culture_by_order[oid] = {
+            "phase": co["phase"],
+            "preliminary_micro": co["preliminary_micro"],
+            "colony_count_cfu": co["colony_count_cfu"],
+            "growth_category": co["growth_category"],
+            "incubation_hours": co["incubation_hours"],
+            "media_used": co["media_used"],
+            "clinical_notes": co["clinical_notes"],
+            "isolates": isolates_list,
+            "alerts": list(dict.fromkeys(alerts_list))
+        }
+
     results_by_section = {}
     ordered_date = None
     technician_name = None
@@ -576,6 +627,9 @@ def get_visit_report_pdf(visit_id: int, db: sqlite3.Connection = Depends(get_db)
             "parameters": order_params,
             "crossmatches": order_crossmatches
         }
+
+        if order_id in culture_by_order:
+            test_data.update(culture_by_order[order_id])
         
         if section_name not in results_by_section:
             results_by_section[section_name] = []
