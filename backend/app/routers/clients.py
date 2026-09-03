@@ -191,14 +191,15 @@ def update_client(client_id: int, req: ClientUpdate, conn: sqlite3.Connection = 
     new_sex = req.sex if req.sex is not None else client_row["sex"]
     new_cat = req.age_category if req.age_category is not None else client_row["age_category"]
     
-    if req.age_string is not None:
-        parsed_age = parse_age_string(req.age_string)
+    age_input = req.age_string if req.age_string is not None else req.age_raw
+    if age_input is not None:
+        parsed_age = parse_age_string(age_input)
     else:
         parsed_age = client_row["age_years"]
 
     # Validate if any demographic changed
-    if any(x is not None for x in [req.full_name, req.sex, req.age_string, req.age_category]):
-        age_str_for_val = req.age_string if req.age_string is not None else f"{parsed_age}y"
+    if any(x is not None for x in [req.full_name, req.sex, age_input, req.age_category]):
+        age_str_for_val = age_input if age_input is not None else f"{parsed_age}y"
         parsed_age = validate_client_demographics(new_name, new_sex, age_str_for_val, new_cat)
 
     updates = []
@@ -207,7 +208,7 @@ def update_client(client_id: int, req: ClientUpdate, conn: sqlite3.Connection = 
     if req.full_name is not None:
         updates.append("full_name = ?")
         params.append(new_name)
-    if req.age_string is not None:
+    if age_input is not None:
         updates.append("age_years = ?")
         params.append(parsed_age)
     if req.age_category is not None:

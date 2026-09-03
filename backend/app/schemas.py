@@ -154,6 +154,7 @@ class ClinicianResponse(ClinicianBase):
 class ClientUpdate(BaseModel):
     full_name: Optional[str] = None
     age_string: Optional[str] = None
+    age_raw: Optional[str] = None
     age_category: Optional[str] = None
     sex: Optional[str] = None
     phone: Optional[str] = None

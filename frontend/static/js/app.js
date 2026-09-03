@@ -3527,7 +3527,7 @@ const app = {
       if (catSelect && ageInput) {
         catSelect.value = data.age_category || 'Adult';
         this.updateEditAgePlaceholder();
-        ageInput.value = data.age_raw || '';
+        ageInput.value = data.age_display || (data.age_years != null ? String(data.age_years) : '');
       }
       
       this.openModal('edit-client-modal');
@@ -3555,14 +3555,19 @@ const app = {
           sex: sex,
           phone: phone,
           age_category: ageCategory,
-          age_raw: ageRaw
+          age_raw: ageRaw,
+          age_string: ageRaw
         })
       });
 
       if (res.ok) {
+        const updated = yield res.json();
         this.closeModal('edit-client-modal');
         this.showNotificationModal("Success", "Client details updated successfully.", false);
-        yield this.loadClientDetails(id);
+        const searchInput = document.getElementById('client-search-input');
+        const q = searchInput ? searchInput.value : '';
+        yield this.searchClients(q);
+        yield this.selectClient(updated.id, updated.client_number, updated.full_name, updated.sex);
       } else {
         const err = yield res.json();
         this.showNotificationModal("Error", err.detail || "Failed to update client.", true);
