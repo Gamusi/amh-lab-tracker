@@ -379,6 +379,15 @@ def _build_department_table(dept_name: str, tests: list, compact: bool = False) 
             t_unit = str(t.get("unit") or "")
             t_ref = str(t.get("reference") or t.get("reference_range") or "")
 
+            # Suppress unit and reference columns for semi-quantitative CD4 RDT
+            t_low = t_name.lower()
+            if ("rapid test strip" in t_low or "cd4_rdt" in t_low or ("cd4" in t_low and "rdt" in t_low)):
+                t_unit = ""
+                t_ref = ""
+
+            if ("cd4" in t_low or "visitect" in t_low) and "below 200" in res_text.lower():
+                flag_text = "L*"
+
             if not flag_text and evaluator.is_qualitative_abnormal(res_text, t_ref, param_name=t_name):
                 flag_text = "\u26A0"
             if flag_text == "[!]":
@@ -425,6 +434,34 @@ def _build_department_table(dept_name: str, tests: list, compact: bool = False) 
                     Paragraph(t_unit, unit_style) if t_unit else "",
                     flag_cell
                 ])
+
+            # CD4 clinical decision support row
+            if ("cd4" in t_low or "visitect" in t_low) and res_text:
+                cd4_eval = evaluator.evaluate_cd4_interpretation(t_name, res_text)
+                comm_text = cd4_eval.get("interpretive_comment")
+                if comm_text:
+                    comm_row_idx = len(data)
+                    is_ahd = cd4_eval.get("is_ahd", False)
+                    comm_style = ParagraphStyle(
+                        name=f"CD4Note_{comm_row_idx}",
+                        fontName=FONT_BOLD if is_ahd else FONT_REGULAR,
+                        fontSize=6.5 if compact else 7,
+                        leading=8.5 if compact else 9,
+                        textColor=colors.HexColor('#991b1b') if is_ahd else colors.HexColor('#475569'),
+                        leftIndent=6,
+                        rightIndent=6
+                    )
+                    prefix = "<b>CRITICAL ALERT:</b> " if is_ahd else "<i><b>Clinical Note:</b> </i>"
+                    clean_note = comm_text
+                    if clean_note.startswith("CRITICAL ALERT:"):
+                        clean_note = clean_note[len("CRITICAL ALERT:"):].strip()
+                    note_para = Paragraph(f"{prefix}{clean_note}", comm_style)
+                    comm_row = [note_para] + [""] * (num_cols - 1)
+                    data.append(comm_row)
+                    style_cmds.append(('SPAN', (0, comm_row_idx), (-1, comm_row_idx)))
+                    style_cmds.append(('BACKGROUND', (0, comm_row_idx), (-1, comm_row_idx), colors.HexColor('#fef2f2') if is_ahd else colors.HexColor('#f8fafc')))
+                    if is_ahd:
+                        style_cmds.append(('BOX', (0, comm_row_idx), (-1, comm_row_idx), 0.5, colors.HexColor('#fca5a5')))
         
     t_elem = Table(data, colWidths=col_widths)
     
@@ -1088,6 +1125,182 @@ def _build_cbc_table(order_data: dict, cbc_test: dict) -> list:
     return flowables
 
 
+def _build_culture_page(order_data: dict, cs_test: dict) -> list:
+    """
+    Builds a dedicated A4 page flowables list for Culture & Antimicrobial Susceptibility Report.
+    Adheres strictly to BEST_PRACTICES.md:
+    - Multi-parameter isolation on dedicated page (Rule 3.3).
+    - Client terminology strictly enforced (Rule 3.2).
+    - No emojis anywhere (Rule A.1).
+    """
+    flowables = []
+    
+    # Dedicated Report Header
+    hdr_title_style = ParagraphStyle(
+        name='CsReportTitle',
+        fontName='Helvetica-Bold',
+        fontSize=12.5,
+        leading=15,
+        alignment=TA_CENTER,
+        textColor=colors.HexColor('#0f172a')
+    )
+    flowables.append(Paragraph("CULTURE & ANTIMICROBIAL SUSCEPTIBILITY REPORT", hdr_title_style))
+    flowables.append(Spacer(1, 4))
+    
+    # Metadata Demographics Table (Patient header per Client standard)
+    flowables.append(_build_cbc_patient_header(order_data))
+    flowables.append(Spacer(1, 6))
+    
+    # Section Banner Style
+    banner_style = ParagraphStyle(name="CsBanner", fontName=FONT_BOLD, fontSize=8.5, leading=10.5, textColor=colors.HexColor('#0f172a'))
+    lbl_style = ParagraphStyle(name="CsLbl", fontName=FONT_BOLD, fontSize=7.5, leading=9.5, textColor=colors.HexColor('#334155'))
+    val_style = ParagraphStyle(name="CsVal", fontName=FONT_REGULAR, fontSize=7.5, leading=9.5, textColor=colors.HexColor('#0f172a'))
+    alert_style = ParagraphStyle(name="CsAlert", fontName=FONT_BOLD, fontSize=7.5, leading=10, textColor=colors.HexColor('#b91c1c'))
+    
+    # 1. Specimen & Preliminary Microscopy Banner
+    specimen_title = cs_test.get("test_name") or "Culture & Sensitivity (C&S)"
+    micro_text = cs_test.get("preliminary_micro") or "None reported"
+    colony_count = cs_test.get("colony_count_cfu") or "None"
+    hours = cs_test.get("incubation_hours") or 24
+    media = cs_test.get("media_used") or "Standard Media"
+    notes = cs_test.get("clinical_notes") or "Routine diagnostic culture."
+    
+    summary_data = [
+        [Paragraph("<b>TEST ORDER:</b>", lbl_style), Paragraph(str(specimen_title), val_style), Paragraph("<b>INCUBATION:</b>", lbl_style), Paragraph(f"{hours} Hours ({media})", val_style)],
+        [Paragraph("<b>PRELIMINARY MICRO:</b>", lbl_style), Paragraph(str(micro_text), val_style), Paragraph("<b>COLONY COUNT:</b>", lbl_style), Paragraph(f"{colony_count} CFU/mL" if str(colony_count).isdigit() or "^" in str(colony_count) else str(colony_count), val_style)],
+        [Paragraph("<b>CLINICAL NOTES:</b>", lbl_style), Paragraph(str(notes), val_style), Paragraph("", lbl_style), Paragraph("", val_style)]
+    ]
+    summary_tbl = Table(summary_data, colWidths=[105, 175, 95, 105])
+    summary_tbl.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#f8fafc')),
+        ('GRID', (0,0), (-1,-1), 0.4, colors.HexColor('#cbd5e1')),
+        ('TOPPADDING', (0,0), (-1,-1), 2.5),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 2.5),
+        ('LEFTPADDING', (0,0), (-1,-1), 3),
+        ('RIGHTPADDING', (0,0), (-1,-1), 3),
+        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+    ]))
+    flowables.append(summary_tbl)
+    flowables.append(Spacer(1, 5))
+    
+    # Clinical / Safety Alerts
+    alerts = cs_test.get("alerts") or []
+    if alerts:
+        alert_rows = []
+        for al in alerts:
+            clean_al = str(al).replace("⚠️", "[ALERT]").replace("🚨", "[EMERGENCY]")
+            alert_rows.append([Paragraph(f"<b>CRITICAL NOTICE:</b> {clean_al}", alert_style)])
+        alert_tbl = Table(alert_rows, colWidths=[480])
+        alert_tbl.setStyle(TableStyle([
+            ('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#fef2f2')),
+            ('GRID', (0,0), (-1,-1), 0.6, colors.HexColor('#ef4444')),
+            ('TOPPADDING', (0,0), (-1,-1), 2.5),
+            ('BOTTOMPADDING', (0,0), (-1,-1), 2.5),
+            ('LEFTPADDING', (0,0), (-1,-1), 4),
+            ('RIGHTPADDING', (0,0), (-1,-1), 4),
+        ]))
+        flowables.append(alert_tbl)
+        flowables.append(Spacer(1, 5))
+        
+    # 2. Isolates & AST Table
+    isolates = cs_test.get("isolates") or []
+    if not isolates:
+        # Check if no growth
+        no_growth_msg = cs_test.get("result") or "No significant bacterial growth after 48 hours of aerobic incubation."
+        ng_tbl = Table([[Paragraph(f"<b>CULTURE RESULT:</b> {no_growth_msg}", ParagraphStyle(name="Ng", fontName=FONT_BOLD, fontSize=8.5, leading=11, textColor=colors.HexColor('#1e293b')))]], colWidths=[480])
+        ng_tbl.setStyle(TableStyle([
+            ('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#f1f5f9')),
+            ('GRID', (0,0), (-1,-1), 0.4, colors.HexColor('#cbd5e1')),
+            ('TOPPADDING', (0,0), (-1,-1), 6),
+            ('BOTTOMPADDING', (0,0), (-1,-1), 6),
+            ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+        ]))
+        flowables.append(ng_tbl)
+        flowables.append(Spacer(1, 10))
+    else:
+        for idx, iso in enumerate(isolates, start=1):
+            iso_name = iso.get("organism_name") or f"Isolate #{idx}"
+            morph = iso.get("colony_morphology") or ""
+            iso_hdr = f"<b>ISOLATE #{idx}:</b> <i>{iso_name}</i>"
+            if morph:
+                iso_hdr += f" ({morph})"
+                
+            iso_banner = Table([[Paragraph(iso_hdr, banner_style)]], colWidths=[480])
+            iso_banner.setStyle(TableStyle([
+                ('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#e2e8f0')),
+                ('TOPPADDING', (0,0), (-1,-1), 2),
+                ('BOTTOMPADDING', (0,0), (-1,-1), 2),
+                ('LEFTPADDING', (0,0), (-1,-1), 3),
+            ]))
+            flowables.append(iso_banner)
+            flowables.append(Spacer(1, 2))
+            
+            ast_list = iso.get("ast_results") or []
+            if not ast_list:
+                flowables.append(Paragraph("<i>No antimicrobial susceptibility testing performed for this isolate.</i>", val_style))
+                flowables.append(Spacer(1, 4))
+            else:
+                # AST Grid
+                ast_header = [
+                    Paragraph("<b>Antimicrobial Class</b>", lbl_style),
+                    Paragraph("<b>Antimicrobial Agent</b>", lbl_style),
+                    Paragraph("<b>Measurement</b>", lbl_style),
+                    Paragraph("<b>Result (S/I/R)</b>", lbl_style),
+                    Paragraph("<b>Interpretation / Guidance</b>", lbl_style)
+                ]
+                ast_rows = [ast_header]
+                for ast in ast_list:
+                    aclass = ast.get("antimicrobial_class") or "Other"
+                    agent = ast.get("agent_name") or ""
+                    m_val = ast.get("measurement_value")
+                    m_type = ast.get("measurement_type") or "zone_mm"
+                    m_str = f"{m_val} mm" if m_val is not None and m_type == "zone_mm" else (f"{m_val} µg/mL" if m_val is not None else "-")
+                    sir = ast.get("overridden_sir") or ast.get("raw_sir") or "N/A"
+                    
+                    # Color coding for S-I-R text
+                    sir_color = '#15803d' if sir == 'S' else ('#b91c1c' if sir == 'R' else '#d97706')
+                    sir_para = Paragraph(f"<font color='{sir_color}'><b>{sir}</b></font>", ParagraphStyle(name="Sir", fontName=FONT_BOLD, fontSize=8, leading=10, alignment=TA_CENTER))
+                    
+                    note = ast.get("override_reason") or ast.get("clinical_note") or ""
+                    if sir == 'S':
+                        interp = "Susceptible - Standard dosing"
+                    elif sir == 'I':
+                        interp = "Intermediate - Increased exposure"
+                    elif sir == 'R':
+                        interp = "Resistant - Clinical failure likely"
+                    else:
+                        interp = "-"
+                    if note:
+                        interp += f"<br/><font color='#b91c1c' size=6.5>{note}</font>"
+                        
+                    ast_rows.append([
+                        Paragraph(aclass, val_style),
+                        Paragraph(f"<b>{agent}</b>", val_style),
+                        Paragraph(m_str, val_style),
+                        sir_para,
+                        Paragraph(interp, val_style)
+                    ])
+                    
+                ast_tbl = Table(ast_rows, colWidths=[100, 110, 65, 55, 150])
+                ast_tbl.setStyle(TableStyle([
+                    ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#f1f5f9')),
+                    ('GRID', (0,0), (-1,-1), 0.3, colors.HexColor('#cbd5e1')),
+                    ('TOPPADDING', (0,0), (-1,-1), 1.8),
+                    ('BOTTOMPADDING', (0,0), (-1,-1), 1.8),
+                    ('LEFTPADDING', (0,0), (-1,-1), 2.5),
+                    ('RIGHTPADDING', (0,0), (-1,-1), 2.5),
+                    ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+                    ('ALIGN', (2,1), (3,-1), 'CENTER'),
+                ]))
+                flowables.append(ast_tbl)
+                flowables.append(Spacer(1, 4))
+                
+    # Footer Signatures
+    flowables.append(Spacer(1, 4))
+    flowables.append(_build_signatures_table(order_data, compact=True))
+    return flowables
+
+
 from reportlab.platypus import PageBreak
 
 def generate_pdf(order_data: dict, results_data: list) -> bytes:
@@ -1118,9 +1331,10 @@ def generate_pdf(order_data: dict, results_data: list) -> bytes:
     
     flowables = []
     
-    # Check for CBC
+    # Check for CBC and C&S
     cbc_test = None
     cbc_params_collected = []
+    cs_tests = []
     other_departments = []
     
     cbc_param_keywords = [
@@ -1137,6 +1351,8 @@ def generate_pdf(order_data: dict, results_data: list) -> bytes:
             t_name = str(t.get("test_name") or "").lower()
             if "cbc" in t_name or "complete blood count" in t_name:
                 cbc_test = t
+            elif "culture & sensitivity" in t_name or "c&s" in t_name or t.get("phase") is not None or t.get("isolates") is not None:
+                cs_tests.append(t)
             elif any(k in t_name for k in cbc_param_keywords):
                 cbc_params_collected.append(t)
             else:
@@ -1155,7 +1371,7 @@ def generate_pdf(order_data: dict, results_data: list) -> bytes:
             cbc_test["parameters"] = cbc_params_collected
 
     # If we have other tests, render main report page first
-    if other_departments or not cbc_test:
+    if other_departments or (not cbc_test and not cs_tests):
         total_tests_count = sum(len(d.get("tests", [])) for d in other_departments)
         is_dense = total_tests_count > 5
 
@@ -1204,16 +1420,21 @@ def generate_pdf(order_data: dict, results_data: list) -> bytes:
             flowables.append(_build_urinalysis_table(urinalysis_test, compact=is_dense))
             
         flowables.append(_build_signatures_table(order_data, compact=is_dense))
-        
-        if cbc_test:
-            flowables.append(PageBreak())
 
     # Render dedicated CBC page if present
     if cbc_test:
+        if flowables:
+            flowables.append(PageBreak())
         flowables.append(_build_cbc_patient_header(order_data))
         flowables.append(Spacer(1, 6))
         flowables.extend(_build_cbc_table(order_data, cbc_test))
         flowables.append(_build_cbc_footer(order_data, cbc_test))
+
+    # Render dedicated C&S pages for each culture & sensitivity order (Strict Rule 3.3)
+    for cs in cs_tests:
+        if flowables:
+            flowables.append(PageBreak())
+        flowables.extend(_build_culture_page(order_data, cs))
     
     custom_letterhead = order_data.get("letterhead_path")
     def make_canvas(*args, **kwargs):

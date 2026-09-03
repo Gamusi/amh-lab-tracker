@@ -224,4 +224,63 @@ def test_widal_and_hiv_pdf_report_rendering():
     assert isinstance(pdf_detailed, bytes)
     assert len(pdf_detailed) > 1000
 
+def test_culture_and_sensitivity_dedicated_single_page_pdf():
+    order_data = {
+        "lab_number": "AMH-26-9-100",
+        "full_name": "Amina Nakato",
+        "client_number": "AMH-999",
+        "age": "28y",
+        "sex": "Female",
+        "ward_of_origin": "GOPD",
+        "ordered_date": "2026-09-03"
+    }
+    cs_test = {
+        "test_name": "Urine Culture & Sensitivity (C&S)",
+        "phase": 4,
+        "preliminary_micro": "Pus cells 10-15/hpf, Gram-negative rods seen",
+        "colony_count_cfu": ">= 10^5",
+        "growth_category": "significant",
+        "incubation_hours": 24,
+        "media_used": "CLED & MacConkey Agar",
+        "clinical_notes": "Clean-catch midstream urine sample.",
+        "isolates": [
+            {
+                "organism_name": "Escherichia coli",
+                "colony_morphology": "Yellow lactose-fermenting colonies on CLED",
+                "ast_results": [
+                    {"antimicrobial_class": "Penicillins", "agent_name": "Ampicillin", "measurement_value": 12.0, "measurement_type": "zone_mm", "raw_sir": "R", "overridden_sir": "R"},
+                    {"antimicrobial_class": "Beta-Lactam/Inh.", "agent_name": "Amoxicillin/Clavulanate", "measurement_value": 19.0, "measurement_type": "zone_mm", "raw_sir": "S", "overridden_sir": "S"},
+                    {"antimicrobial_class": "Cephalosporins", "agent_name": "Ceftriaxone", "measurement_value": 16.0, "measurement_type": "zone_mm", "raw_sir": "I", "overridden_sir": "I"},
+                    {"antimicrobial_class": "Fluoroquinolones", "agent_name": "Ciprofloxacin", "measurement_value": 22.0, "measurement_type": "zone_mm", "raw_sir": "S", "overridden_sir": "S"},
+                    {"antimicrobial_class": "Aminoglycosides", "agent_name": "Gentamicin", "measurement_value": 10.0, "measurement_type": "zone_mm", "raw_sir": "R", "overridden_sir": "R"}
+                ]
+            }
+        ],
+        "alerts": [
+            "[CRITICAL ALERT]: Phenotypic quality review confirms active bacterial infection."
+        ]
+    }
+    # Case A: Combined General Test + C&S (Must produce 2 pages, C&S on dedicated page)
+    results_data = [
+        {
+            "department": "Parasitology",
+            "tests": [{"test_name": "BS for MPS", "result": "No malaria parasites seen", "reference": "No malaria parasites seen"}]
+        },
+        {
+            "department": "Microbiology & Tuberculosis",
+            "tests": [cs_test]
+        }
+    ]
+    pdf_bytes = generate_pdf(order_data, results_data)
+    assert isinstance(pdf_bytes, bytes)
+    assert len(pdf_bytes) > 1000
+    import pypdf
+    reader = pypdf.PdfReader(io.BytesIO(pdf_bytes))
+    full_text = "".join(page.extract_text() for page in reader.pages)
+    assert "CULTURE & ANTIMICROBIAL SUSCEPTIBILITY REPORT" in full_text
+    assert "Escherichia coli" in full_text
+    assert "Ampicillin" in full_text
+    assert "Ciprofloxacin" in full_text
+
+
 
