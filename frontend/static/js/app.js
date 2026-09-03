@@ -4418,17 +4418,9 @@ const app = {
              cVal.style.borderColor = '#f87171';
              if (dAlert) dAlert.style.display = 'block';
            }
-         }
-       }
-       paramsContainer.querySelectorAll('.bg-eval-trigger').forEach(function(el) {
+         paramsContainer.querySelectorAll('.bg-eval-trigger').forEach(function(el) {
          el.onchange = updateBgEval;
        });
-       updateBgEval();
-    } else if (nameLower.includes('urinalysis')) {
-       // URINALYSIS FULL MODAL — 3-section panel via API sub-parameters
-       singleContainer.style.display = 'none';
-       paramsContainer.style.display = 'block';
-       var uaParamRes = yield fetch('/api/config/tests/' + testId + '/parameters');
        var uaParams = [];
        if (uaParamRes.ok) {
          uaParams = yield uaParamRes.json();
@@ -4519,6 +4511,10 @@ const app = {
         } catch (e) {}
 
         if (test.result_type === 'qualitative' || test.result_type === 'semi_quantitative' || test.result_type === 'options' || (options && options.length > 0)) {
+            let rdtHint = '';
+            if (nameLower.indexOf('cd4') !== -1 && (nameLower.indexOf('rapid') !== -1 || nameLower.indexOf('rdt') !== -1 || nameLower.indexOf('strip') !== -1)) {
+              rdtHint = '<small style="display:block; margin-top:6px; padding:6px 8px; background:#f8fafc; border:1px solid #cbd5e1; border-radius:4px; color:var(--text-dark); font-size:0.8rem;"><b>Clinical Staging SOP:</b> Below 200 cells/µL defines Advanced HIV Disease (AHD). If "Invalid", cassette run cannot be released—discard and repeat test.</small>';
+            }
             if (options && options.length > 0) {
                 let optsHtml = options.map(o => `<option value="${this.escape(o)}"${isEdit && existingVal === o ? ' selected' : ''}>${this.escape(o)}</option>`).join('');
                 singleContainer.innerHTML = `
@@ -4526,6 +4522,7 @@ const app = {
                   <select id="qual-res" style="width:100%; padding:8px;">
                     ${optsHtml}
                   </select>
+                  ${rdtHint}
                 `;
                 if (isEdit && existingVal) {
                   const sel = document.getElementById('qual-res');
@@ -4535,6 +4532,7 @@ const app = {
                 singleContainer.innerHTML = `
                   <label>Result:</label>
                   <input type="text" id="result-entry-value" value="${isEdit ? this.escape(existingVal) : ''}" placeholder="Enter text result" style="width:100%; padding:8px;">
+                  ${rdtHint}
                 `;
             }
         } else {
@@ -4553,6 +4551,9 @@ const app = {
             if (nameLower.includes('hcg') && nameLower.includes('blood')) {
               placeholderText = "e.g. 150.0 (Non-pregnant: <5.0, Pregnant: >=25.0 mIU/mL)";
               clinicalHint = '<small style="display:block; margin-top:4px; color:var(--text-muted); font-size:0.75rem;"><b>Pregnancy Staging:</b> Baseline < 5.0 mIU/mL (Non-pregnant); >= 25.0 mIU/mL (Positive). Normal early gestation exhibits rapid doubling times (every 48-72h).</small>';
+            } else if (nameLower.indexOf('cd4') !== -1 && nameLower.indexOf('rapid') === -1 && nameLower.indexOf('strip') === -1 && nameLower.indexOf('rdt') === -1) {
+              placeholderText = "e.g. 450 (Adult Normal: 500 - 1500 cells/µL)";
+              clinicalHint = '<small style="display:block; margin-top:6px; padding:6px 8px; background:#f8fafc; border:1px solid #cbd5e1; border-radius:4px; color:var(--text-dark); font-size:0.8rem;"><b>Clinical Decision Support:</b> < 200 cells/µL defines Advanced HIV Disease (AHD) triggering TB-LAM & CrAg screening. For pediatric clients under 5 years (< 60 months), evaluate concurrent CD4% (< 25% defines Pediatric AHD).</small>';
             }
 
             singleContainer.innerHTML = `
@@ -4769,9 +4770,15 @@ const app = {
            finalVal = 'Negative';
            paramResults = null;
          }
-       } else if (document.getElementById('qual-res')) {
-         finalVal = document.getElementById('qual-res').value;
-       } else {
+        } else if (document.getElementById('qual-res')) {
+          finalVal = document.getElementById('qual-res').value;
+          if (nameLower.indexOf('cd4') !== -1 && (nameLower.indexOf('rapid') !== -1 || nameLower.indexOf('rdt') !== -1 || nameLower.indexOf('strip') !== -1)) {
+            if (finalVal === 'Invalid') {
+              app.showNotificationModal("Invalid Test Run", "Invalid RDT cassette run cannot be released as a final client result. Discard cassette, log wastage in inventory, and repeat test with a new cassette.", true);
+              return;
+            }
+          }
+        } else {
          finalVal = document.getElementById('result-entry-value').value.trim();
        }
        
