@@ -1,5 +1,5 @@
 import datetime, sqlite3, logging
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
 from ..database import get_db
