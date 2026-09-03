@@ -693,7 +693,6 @@ const app = {
     else if (viewName === 'backlog') this.renderBacklog(container);
     else if (viewName === 'inventory') this.renderInventory(container);
     else if (viewName === 'reports') this.renderReports(container);
-    else if (viewName === 'trends') this.renderTrends(container);
     else if (viewName === 'clients') this.renderClients(container);
     else if (viewName === 'config') this.renderConfig(container);
     else if (viewName === 'audit') this.renderAuditLog(container);
@@ -848,7 +847,7 @@ const app = {
       const isAlt = e.altKey;
       const key = e.key;
 
-      if (isAlt && (key >= '1' && key <= '8')) {
+      if (isAlt && (key >= '1' && key <= '7')) {
         e.preventDefault();
         const tabMap = {
           '1': 'clients',
@@ -856,9 +855,8 @@ const app = {
           '3': 'backlog',
           '4': 'inventory',
           '5': 'reports',
-          '6': 'trends',
-          '7': 'config',
-          '8': 'audit'
+          '6': 'config',
+          '7': 'audit'
         };
         const targetView = tabMap[key];
         if (targetView) {
@@ -2385,104 +2383,6 @@ const app = {
     document.body.removeChild(link);
     this.showNotificationModal("Success", 'Surveillance CSV exported successfully!', false);
   },
-
-  // Trends View
-  renderTrends: __async(function*(container) {
-    container.innerHTML = `
-      <div class="card">
-        <div class="card-header">
-          <span class="card-title">${this.icon('trending-up')} Longitudinal Monthly Trends</span>
-          <div class="controls-row">
-            <div class="form-group">
-              <label>From Year:</label>
-              <select id="trend-from-year" onchange="app.loadTrendsData()">
-                <option value="2026">2026</option>
-                <option value="2025">2025</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label>To Year:</label>
-              <select id="trend-to-year" onchange="app.loadTrendsData()">
-                <option value="2027" selected>2027</option>
-                <option value="2026">2026</option>
-              </select>
-            </div>
-            <button class="btn btn-primary" onclick="app.exportTrendsCSV()">${this.icon('download')} Export CSV</button>
-          </div>
-        </div>
-
-        <div id="trends-table-container">
-          <p>Loading trends...</p>
-        </div>
-      </div>
-    `;
-    yield this.loadTrendsData();
-  }),
-
-  exportTrendsCSV: function() {
-    const fy = document.getElementById('trend-from-year').value;
-    const ty = document.getElementById('trend-to-year').value;
-    
-    const table = document.querySelector('#trends-table-container table');
-    if (!table) return;
-
-    let csvContent = `Laboratory Monthly Trends (${fy} to ${ty})\n\n`;
-
-    table.querySelectorAll('tr').forEach(tr => {
-      const cells = Array.from(tr.querySelectorAll('th, td')).map(c => `"${c.textContent.trim()}"`);
-      csvContent += cells.join(',') + '\n';
-    });
-
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.setAttribute('download', `AMH_Lab_Trends_${fy}_${ty}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    this.showNotificationModal("Success", 'Trends CSV exported successfully!', false);
-  },
-
-  loadTrendsData: __async(function*() {
-    const fy = document.getElementById('trend-from-year').value;
-    const ty = document.getElementById('trend-to-year').value;
-
-    try {
-      const res = yield fetch(`/api/trends?from_year=${fy}&to_year=${ty}`);
-      if (!res.ok) throw new Error('API returned ' + res.status);
-      const data = yield res.json();
-
-      let headers = '<th>Month</th>';
-      data.sections.forEach(s => { headers += `<th style="text-align: right;">${this.escape(s)}</th>`; });
-      headers += '<th style="text-align: right;">Monthly Total</th>';
-
-      let rows = '';
-      data.trends.forEach(r => {
-        let secCols = '';
-        data.sections.forEach(s => { secCols += `<td style="text-align: right;">${r[s] || 0}</td>`; });
-        rows += `
-          <tr>
-            <td><strong>${r.month}</strong></td>
-            ${secCols}
-            <td style="text-align: right; font-weight: 700;">${r.Total}</td>
-          </tr>
-        `;
-      });
-
-      document.getElementById('trends-table-container').innerHTML = `
-        <table class="data-table">
-          <thead>
-            <tr>${headers}</tr>
-          </thead>
-          <tbody>
-            ${rows}
-          </tbody>
-        </table>
-      `;
-    } catch (e) {
-      console.error('Trends error:', e);
-    }
-  }),
 
   // Test Reports View
   renderClients: __async(function*(container) {

@@ -5,7 +5,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from .database import init_db
-from .routers import auth, daily_log, config, reports, trends, audit, clients, integrations
+from .routers import auth, daily_log, config, reports, audit, clients, integrations
 
 # Configure Logging
 logging.basicConfig(
@@ -28,7 +28,7 @@ async def log_requests(request: Request, call_next):
     logger.info(f"Method={request.method} Path={request.url.path} Status={response.status_code} Time={process_time:.2f}ms")
     return response
 
-from .routers import auth, daily_log, config, reports, trends, audit, clients, integrations, stock, export, backlog
+from .routers import auth, daily_log, config, reports, audit, clients, integrations, stock, export, backlog
 
 # Register API Routers
 app.include_router(auth.router)
@@ -36,7 +36,6 @@ app.include_router(daily_log.router)
 app.include_router(backlog.router)
 app.include_router(config.router)
 app.include_router(reports.router)
-app.include_router(trends.router)
 app.include_router(audit.router)
 app.include_router(clients.router)
 app.include_router(integrations.router)
