@@ -300,7 +300,8 @@ def generate_operations_pdf(data: dict, current_user: dict) -> bytes:
         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
     ]))
     
-    story.append(KeepTogether([Paragraph("1. Section Workload and TAT", styles["SectionHeader"]), sec_table]))
+    story.append(Paragraph("1. Section Workload and TAT", styles["SectionHeader"]))
+    story.append(sec_table)
     story.append(Spacer(1, 10))
 
     # =========================================================================
@@ -349,7 +350,10 @@ def generate_operations_pdf(data: dict, current_user: dict) -> bytes:
         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
     ]))
     
-    story.append(KeepTogether([Paragraph("2. Monthly Workload Trends", styles["SectionHeader"]), chart_drawing, Spacer(1, 4), trends_table]))
+    story.append(Paragraph("2. Monthly Workload Trends", styles["SectionHeader"]))
+    story.append(chart_drawing)
+    story.append(Spacer(1, 4))
+    story.append(trends_table)
     story.append(Spacer(1, 8))
 
     # =========================================================================
@@ -381,7 +385,8 @@ def generate_operations_pdf(data: dict, current_user: dict) -> bytes:
         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
     ]))
     
-    story.append(KeepTogether([Paragraph("3. Workload by Ward of Origin", styles["SectionHeader"]), ward_table]))
+    story.append(Paragraph("3. Workload by Ward of Origin", styles["SectionHeader"]))
+    story.append(ward_table)
     story.append(Spacer(1, 10))
 
     # =========================================================================
@@ -410,7 +415,8 @@ def generate_operations_pdf(data: dict, current_user: dict) -> bytes:
         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
     ]))
     
-    story.append(KeepTogether([Paragraph("4. Test Category Distribution", styles["SectionHeader"]), cat_table]))
+    story.append(Paragraph("4. Test Category Distribution", styles["SectionHeader"]))
+    story.append(cat_table)
     story.append(Spacer(1, 10))
 
     # =========================================================================

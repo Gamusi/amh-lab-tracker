@@ -215,7 +215,10 @@ def generate_surveillance_pdf(data: dict, current_user: dict) -> bytes:
         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
     ]))
     
-    story.append(KeepTogether([Paragraph("1. Monthly Incidence & Positivity Trends", styles["SectionHeader"]), chart_drawing, Spacer(1, 4), trends_table]))
+    story.append(Paragraph("1. Monthly Incidence & Positivity Trends", styles["SectionHeader"]))
+    story.append(chart_drawing)
+    story.append(Spacer(1, 4))
+    story.append(trends_table)
     story.append(Spacer(1, 8))
 
     # =========================================================================
@@ -249,7 +252,8 @@ def generate_surveillance_pdf(data: dict, current_user: dict) -> bytes:
         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
     ]))
     
-    story.append(KeepTogether([Paragraph("2. Positive Cases by Ward of Origin", styles["SectionHeader"]), ward_table]))
+    story.append(Paragraph("2. Positive Cases by Ward of Origin", styles["SectionHeader"]))
+    story.append(ward_table)
 
     # =========================================================================
     # 3. Disease & Syndrome Surveillance Ledger (Page 2)
