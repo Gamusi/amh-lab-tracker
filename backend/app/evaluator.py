@@ -28,6 +28,19 @@ ALIAS_MAP = {
     "rbs": "RBS (Random Blood Sugar)",
     "random blood sugar": "RBS (Random Blood Sugar)",
     "rbs (random blood sugar)": "RBS (Random Blood Sugar)",
+    "cd4 count": "Absolute CD4 Count (Cytometry)",
+    "cd4": "Absolute CD4 Count (Cytometry)",
+    "absolute cd4 count": "Absolute CD4 Count (Cytometry)",
+    "cd4_quant": "Absolute CD4 Count (Cytometry)",
+    "cd4 quant": "Absolute CD4 Count (Cytometry)",
+    "cd4 count (cytometry)": "Absolute CD4 Count (Cytometry)",
+    "cd4 count (rapid test strip)": "CD4 Count (Rapid Test Strip)",
+    "cd4_rdt": "CD4 Count (Rapid Test Strip)",
+    "cd4 rdt": "CD4 Count (Rapid Test Strip)",
+    "visitect": "CD4 Count (Rapid Test Strip)",
+    "visitect cd4": "CD4 Count (Rapid Test Strip)",
+    "cd4 percentage": "CD4 Percentage",
+    "cd4%": "CD4 Percentage",
 }
 
 def calculate_age(dob: datetime.date, entry_date: datetime.date) -> int:
@@ -156,10 +169,15 @@ def is_qualitative_abnormal(result_val: str, ref_val: str = None, param_name: st
         "1-2 / lpf", "3-4 / lpf", "few", "1.0 eu/dl", "normal (1.0 eu/dl)",
         "not done", "< 1:20", "<1:20", "1:20", "1:40",
         "negative (not detected)", "not detected", "no growth after 48 hours",
-        "afb negative", "afb negative (no bacilli seen in 100 hpf)"
+        "afb negative", "afb negative (no bacilli seen in 100 hpf)",
+        "cd4 count: 200 cells/µl or above", "cd4 count: 200 cells/ul or above",
+        "200 cells/µl or above", "200 cells/ul or above"
     }
     if v_low in normal_exact:
         return False
+
+    if "below 200" in v_low:
+        return True
 
     # Defensive check: if text clearly indicates non-reactivity / negativity
     if (v_low.startswith("non-reactive") or v_low.startswith("non reactive") or 
@@ -292,9 +310,22 @@ def evaluate_result(test_name: str, result_value: str, dob: datetime.date = None
         elif n_max is not None and val > n_max:
             flag = "H"
 
+    t_low = (test_name or "").lower()
+    # CD4 specific quantitative gate: < 200 is severe immunosuppression (AHD) -> L*
+    if val is not None and ("cd4" in t_low or "cytometry" in t_low):
+        if val < 200.0:
+            flag = "L*"
+        elif val < 500.0:
+            flag = "L"
+
     # Qualitative abnormal findings check
     if not flag and result_value:
-        if is_qualitative_abnormal(result_value, ref_str, test_name):
+        res_low = str(result_value).strip().lower()
+        if "below 200" in res_low and ("cd4" in t_low or "visitect" in t_low or "strip" in t_low or "rdt" in t_low):
+            flag = "L*"
+        elif "invalid" in res_low and ("cd4" in t_low or "rdt" in t_low):
+            flag = "\u26A0"
+        elif is_qualitative_abnormal(result_value, ref_str, test_name):
             flag = "\u26A0"
 
     is_abnormal = (flag is not None)
@@ -304,6 +335,116 @@ def evaluate_result(test_name: str, result_value: str, dob: datetime.date = None
         "reference": ref_str,
         "flag": flag,
         "is_abnormal": is_abnormal
+    }
+
+
+def evaluate_cd4_interpretation(test_name: str, result_value: str, age_months: Optional[int] = None, unit: Optional[str] = None) -> dict:
+    """
+    Evaluates clinical decision pathways and mandatory interpretive comments for CD4 assays.
+    Supports Absolute CD4 Count (Cytometry), CD4 Count (Rapid Test Strip), and CD4 Percentage (<60 months).
+    """
+    t_clean = (test_name or "").strip().lower()
+    val_clean = str(result_value or "").strip()
+    
+    # 1. Pediatric CD4% (< 60 months / < 5 years)
+    if "percent" in t_clean or "%" in t_clean:
+        try:
+            val_num = float(val_clean.replace("%", "").strip().split()[0])
+        except (ValueError, TypeError):
+            val_num = None
+            
+        if val_num is not None and val_num < 25.0:
+            return {
+                "flag": "L*",
+                "is_abnormal": True,
+                "is_ahd": True,
+                "is_invalid": False,
+                "interpretive_comment": "CRITICAL ALERT: CD4 percentage is < 25% in pediatric client under 5 years, defining Pediatric Advanced HIV Disease (AHD). Immediate pediatric ART regimen escalation and opportunistic infection screening indicated.",
+                "ahd_package_indicated": True
+            }
+        else:
+            return {
+                "flag": None,
+                "is_abnormal": False,
+                "is_ahd": False,
+                "is_invalid": False,
+                "interpretive_comment": "Pediatric CD4 percentage is >= 25%, indicating immunological stability above the advanced disease threshold.",
+                "ahd_package_indicated": False
+            }
+
+    # 2. Semi-Quantitative Lateral-Flow RDT (e.g. VISITECT CD4)
+    if "rapid" in t_clean or "rdt" in t_clean or "strip" in t_clean or "visitect" in t_clean:
+        v_low = val_clean.lower()
+        if "invalid" in v_low:
+            return {
+                "flag": "\u26A0",
+                "is_abnormal": True,
+                "is_ahd": False,
+                "is_invalid": True,
+                "interpretive_comment": "Invalid test run: Control line failed to develop. Result cannot be released. Repeat test with a new cassette.",
+                "ahd_package_indicated": False
+            }
+        elif "below 200" in v_low:
+            return {
+                "flag": "L*",
+                "is_abnormal": True,
+                "is_ahd": True,
+                "is_invalid": False,
+                "interpretive_comment": "CRITICAL ALERT: Absolute CD4 T-cell count evaluated semi-quantitatively via lateral-flow rapid diagnostic test. Results indicate the client's CD4 count has fallen below the 200 cells/µL clinical threshold, defining Advanced HIV Disease (AHD). Immediately initiate the national AHD package of care, including Urine TB-LAM, Sputum GeneXpert, and Serum/CSF Cryptococcal Antigen (CrAg) lateral flow screening.",
+                "ahd_package_indicated": True
+            }
+        else:
+            return {
+                "flag": None,
+                "is_abnormal": False,
+                "is_ahd": False,
+                "is_invalid": False,
+                "interpretive_comment": "Absolute CD4 T-cell count evaluated semi-quantitatively via lateral-flow rapid diagnostic test. CD4 count is confirmed to be at or above the 200 cells/µL decision limit.",
+                "ahd_package_indicated": False
+            }
+
+    # 3. Quantitative POC Cytometry (e.g. Alere PIMA / BD FACSPresto)
+    try:
+        val_num = float(val_clean.split()[0])
+    except (ValueError, TypeError):
+        val_num = None
+
+    if val_num is not None:
+        if val_num < 200.0:
+            return {
+                "flag": "L*",
+                "is_abnormal": True,
+                "is_ahd": True,
+                "is_invalid": False,
+                "interpretive_comment": "CRITICAL ALERT: Absolute CD4 count is < 200 cells/µL, indicating severe immunological collapse and defining Advanced HIV Disease (AHD). Immediately initiate the national AHD package of care, including Urine TB-LAM, Sputum GeneXpert, and Serum Cryptococcal Antigen (CrAg) lateral flow screening.",
+                "ahd_package_indicated": True
+            }
+        elif val_num < 500.0:
+            return {
+                "flag": "L",
+                "is_abnormal": True,
+                "is_ahd": False,
+                "is_invalid": False,
+                "interpretive_comment": "Absolute CD4 T-lymphocyte count indicates mild-to-moderate immunosuppression (200 - 499 cells/µL). Result is above the advanced disease threshold.",
+                "ahd_package_indicated": False
+            }
+        else:
+            return {
+                "flag": None,
+                "is_abnormal": False,
+                "is_ahd": False,
+                "is_invalid": False,
+                "interpretive_comment": "Absolute CD4 T-lymphocyte count performed via automated point-of-care cytometry. Results indicate immunological stability above the advanced disease threshold.",
+                "ahd_package_indicated": False
+            }
+
+    return {
+        "flag": None,
+        "is_abnormal": False,
+        "is_ahd": False,
+        "is_invalid": False,
+        "interpretive_comment": "",
+        "ahd_package_indicated": False
     }
 
 

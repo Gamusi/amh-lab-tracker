@@ -82,7 +82,9 @@ def _find_matching_rule(conn_or_cur, param_name: str, age: Optional[int] = None,
 
     query += " ORDER BY id ASC"
     cur.execute(query, params)
-    rows = cur.fetchall()
+    raw_rows = cur.fetchall()
+    cols = [d[0] for d in cur.description] if cur.description else []
+    rows = [dict(zip(cols, row)) if isinstance(row, (tuple, list)) else dict(row) for row in raw_rows]
     
     if not rows and unit:
         # Fallback without unit constraint if none matched
@@ -95,7 +97,9 @@ def _find_matching_rule(conn_or_cur, param_name: str, age: Optional[int] = None,
             ORDER BY id ASC
         """
         cur.execute(query_fallback, [c.lower() for c in candidates])
-        rows = cur.fetchall()
+        raw_fallback = cur.fetchall()
+        cols_fallback = [d[0] for d in cur.description] if cur.description else cols
+        rows = [dict(zip(cols_fallback, row)) if isinstance(row, (tuple, list)) else dict(row) for row in raw_fallback]
 
     if not rows:
         from .seed import DEFAULT_REFERENCE_RANGES
@@ -266,6 +270,16 @@ def validate_biochem_parameter(
     # 4. Qualitative Abnormal Finding Flag
     if not flag and val_clean:
         if is_qualitative_abnormal(val_clean, ref_str, param_name):
+            flag = "\u26A0"
+
+    # 4. CD4 and Qualitative Abnormal Findings
+    if not flag and val_clean:
+        v_low = val_clean.lower()
+        if "below 200" in v_low and ("cd4" in p_lower or "visitect" in p_lower):
+            flag = "L*"
+        elif "invalid" in v_low and ("cd4" in p_lower or "visitect" in p_lower):
+            flag = "\u26A0"
+        elif is_qualitative_abnormal(val_clean, ref_str, param_name):
             flag = "\u26A0"
 
     is_abnormal = (flag is not None)
