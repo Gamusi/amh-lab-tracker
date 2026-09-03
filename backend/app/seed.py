@@ -657,9 +657,67 @@ def seed_database(conn=None):
                 """, (mal_id, pname, punit, pref, porder, popts))
             else:
                 cur.execute("""
-                    UPDATE test_parameters SET unit = ?, ref_range = ?, sort_order = ?, options = ?
-                    WHERE id = ?
-                """, (punit, pref, porder, popts, tp_r["id"]))
+    # Seed Immunohematology parameters
+    BLOOD_GROUP_PARAMS = [
+        ("Forward Anti-A", None, None, 1, '["Agglutination (+)", "No Agglutination (-)"]'),
+        ("Forward Anti-B", None, None, 2, '["Agglutination (+)", "No Agglutination (-)"]'),
+        ("Forward Anti-D", None, None, 3, '["Agglutination (+)", "No Agglutination (-)"]'),
+        ("Reverse A1-cells", None, None, 4, '["Agglutination (+)", "No Agglutination (-)"]'),
+        ("Reverse B-cells", None, None, 5, '["Agglutination (+)", "No Agglutination (-)"]'),
+        ("Consolidated Blood Group", None, None, 6, '["A Rh(D) Positive", "A Rh(D) Negative", "B Rh(D) Positive", "B Rh(D) Negative", "AB Rh(D) Positive", "AB Rh(D) Negative", "O Rh(D) Positive", "O Rh(D) Negative", "Grouping Discrepancy"]'),
+    ]
+    cur.execute("SELECT id FROM tests WHERE LOWER(name) LIKE '%blood group%'")
+    for bg_row in cur.fetchall():
+        bg_id = bg_row["id"]
+        for pname, punit, pref, porder, popts in BLOOD_GROUP_PARAMS:
+            cur.execute("SELECT id FROM test_parameters WHERE test_id = ? AND parameter_name = ?", (bg_id, pname))
+            tp_r = cur.fetchone()
+            if not tp_r:
+                cur.execute("""
+                    INSERT INTO test_parameters (test_id, parameter_name, unit, ref_range, sort_order, options)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                """, (bg_id, pname, punit, pref, porder, popts))
+            else:
+                cur.execute("UPDATE test_parameters SET sort_order = ?, options = ? WHERE id = ?", (porder, popts, tp_r["id"]))
+
+    DIRECT_COOMBS_PARAMS = [
+        ("DAT Qualitative Status", None, None, 1, '["Negative", "Positive"]'),
+        ("Reaction Strength", None, None, 2, '["Negative", "Trace", "1+", "2+", "3+", "4+"]'),
+        ("Reagent Specificity", None, None, 3, '["Polyspecific AHG", "Anti-IgG", "Anti-C3d"]'),
+    ]
+    cur.execute("SELECT id FROM tests WHERE LOWER(name) LIKE '%direct coombs%'")
+    for dc_row in cur.fetchall():
+        dc_id = dc_row["id"]
+        for pname, punit, pref, porder, popts in DIRECT_COOMBS_PARAMS:
+            cur.execute("SELECT id FROM test_parameters WHERE test_id = ? AND parameter_name = ?", (dc_id, pname))
+            tp_r = cur.fetchone()
+            if not tp_r:
+                cur.execute("""
+                    INSERT INTO test_parameters (test_id, parameter_name, unit, ref_range, sort_order, options)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                """, (dc_id, pname, punit, pref, porder, popts))
+            else:
+                cur.execute("UPDATE test_parameters SET sort_order = ?, options = ? WHERE id = ?", (porder, popts, tp_r["id"]))
+
+    INDIRECT_COOMBS_PARAMS = [
+        ("IAT Qualitative Status", None, None, 1, '["Negative", "Positive"]'),
+        ("Screening Cell I", None, None, 2, '["Negative", "Trace", "1+", "2+", "3+", "4+"]'),
+        ("Screening Cell II", None, None, 3, '["Negative", "Trace", "1+", "2+", "3+", "4+"]'),
+        ("Screening Cell III", None, None, 4, '["Negative", "Trace", "1+", "2+", "3+", "4+"]'),
+    ]
+    cur.execute("SELECT id FROM tests WHERE LOWER(name) LIKE '%indirect coombs%'")
+    for ic_row in cur.fetchall():
+        ic_id = ic_row["id"]
+        for pname, punit, pref, porder, popts in INDIRECT_COOMBS_PARAMS:
+            cur.execute("SELECT id FROM test_parameters WHERE test_id = ? AND parameter_name = ?", (ic_id, pname))
+            tp_r = cur.fetchone()
+            if not tp_r:
+                cur.execute("""
+                    INSERT INTO test_parameters (test_id, parameter_name, unit, ref_range, sort_order, options)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                """, (ic_id, pname, punit, pref, porder, popts))
+            else:
+                cur.execute("UPDATE test_parameters SET sort_order = ?, options = ? WHERE id = ?", (porder, popts, tp_r["id"]))
 
     seed_reference_ranges(cur)
     seed_specimens(cur)

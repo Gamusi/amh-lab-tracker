@@ -248,6 +248,25 @@ SCHEMA_SQL = """
         user_id INTEGER REFERENCES users(id)
     );
 
+    CREATE TABLE IF NOT EXISTS donor_crossmatches (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        order_id INTEGER NOT NULL REFERENCES test_orders(id) ON DELETE CASCADE,
+        donor_unit_id TEXT NOT NULL,
+        donor_blood_group TEXT NOT NULL,
+        product_type TEXT NOT NULL,
+        expiry_date DATE NOT NULL,
+        phase_is TEXT NOT NULL,
+        phase_thermophase TEXT NOT NULL,
+        phase_ahg TEXT NOT NULL,
+        compatibility_status TEXT NOT NULL,
+        release_status TEXT NOT NULL,
+        clinical_summary TEXT NOT NULL,
+        is_locked BOOLEAN NOT NULL DEFAULT 0,
+        entered_by_user_id INTEGER REFERENCES users(id),
+        verified_by_user_id INTEGER REFERENCES users(id),
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
     CREATE INDEX IF NOT EXISTS idx_clients_full_name ON clients(full_name);
     CREATE INDEX IF NOT EXISTS idx_clients_phone ON clients(phone);
     CREATE INDEX IF NOT EXISTS idx_visits_client_id ON visits(client_id);
@@ -256,6 +275,8 @@ SCHEMA_SQL = """
     CREATE INDEX IF NOT EXISTS idx_daily_entries_date_test ON daily_entries(entry_date, test_id);
     CREATE INDEX IF NOT EXISTS idx_stock_tx_lot_id ON diagnostic_kit_transactions(lot_id);
     CREATE INDEX IF NOT EXISTS idx_audit_log_timestamp ON audit_log(timestamp);
+    CREATE INDEX IF NOT EXISTS idx_donor_crossmatches_order_id ON donor_crossmatches(order_id);
+    CREATE INDEX IF NOT EXISTS idx_donor_crossmatches_unit ON donor_crossmatches(donor_unit_id);
 """
 
 def get_connection():
@@ -307,8 +328,101 @@ def get_connection():
     except Exception as e:
         logger.debug(f"Column/table migration check: {e}")
 
+    _ensure_transfusion_schema(conn)
+
     logger.debug(f"Connected to database at {DB_PATH}")
     return conn
+
+def _ensure_transfusion_schema(conn):
+    try:
+        cur = conn.cursor()
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS donor_crossmatches (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                order_id INTEGER NOT NULL REFERENCES test_orders(id) ON DELETE CASCADE,
+                donor_unit_id TEXT NOT NULL,
+                donor_blood_group TEXT NOT NULL,
+                product_type TEXT NOT NULL,
+                expiry_date DATE NOT NULL,
+                phase_is TEXT NOT NULL,
+                phase_thermophase TEXT NOT NULL,
+                phase_ahg TEXT NOT NULL,
+                compatibility_status TEXT NOT NULL,
+                release_status TEXT NOT NULL,
+                clinical_summary TEXT NOT NULL,
+                is_locked BOOLEAN NOT NULL DEFAULT 0,
+                entered_by_user_id INTEGER REFERENCES users(id),
+                verified_by_user_id INTEGER REFERENCES users(id),
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            );
+        """)
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_donor_crossmatches_order_id ON donor_crossmatches(order_id);")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_donor_crossmatches_unit ON donor_crossmatches(donor_unit_id);")
+
+        BLOOD_GROUP_PARAMS = [
+            ("Forward Anti-A", None, None, 1, '["Agglutination (+)", "No Agglutination (-)"]'),
+            ("Forward Anti-B", None, None, 2, '["Agglutination (+)", "No Agglutination (-)"]'),
+            ("Forward Anti-D", None, None, 3, '["Agglutination (+)", "No Agglutination (-)"]'),
+            ("Reverse A1-cells", None, None, 4, '["Agglutination (+)", "No Agglutination (-)"]'),
+            ("Reverse B-cells", None, None, 5, '["Agglutination (+)", "No Agglutination (-)"]'),
+            ("Consolidated Blood Group", None, None, 6, '["A Rh(D) Positive", "A Rh(D) Negative", "B Rh(D) Positive", "B Rh(D) Negative", "AB Rh(D) Positive", "AB Rh(D) Negative", "O Rh(D) Positive", "O Rh(D) Negative", "Grouping Discrepancy"]'),
+        ]
+        cur.execute("SELECT id FROM tests WHERE LOWER(name) LIKE '%blood group%'")
+        for bg_row in cur.fetchall():
+            bg_id = bg_row[0]
+            for pname, punit, pref, porder, popts in BLOOD_GROUP_PARAMS:
+                cur.execute("SELECT id FROM test_parameters WHERE test_id = ? AND parameter_name = ?", (bg_id, pname))
+                p_ex = cur.fetchone()
+                if not p_ex:
+                    cur.execute("""
+                        INSERT INTO test_parameters (test_id, parameter_name, unit, ref_range, sort_order, options)
+                        VALUES (?, ?, ?, ?, ?, ?)
+                    """, (bg_id, pname, punit, pref, porder, popts))
+                else:
+                    cur.execute("UPDATE test_parameters SET sort_order = ?, options = ? WHERE id = ?", (porder, popts, p_ex[0]))
+
+        DIRECT_COOMBS_PARAMS = [
+            ("DAT Qualitative Status", None, None, 1, '["Negative", "Positive"]'),
+            ("Reaction Strength", None, None, 2, '["Negative", "Trace", "1+", "2+", "3+", "4+"]'),
+            ("Reagent Specificity", None, None, 3, '["Polyspecific AHG", "Anti-IgG", "Anti-C3d"]'),
+        ]
+        cur.execute("SELECT id FROM tests WHERE LOWER(name) LIKE '%direct coombs%'")
+        for dc_row in cur.fetchall():
+            dc_id = dc_row[0]
+            for pname, punit, pref, porder, popts in DIRECT_COOMBS_PARAMS:
+                cur.execute("SELECT id FROM test_parameters WHERE test_id = ? AND parameter_name = ?", (dc_id, pname))
+                p_ex = cur.fetchone()
+                if not p_ex:
+                    cur.execute("""
+                        INSERT INTO test_parameters (test_id, parameter_name, unit, ref_range, sort_order, options)
+                        VALUES (?, ?, ?, ?, ?, ?)
+                    """, (dc_id, pname, punit, pref, porder, popts))
+                else:
+                    cur.execute("UPDATE test_parameters SET sort_order = ?, options = ? WHERE id = ?", (porder, popts, p_ex[0]))
+
+        INDIRECT_COOMBS_PARAMS = [
+            ("IAT Qualitative Status", None, None, 1, '["Negative", "Positive"]'),
+            ("Screening Cell I", None, None, 2, '["Negative", "Trace", "1+", "2+", "3+", "4+"]'),
+            ("Screening Cell II", None, None, 3, '["Negative", "Trace", "1+", "2+", "3+", "4+"]'),
+            ("Screening Cell III", None, None, 4, '["Negative", "Trace", "1+", "2+", "3+", "4+"]'),
+        ]
+        cur.execute("SELECT id FROM tests WHERE LOWER(name) LIKE '%indirect coombs%'")
+        for ic_row in cur.fetchall():
+            ic_id = ic_row[0]
+            for pname, punit, pref, porder, popts in INDIRECT_COOMBS_PARAMS:
+                cur.execute("SELECT id FROM test_parameters WHERE test_id = ? AND parameter_name = ?", (ic_id, pname))
+                p_ex = cur.fetchone()
+                if not p_ex:
+                    cur.execute("""
+                        INSERT INTO test_parameters (test_id, parameter_name, unit, ref_range, sort_order, options)
+                        VALUES (?, ?, ?, ?, ?, ?)
+                    """, (ic_id, pname, punit, pref, porder, popts))
+                else:
+                    cur.execute("UPDATE test_parameters SET sort_order = ?, options = ? WHERE id = ?", (porder, popts, p_ex[0]))
+
+        conn.commit()
+    except Exception as e:
+        logger.debug(f"Transfusion schema migration error: {e}")
 
 def get_db():
     conn = get_connection()
