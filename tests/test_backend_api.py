@@ -1112,7 +1112,7 @@ def test_hiv_conclusive_algorithm_derivations():
     # 1. Screening Non-Reactive -> Negative
     out1 = derive_hiv_outcome([{"name": "MHS HIV 1/2 Kwiq Test", "result": "Non-Reactive"}])
     assert out1["conclusive_status"] == "Negative"
-    assert "Non-Reactive (Negative)" in out1["display_result"]
+    assert out1["display_result"] == "Negative"
     assert out1["clinical_flag"] is None
 
     # 2. Concordant Reactive (A1+, A2+, A3+) -> Positive
@@ -1122,9 +1122,18 @@ def test_hiv_conclusive_algorithm_derivations():
         {"name": "SD Bioline HIV-1/2", "result": "Reactive"}
     ])
     assert out2["conclusive_status"] == "Positive"
-    assert "Reactive (Positive)" in out2["display_result"]
+    assert out2["display_result"] == "Positive"
     assert out2["clinical_flag"] == "\u26A0"
     assert "CD4" in out2["advisory"]
+
+    # 2b. Screening + Confirmatory Reactive without A3 (A1+, A2+) -> Positive
+    out2b = derive_hiv_outcome([
+        {"name": "MHS HIV 1/2 Kwiq Test", "result": "Reactive"},
+        {"name": "HIV 1/2 Stat-Pak®", "result": "Reactive"}
+    ])
+    assert out2b["conclusive_status"] == "Positive"
+    assert out2b["display_result"] == "Positive"
+    assert out2b["clinical_flag"] == "\u26A0"
 
     # 3. Discordant Resolved Negative (A1+, A2-, A3-) -> Negative
     out3 = derive_hiv_outcome([
@@ -1133,7 +1142,7 @@ def test_hiv_conclusive_algorithm_derivations():
         {"name": "SD Bioline HIV-1/2", "result": "Non-Reactive"}
     ])
     assert out3["conclusive_status"] == "Negative"
-    assert "Resolved Discordance" in out3["display_result"]
+    assert out3["display_result"] == "Negative"
     assert out3["clinical_flag"] is None
 
     # 4. Inconclusive Discrepant (A1+, A2+, A3-) -> Inconclusive
@@ -1143,7 +1152,7 @@ def test_hiv_conclusive_algorithm_derivations():
         {"name": "SD Bioline HIV-1/2", "result": "Non-Reactive"}
     ])
     assert out4["conclusive_status"] == "Inconclusive"
-    assert "Inconclusive" in out4["display_result"]
+    assert out4["display_result"] == "Inconclusive"
     assert out4["clinical_flag"] == "\u26A0"
     assert "14 days" in out4["advisory"]
 
@@ -1154,26 +1163,27 @@ def test_hiv_conclusive_algorithm_derivations():
         {"name": "SD Bioline HIV-1/2", "result": "Reactive"}
     ])
     assert out5["conclusive_status"] == "Inconclusive"
-    assert "Inconclusive" in out5["display_result"]
+    assert out5["display_result"] == "Inconclusive"
     assert out5["clinical_flag"] == "\u26A0"
 
-    # 6. EID PCR Positive
+    # 6. EID PCR Positive (reported independently)
     out6 = derive_hiv_outcome([{"name": "EID 1st PCR (4-6 Weeks)", "result": "Positive (Detected)"}])
     assert out6["conclusive_status"] == "Positive"
-    assert "EID PCR Detected" in out6["display_result"]
+    assert out6["display_result"] == "Positive"
     assert out6["clinical_flag"] == "\u26A0"
 
-    # 7. EID PCR Negative
+    # 7. EID PCR Negative (reported independently)
     out7 = derive_hiv_outcome([{"name": "EID 1st PCR (4-6 Weeks)", "result": "Negative (Not Detected)"}])
     assert out7["conclusive_status"] == "Negative"
-    assert "EID PCR Not Detected" in out7["display_result"]
+    assert out7["display_result"] == "Negative"
     assert out7["clinical_flag"] is None
 
     # 8. HIVST Self-Test Screening
     out8 = derive_hiv_outcome([{"name": "OraQuick® HIV Self-Test", "result": "Reactive"}])
-    assert out8["conclusive_status"] == "Preliminary Positive"
-    assert "Self-Test Screening" in out8["display_result"]
+    assert out8["conclusive_status"] == "Inconclusive"
+    assert out8["display_result"] == "Inconclusive"
     assert out8["clinical_flag"] == "\u26A0"
+
 
 
 def test_health_check_endpoint():

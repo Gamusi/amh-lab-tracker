@@ -138,11 +138,11 @@ PANELS = {
         'Stool Analysis (Macroscopy)', 'Stool Analysis (Microscopy)', 'Stool Occult Blood'
     ],
     'HIV Testing': [
-        'MHS HIV 1/2 Kwiq Test', 'Determine™ HIV-1/2', 'HIV 1/2 Stat-Pak®', 'SD Bioline HIV-1/2',
         'OraQuick® HIV Self-Test', 'Fingerstick HIVST',
-        'EID 1st PCR (4-6 Weeks)', 'EID 2nd PCR (9 Months)', 'EID Final Rapid Test (18 Months)'
+        'MHS HIV 1/2 Kwiq Test', 'Determine™ HIV-1/2', 'HIV 1/2 Stat-Pak®', 'SD Bioline HIV-1/2'
     ]
 }
+
 
 TESTS = [
     {'name': 'Complete Blood Count (CBC)', 'section': 'Hematology', 'is_tracked': 1, 'result_type': 'panel', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': None, 'parent_name': None, 'sort_order': 0, 'clinical_comments': 'Evaluates cellular elements of peripheral blood (erythroid, myeloid, thromboid series). Normal: baseline hematopoiesis. Abnormal: cytopenias indicate marrow suppression/destruction; cytoses indicate reactive/inflammatory or myeloproliferative processes.'},
@@ -266,16 +266,17 @@ TESTS = [
     {'name': 'Stool Analysis (Macroscopy)', 'section': 'Parasitology & Stool Diagnostics', 'is_tracked': 0, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['Formed, No blood/mucus', 'Semi-formed, No blood/mucus', 'Loose', 'Watery', 'Blood present', 'Mucus present', 'Blood and mucus present'], 'parent_name': 'STOOL ANALYSIS', 'sort_order': 1},
     {'name': 'Stool Analysis (Microscopy)', 'section': 'Parasitology & Stool Diagnostics', 'is_tracked': 0, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['No ova, cysts, or trophozoites seen', 'E. histolytica cysts seen', 'E. histolytica trophozoites seen', 'G. lamblia cysts seen', 'G. lamblia trophozoites seen', 'Hookworm ova seen', 'Ascaris lumbricoides ova seen', 'Schistosoma mansoni ova seen', 'Trichuris trichiura ova seen'], 'parent_name': 'STOOL ANALYSIS', 'sort_order': 2},
     {'name': 'Stool Occult Blood', 'section': 'Parasitology & Stool Diagnostics', 'is_tracked': 0, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['Negative', 'Positive'], 'parent_name': 'STOOL ANALYSIS', 'sort_order': 3},
-    {'name': 'MHS HIV 1/2 Kwiq Test', 'section': 'Serology & Clinical Immunology', 'is_tracked': 0, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['Non-Reactive', 'Reactive'], 'parent_name': 'HIV Testing', 'sort_order': 1},
-    {'name': 'Determine™ HIV-1/2', 'section': 'Serology & Clinical Immunology', 'is_tracked': 0, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['Non-Reactive', 'Reactive'], 'parent_name': 'HIV Testing', 'sort_order': 2},
-    {'name': 'HIV 1/2 Stat-Pak®', 'section': 'Serology & Clinical Immunology', 'is_tracked': 0, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['Non-Reactive', 'Reactive'], 'parent_name': 'HIV Testing', 'sort_order': 3},
-    {'name': 'SD Bioline HIV-1/2', 'section': 'Serology & Clinical Immunology', 'is_tracked': 0, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['Non-Reactive', 'Reactive'], 'parent_name': 'HIV Testing', 'sort_order': 4},
-    {'name': 'OraQuick® HIV Self-Test', 'section': 'Serology & Clinical Immunology', 'is_tracked': 0, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['Non-Reactive', 'Reactive'], 'parent_name': 'HIV Testing', 'sort_order': 5},
-    {'name': 'Fingerstick HIVST', 'section': 'Serology & Clinical Immunology', 'is_tracked': 0, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['Non-Reactive', 'Reactive'], 'parent_name': 'HIV Testing', 'sort_order': 6},
-    {'name': 'EID 1st PCR (4-6 Weeks)', 'section': 'Serology & Clinical Immunology', 'is_tracked': 0, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['Negative (Not Detected)', 'Positive (Detected)'], 'parent_name': 'HIV Testing', 'sort_order': 7},
-    {'name': 'EID 2nd PCR (9 Months)', 'section': 'Serology & Clinical Immunology', 'is_tracked': 0, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['Negative (Not Detected)', 'Positive (Detected)'], 'parent_name': 'HIV Testing', 'sort_order': 8},
-    {'name': 'EID Final Rapid Test (18 Months)', 'section': 'Serology & Clinical Immunology', 'is_tracked': 0, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['Non-Reactive', 'Reactive'], 'parent_name': 'HIV Testing', 'sort_order': 9}
+    {'name': 'OraQuick® HIV Self-Test', 'section': 'Serology & Clinical Immunology', 'is_tracked': 0, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['Non-Reactive', 'Reactive'], 'parent_name': 'HIV Testing', 'sort_order': 1},
+    {'name': 'Fingerstick HIVST', 'section': 'Serology & Clinical Immunology', 'is_tracked': 0, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['Non-Reactive', 'Reactive'], 'parent_name': 'HIV Testing', 'sort_order': 2},
+    {'name': 'MHS HIV 1/2 Kwiq Test', 'section': 'Serology & Clinical Immunology', 'is_tracked': 0, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['Non-Reactive', 'Reactive'], 'parent_name': 'HIV Testing', 'sort_order': 3},
+    {'name': 'Determine™ HIV-1/2', 'section': 'Serology & Clinical Immunology', 'is_tracked': 0, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['Non-Reactive', 'Reactive'], 'parent_name': 'HIV Testing', 'sort_order': 4},
+    {'name': 'HIV 1/2 Stat-Pak®', 'section': 'Serology & Clinical Immunology', 'is_tracked': 0, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['Non-Reactive', 'Reactive'], 'parent_name': 'HIV Testing', 'sort_order': 5},
+    {'name': 'SD Bioline HIV-1/2', 'section': 'Serology & Clinical Immunology', 'is_tracked': 0, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['Non-Reactive', 'Reactive'], 'parent_name': 'HIV Testing', 'sort_order': 6},
+    {'name': 'EID 1st PCR (4-6 Weeks)', 'section': 'Serology & Clinical Immunology', 'is_tracked': 0, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['Negative (Not Detected)', 'Positive (Detected)'], 'parent_name': None, 'sort_order': 0, 'clinical_comments': 'First-line molecular PCR for early infant HIV diagnosis at 4-6 weeks.'},
+    {'name': 'EID 2nd PCR (9 Months)', 'section': 'Serology & Clinical Immunology', 'is_tracked': 0, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['Negative (Not Detected)', 'Positive (Detected)'], 'parent_name': None, 'sort_order': 0, 'clinical_comments': 'Second-line molecular PCR for early infant HIV diagnosis at 9 months.'},
+    {'name': 'EID Final Rapid Test (18 Months)', 'section': 'Serology & Clinical Immunology', 'is_tracked': 0, 'result_type': 'options', 'default_unit': None, 'secondary_unit': None, 'ref_range': None, 'options': ['Non-Reactive', 'Reactive'], 'parent_name': None, 'sort_order': 0, 'clinical_comments': 'Final rapid exit test for early infant diagnosis after maternal antibody clearance at 18 months.'}
 ]
+
 
 DEFAULT_REFERENCE_RANGES = [
     # CBC / Hematology
@@ -565,10 +566,12 @@ def seed_database(conn=None):
 
     conn.commit()
 
-    # Clean legacy short-named parameters under HIV Testing if any
+    # Clean legacy short-named parameters and decouple EID from HIV Testing if any
     hiv_parent_id = test_id_map.get("HIV Testing")
     if hiv_parent_id:
         cur.execute("DELETE FROM test_parameters WHERE test_id = ? AND parameter_name IN ('Determine', 'Stat-Pak', 'SD Bioline')", (hiv_parent_id,))
+        cur.execute("DELETE FROM test_parameters WHERE test_id = ? AND parameter_name LIKE 'EID %'", (hiv_parent_id,))
+        cur.execute("UPDATE tests SET parent_rollup_id = NULL WHERE name LIKE 'EID %'")
 
     for t in TESTS:
         if not t.get("parent_name"):

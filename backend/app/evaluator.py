@@ -342,7 +342,7 @@ def derive_hiv_outcome(kit_results: list | dict) -> dict:
             return False
         return any(x in v for x in ("non-reactive", "non reactive", "negative", "not detected"))
 
-    # 1. Check EID Molecular PCR protocols
+    # 1. Check EID Molecular PCR protocols (if passed directly)
     eid_keys = [k for k in kit_map if "pcr" in k or "eid" in k]
     if eid_keys:
         eid_pos = any(is_pos_or_react(kit_map[k]) for k in eid_keys)
@@ -350,17 +350,17 @@ def derive_hiv_outcome(kit_results: list | dict) -> dict:
         if eid_pos:
             return {
                 "conclusive_status": "Positive",
-                "display_result": "HIV-Positive (EID PCR Detected)",
+                "display_result": "Positive",
                 "clinical_flag": "\u26A0",
-                "reference": "Negative (Not Detected)",
+                "reference": "Negative",
                 "advisory": "Infant HIV DNA/RNA detected. Immediate pediatric ART referral recommended."
             }
         elif eid_neg:
             return {
                 "conclusive_status": "Negative",
-                "display_result": "HIV-Negative (EID PCR Not Detected)",
+                "display_result": "Negative",
                 "clinical_flag": None,
-                "reference": "Negative (Not Detected)",
+                "reference": "Negative",
                 "advisory": "No infant HIV DNA/RNA detected on current PCR run."
             }
 
@@ -371,18 +371,18 @@ def derive_hiv_outcome(kit_results: list | dict) -> dict:
     if hivst_keys and not any(is_pos_or_react(kit_map[k]) or is_neg_or_non_react(kit_map[k]) for k in rdt_keys):
         if any(is_pos_or_react(kit_map[k]) for k in hivst_keys):
             return {
-                "conclusive_status": "Preliminary Positive",
-                "display_result": "Preliminary Positive (Self-Test Screening)",
+                "conclusive_status": "Inconclusive",
+                "display_result": "Inconclusive",
                 "clinical_flag": "\u26A0",
-                "reference": "Non-Reactive",
+                "reference": "Negative",
                 "advisory": "Self-test is screening only. Must undergo full 3-test clinical algorithm before ART."
             }
         elif any(is_neg_or_non_react(kit_map[k]) for k in hivst_keys):
             return {
                 "conclusive_status": "Negative",
-                "display_result": "Non-Reactive (Negative Self-Test)",
+                "display_result": "Negative",
                 "clinical_flag": None,
-                "reference": "Non-Reactive",
+                "reference": "Negative",
                 "advisory": "Routine prevention counseling recommended."
             }
 
@@ -413,17 +413,17 @@ def derive_hiv_outcome(kit_results: list | dict) -> dict:
         if any(is_pos_or_react(v) for v in raw_vals):
             return {
                 "conclusive_status": "Positive",
-                "display_result": "Reactive (Positive)",
+                "display_result": "Positive",
                 "clinical_flag": "\u26A0",
-                "reference": "Non-Reactive",
+                "reference": "Negative",
                 "advisory": "Reactive antibody finding."
             }
         else:
             return {
                 "conclusive_status": "Negative",
-                "display_result": "Non-Reactive (Negative)",
+                "display_result": "Negative",
                 "clinical_flag": None,
-                "reference": "Non-Reactive",
+                "reference": "Negative",
                 "advisory": "Routine prevention counseling recommended."
             }
 
@@ -435,9 +435,9 @@ def derive_hiv_outcome(kit_results: list | dict) -> dict:
     if a1_val and not a1_pos:
         return {
             "conclusive_status": "Negative",
-            "display_result": "Non-Reactive (Negative)",
+            "display_result": "Negative",
             "clinical_flag": None,
-            "reference": "Non-Reactive",
+            "reference": "Negative",
             "advisory": "Screening test non-reactive. Routine prevention counseling recommended."
         }
 
@@ -450,27 +450,27 @@ def derive_hiv_outcome(kit_results: list | dict) -> dict:
                         # Concordant Positive: A1+, A2+, A3+
                         return {
                             "conclusive_status": "Positive",
-                            "display_result": "Reactive (Positive)",
+                            "display_result": "Positive",
                             "clinical_flag": "\u26A0",
-                            "reference": "Non-Reactive",
+                            "reference": "Negative",
                             "advisory": "Concordant 3-test reactive. Refer to ART clinic for baseline CD4/VL."
                         }
                     else:
                         # Inconclusive: A1+, A2+, A3-
                         return {
                             "conclusive_status": "Inconclusive",
-                            "display_result": "Inconclusive (Discordant)",
+                            "display_result": "Inconclusive",
                             "clinical_flag": "\u26A0",
-                            "reference": "Non-Reactive",
+                            "reference": "Negative",
                             "advisory": "Discrepant antibody pattern. Do NOT initiate ART. Repeat blood draw in 14 days."
                         }
                 else:
-                    # A1+ and A2+ entered, A3 pending
+                    # A1+ and A2+ entered, A3 pending / not done
                     return {
                         "conclusive_status": "Positive",
-                        "display_result": "Reactive (A1+/A2+ Confirmed)",
+                        "display_result": "Positive",
                         "clinical_flag": "\u26A0",
-                        "reference": "Non-Reactive",
+                        "reference": "Negative",
                         "advisory": "Concordant reactive screening and confirmatory tests."
                     }
             else:
@@ -480,37 +480,38 @@ def derive_hiv_outcome(kit_results: list | dict) -> dict:
                         # Discordant resolved negative: A1+, A2-, A3-
                         return {
                             "conclusive_status": "Negative",
-                            "display_result": "Non-Reactive (Resolved Discordance)",
+                            "display_result": "Negative",
                             "clinical_flag": None,
-                            "reference": "Non-Reactive",
+                            "reference": "Negative",
                             "advisory": "Discordance resolved negative (A2 & A3 non-reactive)."
                         }
                     else:
                         # Inconclusive: A1+, A2-, A3+
                         return {
                             "conclusive_status": "Inconclusive",
-                            "display_result": "Inconclusive (Discordant)",
+                            "display_result": "Inconclusive",
                             "clinical_flag": "\u26A0",
-                            "reference": "Non-Reactive",
+                            "reference": "Negative",
                             "advisory": "Discrepant antibody pattern (Stat-Pak negative). Repeat blood draw in 14 days."
                         }
                 else:
                     # A1+ and A2-, A3 pending
                     return {
                         "conclusive_status": "Inconclusive",
-                        "display_result": "Discordant (A3 Tie-Breaker Required)",
+                        "display_result": "Inconclusive",
                         "clinical_flag": "\u26A0",
-                        "reference": "Non-Reactive",
+                        "reference": "Negative",
                         "advisory": "Discordant screening/confirmation. Perform tie-breaker test (SD Bioline / Uni-Gold)."
                     }
 
     return {
         "conclusive_status": "Negative",
-        "display_result": "Non-Reactive (Negative)",
+        "display_result": "Negative",
         "clinical_flag": None,
-        "reference": "Non-Reactive",
+        "reference": "Negative",
         "advisory": "Routine prevention counseling recommended."
     }
+
 
 
 

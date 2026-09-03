@@ -232,7 +232,25 @@ def _build_department_table(dept_name: str, tests: list, compact: bool = False) 
             style_cmds.append(('BACKGROUND', (0, panel_row_idx), (-1, panel_row_idx), colors.HexColor('#f8fafc')))
             style_cmds.append(('SPAN', (0, panel_row_idx), (-1, panel_row_idx)))
 
-            for p in params:
+            if "hiv" in panel_name.lower():
+                def _hiv_sort_key(p):
+                    pname = str(p.get("name") or p.get("parameter_name") or "").lower()
+                    if any(k in pname for k in ("oraquick", "self-test", "hivst")):
+                        return 1
+                    if any(k in pname for k in ("kwiq", "determine")):
+                        return 2
+                    if any(k in pname for k in ("stat-pak", "statpak")):
+                        return 3
+                    if any(k in pname for k in ("bioline", "uni-gold")):
+                        return 4
+                    return p.get("sort_order") if p.get("sort_order") is not None else 99
+                # Filter out EID tests from HIV rapid algorithm panel (they are reported independently)
+                display_params = [p for p in params if not any(x in str(p.get("name") or p.get("parameter_name") or "").lower() for x in ("eid", "pcr"))]
+                display_params = sorted(display_params, key=_hiv_sort_key)
+            else:
+                display_params = sorted(params, key=lambda p: (p.get("sort_order") if p.get("sort_order") is not None else 999))
+
+            for p in display_params:
                 p_name = str(p.get("name") or p.get("parameter_name") or "")
                 p_res = str(p.get("result") if p.get("result") is not None else p.get("result_value", ""))
                 p_unit = str(p.get("unit") or "")
@@ -286,8 +304,8 @@ def _build_department_table(dept_name: str, tests: list, compact: bool = False) 
                         flag_cell
                     ])
 
-            if "hiv" in panel_name.lower() and params:
-                hiv_derived = evaluator.derive_hiv_outcome(params)
+            if "hiv" in panel_name.lower() and display_params:
+                hiv_derived = evaluator.derive_hiv_outcome(display_params)
                 h_flag = hiv_derived.get("clinical_flag")
                 if h_flag:
                     if FONT_SYMBOL != 'Helvetica':
@@ -304,14 +322,14 @@ def _build_department_table(dept_name: str, tests: list, compact: bool = False) 
                         h_res_para,
                         Paragraph("", unit_style),
                         h_flag_cell,
-                        Paragraph(hiv_derived.get("reference") or "Non-Reactive", ref_style)
+                        Paragraph(hiv_derived.get("reference") or "Negative", ref_style)
                     ])
                 elif layout_mode == 'NO_UNIT':
                     data.append([
                         Paragraph("<b>Final HIV Interpretation:</b>", param_title_style),
                         h_res_para,
                         h_flag_cell,
-                        Paragraph(hiv_derived.get("reference") or "Non-Reactive", ref_style)
+                        Paragraph(hiv_derived.get("reference") or "Negative", ref_style)
                     ])
                 else:
                     data.append([
@@ -321,6 +339,7 @@ def _build_department_table(dept_name: str, tests: list, compact: bool = False) 
                     ])
                 summary_row_idx = len(data) - 1
                 style_cmds.append(('BACKGROUND', (0, summary_row_idx), (-1, summary_row_idx), colors.HexColor('#f1f5f9')))
+
 
                 if hiv_derived.get("advisory"):
                     adv_row_idx = len(data)

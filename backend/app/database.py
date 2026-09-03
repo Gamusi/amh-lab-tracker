@@ -393,9 +393,18 @@ def init_db():
     cursor.execute("UPDATE clients SET full_name = UPPER(TRIM(full_name)) WHERE full_name IS NOT NULL AND full_name != UPPER(TRIM(full_name))")
     cursor.execute("UPDATE clinicians SET name = UPPER(TRIM(name)) WHERE name IS NOT NULL AND name != UPPER(TRIM(name))")
     cursor.execute("UPDATE users SET full_name = UPPER(TRIM(full_name)) WHERE full_name IS NOT NULL AND full_name != UPPER(TRIM(full_name))")
+    # Deduplicate wards case-insensitively before uppercase normalization
+    cursor.execute("""
+        DELETE FROM wards
+        WHERE id NOT IN (
+            SELECT MIN(id) FROM wards GROUP BY UPPER(TRIM(name))
+        )
+    """)
     cursor.execute("UPDATE wards SET name = UPPER(TRIM(name)) WHERE name IS NOT NULL AND name != UPPER(TRIM(name))")
     cursor.execute("UPDATE visits SET ward_of_origin = UPPER(TRIM(ward_of_origin)) WHERE ward_of_origin IS NOT NULL AND ward_of_origin != UPPER(TRIM(ward_of_origin))")
     conn.commit()
+
+
 
     # Ensure standardized test names
     cursor.execute("UPDATE tests SET name = 'ZN Staining For AFBs' WHERE name LIKE 'ZN FOR AFBs%' OR name LIKE 'ZN Staining%'")
@@ -499,23 +508,22 @@ def init_db():
                     WHERE id = ?
                 """, (punit, pref, porder, popts, existing_p[0]))
 
-    # Pre-seed HIV test parameters
+    # Pre-seed HIV test parameters (Ordered: Self-tests -> Screening -> Confirmatory -> Tie-breaker)
     HIV_PARAMS = [
-        ("MHS HIV 1/2 Kwiq Test", None, None, 1, '["Non-Reactive", "Reactive"]'),
-        ("Determine™ HIV-1/2", None, None, 2, '["Non-Reactive", "Reactive"]'),
-        ("HIV 1/2 Stat-Pak®", None, None, 3, '["Non-Reactive", "Reactive"]'),
-        ("SD Bioline HIV-1/2", None, None, 4, '["Non-Reactive", "Reactive"]'),
-        ("OraQuick® HIV Self-Test", None, None, 5, '["Non-Reactive", "Reactive"]'),
-        ("Fingerstick HIVST", None, None, 6, '["Non-Reactive", "Reactive"]'),
-        ("EID 1st PCR (4-6 Weeks)", None, None, 7, '["Negative (Not Detected)", "Positive (Detected)"]'),
-        ("EID 2nd PCR (9 Months)", None, None, 8, '["Negative (Not Detected)", "Positive (Detected)"]'),
-        ("EID Final Rapid Test (18 Months)", None, None, 9, '["Non-Reactive", "Reactive"]'),
+        ("OraQuick® HIV Self-Test", None, None, 1, '["Non-Reactive", "Reactive"]'),
+        ("Fingerstick HIVST", None, None, 2, '["Non-Reactive", "Reactive"]'),
+        ("MHS HIV 1/2 Kwiq Test", None, None, 3, '["Non-Reactive", "Reactive"]'),
+        ("Determine™ HIV-1/2", None, None, 4, '["Non-Reactive", "Reactive"]'),
+        ("HIV 1/2 Stat-Pak®", None, None, 5, '["Non-Reactive", "Reactive"]'),
+        ("SD Bioline HIV-1/2", None, None, 6, '["Non-Reactive", "Reactive"]'),
     ]
     cursor.execute("UPDATE tests SET name = 'HIV Testing' WHERE name IN ('HIV (MoH Three-Test Algorithm)', 'HIV Testing Service')")
     cursor.execute("SELECT id FROM tests WHERE name IN ('HIV Testing', 'HIV Testing Service')")
     for hiv_row in cursor.fetchall():
         hiv_id = hiv_row[0]
         cursor.execute("DELETE FROM test_parameters WHERE test_id = ? AND parameter_name IN ('Determine', 'Stat-Pak', 'SD Bioline')", (hiv_id,))
+        # Decouple EID tests from the HIV rapid antibody algorithm panel
+        cursor.execute("DELETE FROM test_parameters WHERE test_id = ? AND parameter_name LIKE 'EID %'", (hiv_id,))
         for pname, punit, pref, porder, popts in HIV_PARAMS:
             cursor.execute("SELECT id FROM test_parameters WHERE test_id = ? AND parameter_name = ?", (hiv_id, pname))
             existing_p = cursor.fetchone()
@@ -530,6 +538,24 @@ def init_db():
                     SET unit = ?, ref_range = ?, sort_order = ?, options = ?
                     WHERE id = ?
                 """, (punit, pref, porder, popts, existing_p[0]))
+
+    # Ensure EID tests exist as independent tests in Serology section
+    cursor.execute("SELECT id FROM sections WHERE name = 'Serology & Clinical Immunology'")
+    serology_sec = cursor.fetchone()
+    if serology_sec:
+        ser_sec_id = serology_sec[0]
+        EID_STANDALONE = [
+            ("EID 1st PCR (4-6 Weeks)", '["Negative (Not Detected)", "Positive (Detected)"]'),
+            ("EID 2nd PCR (9 Months)", '["Negative (Not Detected)", "Positive (Detected)"]'),
+            ("EID Final Rapid Test (18 Months)", '["Non-Reactive", "Reactive"]')
+        ]
+        for ename, eopts in EID_STANDALONE:
+            cursor.execute("SELECT id FROM tests WHERE name = ?", (ename,))
+            if not cursor.fetchone():
+                cursor.execute("""
+                    INSERT INTO tests (name, section_id, is_tracked, result_type, options, is_active)
+                    VALUES (?, ?, 0, 'options', ?, 1)
+                """, (ename, ser_sec_id, eopts))
 
     # Pre-seed WIDAL test parameters
     WIDAL_PARAMS = [

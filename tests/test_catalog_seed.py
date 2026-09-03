@@ -115,8 +115,15 @@ def test_hiv_testing_catalog_seeding(db_connection):
     assert "HIV 1/2 Stat-Pak®" in params or "Stat-Pak" in params
     assert "SD Bioline HIV-1/2" in params or "SD Bioline" in params
     assert any("OraQuick" in p for p in params)
-    assert any("1st PCR" in p for p in params)
-    assert len(params) == 9
+    assert len(params) == 6
+
+    # Verify EID tests are independent tests, not part of the algorithm
+    cur.execute("SELECT name FROM tests WHERE name LIKE 'EID %' AND parent_rollup_id IS NULL")
+    eid_tests = [r[0] for r in cur.fetchall()]
+    assert "EID 1st PCR (4-6 Weeks)" in eid_tests
+    assert "EID 2nd PCR (9 Months)" in eid_tests
+    assert "EID Final Rapid Test (18 Months)" in eid_tests
+
 
 
 def test_widal_structured_antigen_parameters(db_connection):
