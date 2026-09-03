@@ -4108,6 +4108,13 @@ const app = {
     const paramsContainer = document.getElementById('result-entry-params-container');
     const trackGroup = document.getElementById('result-entry-tracked-group');
     if (trackGroup) trackGroup.style.display = 'none';
+
+    const submitBtn = document.getElementById('result-entry-submit-btn');
+    if (submitBtn) {
+      submitBtn.style.display = 'inline-block';
+      submitBtn.textContent = 'Save Result';
+      submitBtn.onclick = null;
+    }
     
     paramsContainer.style.display = 'none';
     singleContainer.style.display = 'block';
@@ -4116,7 +4123,308 @@ const app = {
     const test = (this.testCatalog || []).find(t => t.id === testId) || {};
     
     // Tailored Forms
-    if (nameLower.includes('urinalysis')) {
+    if (nameLower.indexOf('cross-matching') !== -1 || nameLower.indexOf('compatibility testing') !== -1) {
+       singleContainer.style.display = 'none';
+       paramsContainer.style.display = 'block';
+       if (submitBtn) {
+         submitBtn.textContent = 'Close';
+         var selfApp = this;
+         submitBtn.onclick = function(ev) {
+           ev.preventDefault();
+           selfApp.closeModal('result-entry-modal');
+         };
+       }
+
+       var selfApp = this;
+       function loadCrossmatchUnits() {
+         fetch('/api/clients/orders/' + orderId + '/crossmatches')
+           .then(function(res) { return res.json(); })
+           .then(function(units) {
+             var listContainer = document.getElementById('crossmatch-units-list');
+             if (!listContainer) return;
+             if (!units || units.length === 0) {
+               listContainer.innerHTML = '<div style="padding:10px; background:#f8fafc; border:1px dashed #cbd5e1; border-radius:4px; text-align:center; color:#64748b; font-size:0.85rem;">No donor units recorded yet for this order.</div>';
+               return;
+             }
+             var uHtml = '<table style="width:100%; border-collapse:collapse; font-size:0.82rem; margin-top:4px;">' +
+               '<thead><tr style="background:#f1f5f9; text-align:left; border-bottom:1px solid #cbd5e1;">' +
+               '<th style="padding:6px;">Unit Barcode</th>' +
+               '<th style="padding:6px;">Group</th>' +
+               '<th style="padding:6px;">Product</th>' +
+               '<th style="padding:6px;">Expiry</th>' +
+               '<th style="padding:6px;">Compatibility</th>' +
+               '<th style="padding:6px; text-align:right;">Actions</th>' +
+               '</tr></thead><tbody>';
+             units.forEach(function(u) {
+               var isCompat = u.compatibility_status === 'COMPATIBLE';
+               var badgeColor = isCompat ? '#15803d' : '#b91c1c';
+               var badgeBg = isCompat ? '#dcfce7' : '#fee2e2';
+               uHtml += '<tr style="border-bottom:1px solid #e2e8f0;">' +
+                 '<td style="padding:6px; font-weight:600;">' + selfApp.escape(u.donor_unit_id) + '</td>' +
+                 '<td style="padding:6px;">' + selfApp.escape(u.donor_blood_group) + '</td>' +
+                 '<td style="padding:6px;">' + selfApp.escape(u.product_type) + '</td>' +
+                 '<td style="padding:6px;">' + selfApp.escape(u.expiry_date) + '</td>' +
+                 '<td style="padding:6px;"><span style="padding:2px 6px; border-radius:3px; font-weight:600; font-size:0.75rem; color:' + badgeColor + '; background:' + badgeBg + ';">' + selfApp.escape(u.compatibility_status) + '</span></td>' +
+                 '<td style="padding:6px; text-align:right; white-space:nowrap;">';
+               if (isCompat) {
+                 uHtml += '<button type="button" class="btn btn-sm btn-outline-primary print-label-btn" data-cm-id="' + u.id + '" style="padding:2px 8px; font-size:0.75rem; margin-right:4px;">Print Label</button>';
+               }
+               uHtml += '<button type="button" class="btn btn-sm btn-outline-danger delete-cm-btn" data-cm-id="' + u.id + '" style="padding:2px 8px; font-size:0.75rem;">Delete</button>';
+               uHtml += '</td></tr>';
+             });
+             uHtml += '</tbody></table>';
+             listContainer.innerHTML = uHtml;
+
+             listContainer.querySelectorAll('.print-label-btn').forEach(function(btn) {
+               btn.onclick = function() {
+                 var cmId = btn.getAttribute('data-cm-id');
+                 window.open('/api/reports/crossmatch/' + cmId + '/bag-label', '_blank');
+               };
+             });
+
+             listContainer.querySelectorAll('.delete-cm-btn').forEach(function(btn) {
+               btn.onclick = function() {
+                 var cmId = btn.getAttribute('data-cm-id');
+                 if (confirm('Delete this donor crossmatch record?')) {
+                   fetch('/api/clients/crossmatches/' + cmId, { method: 'DELETE' })
+                     .then(function(r) { return r.json(); })
+                     .then(function(res) {
+                       if (res.status === 'deleted') {
+                         loadCrossmatchUnits();
+                         if (selfApp.loadVisits) selfApp.loadVisits();
+                       } else {
+                         selfApp.showNotificationModal('Error', res.detail || 'Could not delete crossmatch.', true);
+                       }
+                     })
+                     .catch(function(err) {
+                       selfApp.showNotificationModal('Error', 'Failed to delete: ' + err.message, true);
+                     });
+                 }
+               };
+             });
+           });
+       }
+
+       var cmHtml = '<div style="display:flex; flex-direction:column; gap:16px;">' +
+         '<div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; padding:12px;">' +
+           '<h5 style="margin:0 0 6px 0; color:var(--primary-color); font-size:0.95rem;">Cross-Matched Donor Units</h5>' +
+           '<div id="crossmatch-units-list"><div style="padding:10px; text-align:center; color:#64748b; font-size:0.85rem;">Loading recorded units...</div></div>' +
+         '</div>' +
+         '<div style="background:#fff; border:1px solid #cbd5e1; border-radius:6px; padding:12px;">' +
+           '<h5 style="margin:0 0 10px 0; color:var(--primary-color); font-size:0.95rem;">Add New Donor Unit Cross-Match</h5>' +
+           '<div style="display:grid; grid-template-columns:1fr 1fr; gap:10px 14px;">' +
+             '<div>' +
+               '<label style="font-size:0.8rem; font-weight:600; display:block; margin-bottom:3px;">Donor Unit Barcode / ID:</label>' +
+               '<input type="text" id="cm-donor-unit-id" placeholder="e.g. UG-BTS-2026-98715" style="width:100%; padding:6px 8px; border:1px solid var(--border-color); border-radius:4px; font-size:0.85rem; text-transform:uppercase;">' +
+             '</div>' +
+             '<div>' +
+               '<label style="font-size:0.8rem; font-weight:600; display:block; margin-bottom:3px;">Donor Blood Group:</label>' +
+               '<select id="cm-donor-group" style="width:100%; padding:6px 8px; border:1px solid var(--border-color); border-radius:4px; font-size:0.85rem;">' +
+                 '<option value="O Rh(D) Positive">O Rh(D) Positive</option>' +
+                 '<option value="O Rh(D) Negative">O Rh(D) Negative</option>' +
+                 '<option value="A Rh(D) Positive">A Rh(D) Positive</option>' +
+                 '<option value="A Rh(D) Negative">A Rh(D) Negative</option>' +
+                 '<option value="B Rh(D) Positive">B Rh(D) Positive</option>' +
+                 '<option value="B Rh(D) Negative">B Rh(D) Negative</option>' +
+                 '<option value="AB Rh(D) Positive">AB Rh(D) Positive</option>' +
+                 '<option value="AB Rh(D) Negative">AB Rh(D) Negative</option>' +
+               '</select>' +
+             '</div>' +
+             '<div>' +
+               '<label style="font-size:0.8rem; font-weight:600; display:block; margin-bottom:3px;">Product Type:</label>' +
+               '<select id="cm-product-type" style="width:100%; padding:6px 8px; border:1px solid var(--border-color); border-radius:4px; font-size:0.85rem;">' +
+                 '<option value="Packed Red Blood Cells (PRBC)">Packed Red Blood Cells (PRBC)</option>' +
+                 '<option value="Whole Blood">Whole Blood</option>' +
+                 '<option value="Fresh Frozen Plasma (FFP)">Fresh Frozen Plasma (FFP)</option>' +
+                 '<option value="Platelets (Platelet Concentrate)">Platelets (Platelet Concentrate)</option>' +
+               '</select>' +
+             '</div>' +
+             '<div>' +
+               '<label style="font-size:0.8rem; font-weight:600; display:block; margin-bottom:3px;">Unit Expiry Date:</label>' +
+               '<input type="date" id="cm-expiry-date" style="width:100%; padding:6px 8px; border:1px solid var(--border-color); border-radius:4px; font-size:0.85rem;">' +
+             '</div>' +
+           '</div>' +
+           '<div style="margin-top:12px; padding-top:10px; border-top:1px dashed #cbd5e1;">' +
+             '<label style="font-size:0.8rem; font-weight:600; color:var(--text-dark); display:block; margin-bottom:6px;">Multi-Phase Agglutination Results:</label>' +
+             '<div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px;">' +
+               '<div>' +
+                 '<span style="font-size:0.75rem; color:#64748b; display:block;">Phase 1: Immediate Spin</span>' +
+                 '<select id="cm-phase-is" style="width:100%; padding:5px 6px; border:1px solid var(--border-color); border-radius:4px; font-size:0.82rem;">' +
+                   '<option value="Negative">Negative</option><option value="Trace">Trace</option><option value="1+">1+</option><option value="2+">2+</option><option value="3+">3+</option><option value="4+">4+</option>' +
+                 '</select>' +
+               '</div>' +
+               '<div>' +
+                 '<span style="font-size:0.75rem; color:#64748b; display:block;">Phase 2: 37C Thermophase</span>' +
+                 '<select id="cm-phase-thermo" style="width:100%; padding:5px 6px; border:1px solid var(--border-color); border-radius:4px; font-size:0.82rem;">' +
+                   '<option value="Negative">Negative</option><option value="Trace">Trace</option><option value="1+">1+</option><option value="2+">2+</option><option value="3+">3+</option><option value="4+">4+</option>' +
+                 '</select>' +
+               '</div>' +
+               '<div>' +
+                 '<span style="font-size:0.75rem; color:#64748b; display:block;">Phase 3: AHG / Coombs</span>' +
+                 '<select id="cm-phase-ahg" style="width:100%; padding:5px 6px; border:1px solid var(--border-color); border-radius:4px; font-size:0.82rem;">' +
+                   '<option value="Negative">Negative</option><option value="Trace">Trace</option><option value="1+">1+</option><option value="2+">2+</option><option value="3+">3+</option><option value="4+">4+</option>' +
+                 '</select>' +
+               '</div>' +
+             '</div>' +
+           '</div>' +
+           '<div style="margin-top:14px; text-align:right;">' +
+             '<button type="button" id="cm-submit-unit-btn" class="btn btn-primary" style="padding:6px 14px; font-size:0.85rem;">Record & Verify Donor Unit</button>' +
+           '</div>' +
+         '</div>' +
+       '</div>';
+
+       paramsContainer.innerHTML = cmHtml;
+       loadCrossmatchUnits();
+
+       var recordBtn = document.getElementById('cm-submit-unit-btn');
+       if (recordBtn) {
+         recordBtn.onclick = function() {
+           var unitId = (document.getElementById('cm-donor-unit-id').value || '').trim().toUpperCase();
+           var dGroup = document.getElementById('cm-donor-group').value;
+           var pType = document.getElementById('cm-product-type').value;
+           var expDate = document.getElementById('cm-expiry-date').value;
+           var pIs = document.getElementById('cm-phase-is').value;
+           var pTh = document.getElementById('cm-phase-thermo').value;
+           var pAhg = document.getElementById('cm-phase-ahg').value;
+
+           if (!unitId) {
+             selfApp.showNotificationModal('Validation Error', 'Donor Unit Barcode / ID is required.', true);
+             return;
+           }
+           if (!expDate) {
+             selfApp.showNotificationModal('Validation Error', 'Unit Expiry Date is required.', true);
+             return;
+           }
+
+           fetch('/api/clients/orders/' + orderId + '/crossmatch', {
+             method: 'POST',
+             headers: { 'Content-Type': 'application/json' },
+             body: JSON.stringify({
+               donor_unit_id: unitId,
+               donor_blood_group: dGroup,
+               product_type: pType,
+               expiry_date: expDate,
+               phase_is: pIs,
+               phase_thermophase: pTh,
+               phase_ahg: pAhg
+             })
+           })
+           .then(function(res) {
+             return res.json().then(function(data) {
+               if (!res.ok) {
+                 throw new Error(data.detail || 'Cross-match failed.');
+               }
+               return data;
+             });
+           })
+           .then(function(data) {
+             var msg = 'Donor unit ' + data.donor_unit_id + ' recorded as ' + data.compatibility_status + ' (' + data.release_status + ').';
+             selfApp.showNotificationModal('Cross-Match Recorded', msg, data.compatibility_status === 'INCOMPATIBLE');
+             document.getElementById('cm-donor-unit-id').value = '';
+             loadCrossmatchUnits();
+             if (selfApp.loadVisits) selfApp.loadVisits();
+           })
+           .catch(function(err) {
+             selfApp.showNotificationModal('Compatibility Safety Block', err.message, true);
+           });
+         };
+       }
+    } else if (nameLower.indexOf('blood group') !== -1) {
+       singleContainer.style.display = 'none';
+       paramsContainer.style.display = 'block';
+       var bgParamRes = yield fetch('/api/config/tests/' + testId + '/parameters');
+       var bgParams = [];
+       if (bgParamRes.ok) {
+         bgParams = yield bgParamRes.json();
+       }
+       bgParams.sort(function(a, b) { return (a.sort_order || 0) - (b.sort_order || 0); });
+
+       var selfApp = this;
+       var bgHtml = '<div style="margin-bottom: 14px;">' +
+         '<h5 style="margin: 0 0 10px 0; padding-bottom: 4px; border-bottom: 1px solid var(--border-color); color: var(--primary-color);">Forward Typing (Direct Cell Agglutination)</h5>' +
+         '<div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px;">';
+       
+       var fwdParams = bgParams.filter(function(p) { return (p.parameter_name || '').indexOf('Forward') !== -1; });
+       var revParams = bgParams.filter(function(p) { return (p.parameter_name || '').indexOf('Reverse') !== -1; });
+       var cbgParam = bgParams.find(function(p) { return (p.parameter_name || '').indexOf('Consolidated') !== -1; });
+
+       fwdParams.forEach(function(p) {
+         bgHtml += '<div class="modal-param-row" data-param-id="' + p.id + '" data-param-name="' + selfApp.escape(p.parameter_name) + '" style="display:flex; flex-direction:column; gap:4px;">' +
+           '<label style="font-size:0.8rem; font-weight:600;">' + selfApp.escape(p.parameter_name) + '</label>' +
+           '<select class="modal-param-val bg-eval-trigger" style="width:100%; padding:6px 8px; border:1px solid var(--border-color); border-radius:4px; font-size:0.85rem;">' +
+             '<option value="No Agglutination (-)">No Agglutination (-)</option>' +
+             '<option value="Agglutination (+)">Agglutination (+)</option>' +
+           '</select>' +
+         '</div>';
+       });
+       bgHtml += '</div></div>';
+
+       bgHtml += '<div style="margin-bottom: 14px;">' +
+         '<h5 style="margin: 0 0 10px 0; padding-bottom: 4px; border-bottom: 1px solid var(--border-color); color: var(--primary-color);">Reverse Typing (Serum/Plasma Confirmation)</h5>' +
+         '<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">';
+       
+       revParams.forEach(function(p) {
+         bgHtml += '<div class="modal-param-row" data-param-id="' + p.id + '" data-param-name="' + selfApp.escape(p.parameter_name) + '" style="display:flex; flex-direction:column; gap:4px;">' +
+           '<label style="font-size:0.8rem; font-weight:600;">' + selfApp.escape(p.parameter_name) + '</label>' +
+           '<select class="modal-param-val bg-eval-trigger" style="width:100%; padding:6px 8px; border:1px solid var(--border-color); border-radius:4px; font-size:0.85rem;">' +
+             '<option value="No Agglutination (-)">No Agglutination (-)</option>' +
+             '<option value="Agglutination (+)">Agglutination (+)</option>' +
+           '</select>' +
+         '</div>';
+       });
+       bgHtml += '</div></div>';
+
+       if (cbgParam) {
+         bgHtml += '<div style="background:#f8fafc; border:1px solid #cbd5e1; border-radius:6px; padding:10px; margin-top:8px;" class="modal-param-row" data-param-id="' + cbgParam.id + '" data-param-name="' + selfApp.escape(cbgParam.parameter_name) + '">' +
+           '<label style="font-size:0.82rem; font-weight:700; color:var(--text-dark); display:block; margin-bottom:4px;">Consolidated Concordant Blood Group:</label>' +
+           '<input type="text" id="bg-consolidated-val" class="modal-param-val" readonly style="width:100%; padding:6px 10px; font-weight:700; font-size:0.9rem; background:#fff; border:1px solid #94a3b8; border-radius:4px;" value="O Rh(D) Negative">' +
+           '<div id="bg-discordance-alert" style="display:none; margin-top:6px; padding:6px 10px; background:#fef2f2; border:1px solid #f87171; border-radius:4px; color:#b91c1c; font-size:0.8rem; font-weight:600;">Grouping Discrepancy detected between forward and reverse typing. Unit release blocked.</div>' +
+         '</div>';
+       }
+       paramsContainer.innerHTML = bgHtml;
+
+       function updateBgEval() {
+         var antiA = '', antiB = '', antiD = '', a1 = '', bCells = '';
+         paramsContainer.querySelectorAll('.modal-param-row').forEach(function(row) {
+           var pn = row.getAttribute('data-param-name') || '';
+           var val = (row.querySelector('.modal-param-val') ? row.querySelector('.modal-param-val').value : '') || '';
+           if (pn.indexOf('Anti-A') !== -1) antiA = val;
+           if (pn.indexOf('Anti-B') !== -1) antiB = val;
+           if (pn.indexOf('Anti-D') !== -1) antiD = val;
+           if (pn.indexOf('A1-cells') !== -1) a1 = val;
+           if (pn.indexOf('B-cells') !== -1) bCells = val;
+         });
+
+         var posA = antiA.indexOf('+') !== -1;
+         var posB = antiB.indexOf('+') !== -1;
+         var posD = antiD.indexOf('+') !== -1;
+         var posA1 = a1.indexOf('+') !== -1;
+         var posBCells = bCells.indexOf('+') !== -1;
+
+         var fwd = (posA && !posB) ? 'A' : (!posA && posB) ? 'B' : (posA && posB) ? 'AB' : 'O';
+         var rev = (!posA1 && posBCells) ? 'A' : (posA1 && !posBCells) ? 'B' : (!posA1 && !posBCells) ? 'AB' : (posA1 && posBCells) ? 'O' : null;
+
+         var cVal = document.getElementById('bg-consolidated-val');
+         var dAlert = document.getElementById('bg-discordance-alert');
+         if (cVal) {
+           if (fwd === rev) {
+             cVal.value = fwd + ' Rh(D) ' + (posD ? 'Positive' : 'Negative');
+             cVal.style.color = '#0f172a';
+             cVal.style.borderColor = '#94a3b8';
+             if (dAlert) dAlert.style.display = 'none';
+           } else {
+             cVal.value = 'Grouping Discrepancy';
+             cVal.style.color = '#b91c1c';
+             cVal.style.borderColor = '#f87171';
+             if (dAlert) dAlert.style.display = 'block';
+           }
+         }
+       }
+       paramsContainer.querySelectorAll('.bg-eval-trigger').forEach(function(el) {
+         el.onchange = updateBgEval;
+       });
+       updateBgEval();
+    } else if (nameLower.includes('urinalysis')) {
        // URINALYSIS FULL MODAL — 3-section panel via API sub-parameters
        singleContainer.style.display = 'none';
        paramsContainer.style.display = 'block';
@@ -4424,6 +4732,9 @@ const app = {
            } else {
              finalVal = 'No malaria parasites seen';
            }
+         } else if (nameLower.indexOf('blood group') !== -1) {
+           var cbgEl = document.getElementById('bg-consolidated-val');
+           finalVal = cbgEl ? cbgEl.value : 'Completed';
          } else {
            finalVal = 'Completed';
          }
