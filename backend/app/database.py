@@ -267,6 +267,48 @@ SCHEMA_SQL = """
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
 
+    CREATE TABLE IF NOT EXISTS culture_orders (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        order_id INTEGER NOT NULL UNIQUE REFERENCES test_orders(id) ON DELETE CASCADE,
+        phase INTEGER NOT NULL DEFAULT 1,
+        preliminary_micro TEXT,
+        preliminary_micro_date DATETIME,
+        colony_count_cfu TEXT,
+        growth_category TEXT,
+        incubation_hours INTEGER DEFAULT 24,
+        media_used TEXT,
+        clinical_notes TEXT,
+        is_emergency_callback_done BOOLEAN DEFAULT 0,
+        emergency_callback_time DATETIME,
+        emergency_callback_recipient TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME
+    );
+
+    CREATE TABLE IF NOT EXISTS culture_isolates (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        culture_order_id INTEGER NOT NULL REFERENCES culture_orders(id) ON DELETE CASCADE,
+        isolate_number INTEGER NOT NULL DEFAULT 1,
+        organism_name TEXT NOT NULL,
+        colony_morphology TEXT,
+        is_pathogen BOOLEAN NOT NULL DEFAULT 1,
+        is_contaminant BOOLEAN NOT NULL DEFAULT 0,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS culture_ast_results (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        isolate_id INTEGER NOT NULL REFERENCES culture_isolates(id) ON DELETE CASCADE,
+        antimicrobial_class TEXT NOT NULL,
+        agent_name TEXT NOT NULL,
+        measurement_type TEXT NOT NULL DEFAULT 'zone_mm',
+        measurement_value REAL,
+        raw_sir TEXT NOT NULL,
+        overridden_sir TEXT NOT NULL,
+        override_reason TEXT,
+        clinical_note TEXT
+    );
+
     CREATE INDEX IF NOT EXISTS idx_clients_full_name ON clients(full_name);
     CREATE INDEX IF NOT EXISTS idx_clients_phone ON clients(phone);
     CREATE INDEX IF NOT EXISTS idx_visits_client_id ON visits(client_id);
@@ -277,6 +319,9 @@ SCHEMA_SQL = """
     CREATE INDEX IF NOT EXISTS idx_audit_log_timestamp ON audit_log(timestamp);
     CREATE INDEX IF NOT EXISTS idx_donor_crossmatches_order_id ON donor_crossmatches(order_id);
     CREATE INDEX IF NOT EXISTS idx_donor_crossmatches_unit ON donor_crossmatches(donor_unit_id);
+    CREATE INDEX IF NOT EXISTS idx_culture_orders_order_id ON culture_orders(order_id);
+    CREATE INDEX IF NOT EXISTS idx_culture_isolates_order_id ON culture_isolates(culture_order_id);
+    CREATE INDEX IF NOT EXISTS idx_culture_ast_isolate_id ON culture_ast_results(isolate_id);
 """
 
 def get_connection():
@@ -720,6 +765,89 @@ def init_db():
                     WHERE id = ?
                 """, (punit, pref, porder, popts, existing_p[0]))
 
+    # Pre-seed CD4 tests (Point-of-Care Cytometry and Semi-Quantitative Rapid Test Strip)
+    cursor.execute("SELECT id FROM sections WHERE name = 'Serology & Clinical Immunology'")
+    ser_row = cursor.fetchone()
+    if ser_row:
+        ser_sec_id = ser_row[0]
+        # Rename or ensure Absolute CD4 Count (Cytometry)
+        cursor.execute("UPDATE tests SET name = 'Absolute CD4 Count (Cytometry)' WHERE name = 'CD4 COUNT'")
+        cursor.execute("SELECT id FROM tests WHERE name = 'Absolute CD4 Count (Cytometry)'")
+        cd4_quant_row = cursor.fetchone()
+        if not cd4_quant_row:
+            cursor.execute("""
+                INSERT INTO tests (name, section_id, is_tracked, result_type, default_unit, ref_range, is_active, tracks_stock, consumable_name, clinical_comments)
+                VALUES ('Absolute CD4 Count (Cytometry)', ?, 1, 'quantitative', 'cells/µL', '500 - 1500 cells/µL', 1, 1, 'CD4 POC Cartridges (PIMA/FACSPresto)',
+                        'Absolute CD4 T-cell count performed via automated POC cytometry. < 200 cells/µL defines Advanced HIV Disease (AHD).')
+            """, (ser_sec_id,))
+            cd4_quant_id = cursor.lastrowid
+        else:
+            cd4_quant_id = cd4_quant_row[0]
+            cursor.execute("""
+                UPDATE tests
+                SET is_tracked = 1, result_type = 'quantitative', default_unit = 'cells/µL', ref_range = '500 - 1500 cells/µL',
+                    tracks_stock = 1, consumable_name = 'CD4 POC Cartridges (PIMA/FACSPresto)',
+                    clinical_comments = 'Absolute CD4 T-cell count performed via automated POC cytometry. < 200 cells/µL defines Advanced HIV Disease (AHD).'
+                WHERE id = ?
+            """, (cd4_quant_id,))
+
+        # Ensure CD4 Count (Rapid Test Strip)
+        cursor.execute("SELECT id FROM tests WHERE name = 'CD4 Count (Rapid Test Strip)'")
+        cd4_rdt_row = cursor.fetchone()
+        if not cd4_rdt_row:
+            cursor.execute("""
+                INSERT INTO tests (name, section_id, is_tracked, result_type, options, is_active, tracks_stock, consumable_name, clinical_comments)
+                VALUES ('CD4 Count (Rapid Test Strip)', ?, 1, 'options',
+                        '["CD4 Count: Below 200 cells/µL", "CD4 Count: 200 cells/µL or above", "Invalid"]', 1, 1, 'VISITECT CD4 Rapid Test Strips',
+                        'Semi-quantitative lateral-flow CD4 assay. Below 200 cells/µL defines Advanced HIV Disease (AHD).')
+            """, (ser_sec_id,))
+        else:
+            cursor.execute("""
+                UPDATE tests
+                SET is_tracked = 1, result_type = 'options',
+                    options = '["CD4 Count: Below 200 cells/µL", "CD4 Count: 200 cells/µL or above", "Invalid"]',
+                    tracks_stock = 1, consumable_name = 'VISITECT CD4 Rapid Test Strips',
+                    clinical_comments = 'Semi-quantitative lateral-flow CD4 assay. Below 200 cells/µL defines Advanced HIV Disease (AHD).'
+                WHERE id = ?
+            """, (cd4_rdt_row[0],))
+
+        # Ensure CD4 Percentage exists for pediatric staging (< 60 months)
+        cursor.execute("SELECT id FROM tests WHERE name = 'CD4 Percentage'")
+        cd4_pct_row = cursor.fetchone()
+        if not cd4_pct_row:
+            cursor.execute("""
+                INSERT INTO tests (name, section_id, is_tracked, result_type, default_unit, ref_range, is_active, clinical_comments)
+                VALUES ('CD4 Percentage', ?, 0, 'quantitative', '%', '>= 25%', 1,
+                        'Pediatric CD4 immunological monitoring (< 5 years). < 25% defines Pediatric Advanced HIV Disease (AHD).')
+            """, (ser_sec_id,))
+
+    # Seed reference ranges for CD4
+    CD4_REF_RANGES = [
+        ("Absolute CD4 Count (Cytometry)", 5, 999, None, 500.0, 1500.0, 200.0, None, 0.0, 5000.0, 10.0, 3000.0, "cells/µL"),
+        ("CD4 COUNT", 5, 999, None, 500.0, 1500.0, 200.0, None, 0.0, 5000.0, 10.0, 3000.0, "cells/µL"),
+        ("CD4 Percentage", 0, 4, None, 25.0, 65.0, 25.0, None, 0.0, 100.0, 5.0, 65.0, "%"),
+    ]
+    for pname, a_min, a_max, s_sex, n_min, n_max, c_min, c_max, s_min, s_max, p_min, p_max, r_unit in CD4_REF_RANGES:
+        cursor.execute("SELECT id FROM tests WHERE name = ?", (pname,))
+        t_match = cursor.fetchone()
+        t_id_match = t_match[0] if t_match else None
+        cursor.execute("""
+            SELECT id FROM reference_ranges
+            WHERE parameter_name = ? AND age_min = ? AND age_max = ? AND (unit = ? OR (unit IS NULL AND ? IS NULL))
+        """, (pname, a_min, a_max, r_unit, r_unit))
+        rr_existing = cursor.fetchone()
+        if not rr_existing:
+            cursor.execute("""
+                INSERT INTO reference_ranges (test_id, parameter_name, age_min, age_max, sex, normal_min, normal_max, critical_min, critical_max, sanity_min, sanity_max, plausible_min, plausible_max, unit)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (t_id_match, pname, a_min, a_max, s_sex, n_min, n_max, c_min, c_max, s_min, s_max, p_min, p_max, r_unit))
+        else:
+            cursor.execute("""
+                UPDATE reference_ranges
+                SET test_id = ?, normal_min = ?, normal_max = ?, critical_min = ?, critical_max = ?, sanity_min = ?, sanity_max = ?, plausible_min = ?, plausible_max = ?, unit = ?
+                WHERE id = ?
+            """, (t_id_match, n_min, n_max, c_min, c_max, s_min, s_max, p_min, p_max, r_unit, rr_existing[0]))
+
     # Set default stock-tracking flags on existing kit/strip tests
     STOCK_TRACKED_TESTS = [
         ("HIV Testing", "HIV Diagnostic Kits"),
@@ -735,6 +863,8 @@ def init_db():
         ("BAT (Brucella Antigen Test)", "BAT (Brucella Antigen Test) Slide"),
         ("VDRL/RPR (Syphilis Screening)", "Syphilis TPHA / RPR Test Reagents"),
         ("TPHA (Confirmatory Syphilis Test)", "Syphilis TPHA / RPR Test Reagents"),
+        ("Absolute CD4 Count (Cytometry)", "CD4 POC Cartridges (PIMA/FACSPresto)"),
+        ("CD4 Count (Rapid Test Strip)", "VISITECT CD4 Rapid Test Strips"),
     ]
     for tname, cname in STOCK_TRACKED_TESTS:
         cursor.execute("UPDATE tests SET tracks_stock = 1, consumable_name = ? WHERE LOWER(name) = LOWER(?)", (cname, tname))
