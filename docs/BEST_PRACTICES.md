@@ -76,3 +76,10 @@ The system is deployed to low-spec clinical workstations in Uganda that frequent
    - **Regex Lookbehinds (`(?<=...)`) & Named Captures:** Prohibited (ES2018). Use standard capturing groups and submatch extraction.
 3. **Defensive Polyfills:** Core Array and Object helper methods (`Array.prototype.includes`, `Array.prototype.find`, `Object.values`, `Object.entries`) must be polyfilled at the top of `app.js` to ensure stability on Edge 12/13.
 4. **HTML Inline SVG Tags:** Inline SVGs in HTML templates must explicitly close all child elements (e.g. `<path ...></path>`, `<rect ...></rect>`, `<line ...></line>`) rather than using self-closing slashes (`<path .../>`) to prevent `HTML1500` parser warnings in Microsoft Edge/IE.
+
+## H. Migration & Schema Idempotency Standards
+
+1. **Pre-Normalization Deduplication:** When executing data normalization migrations (e.g. `UPPER(TRIM(...))`) on columns backed by `UNIQUE` constraints (such as `wards.name`), always execute a case-insensitive deduplication step first. This prevents bootstrap crashes caused by existing case-variant rows (e.g., `'Emergency'` and `'EMERGENCY'`).
+2. **Idempotent Seeding:** All seed scripts (`backend/app/seed.py` and schema bootstrap in `database.py`) must be safe to run repeatedly on production databases without duplicating parameters, corrupting foreign key links, or failing on existing unique constraints.
+3. **Atomic Multi-Parameter Transactions:** All batch inserts or multi-parameter updates must execute within explicit database transactions (`conn.commit()`) with appropriate rollback guards to guarantee that partial result states are never persisted.
+

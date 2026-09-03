@@ -204,7 +204,23 @@ M-LIS implements a high-performance clinical flagging engine (`backend/app/evalu
 #### 6.2 LIMS-Evaluated Mode (`LIMS_EVALUATED`)
 *   **Protocol:** The LIMS dynamically evaluates clinical ranges using the configuration defined in `test_parameters`. If a value falls outside defined limits or breaches `critical_low`/`critical_high` thresholds, it is stamped in the database with standard clinical codes (`H`, `L`, `CH`, `CL`) and triggers real-time UI indicator badges.
 
+#### 6.3 Algorithmic Diagnostic Outcome Derivation (Uganda MoH HIV 3-Test Protocol)
+The evaluation engine (`backend/app/evaluator.py:derive_hiv_outcome`) executes a deterministic truth table for sequential rapid antibody testing:
+
+| Screening ($A_1$) | Confirmatory ($A_2$) | Tie-Breaker ($A_3$) | Conclusive Status | Display Result | Clinical Action / Advisory |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **Non-Reactive** | *Not Required* | *Not Required* | `Negative` | `Negative` | Non-reactive screening. Routine counseling. |
+| **Reactive** | **Reactive** | *Not Done* / **Reactive** | `Positive` | `Positive` | Concordant reactive. ART baseline referral. |
+| **Reactive** | **Reactive** | **Non-Reactive** | `Inconclusive` | `Inconclusive` | Discrepant antibody finding. Repeat draw in 14 days. |
+| **Reactive** | **Non-Reactive** | **Non-Reactive** | `Negative` | `Negative` | Discordance resolved negative. |
+| **Reactive** | **Non-Reactive** | **Reactive** | `Inconclusive` | `Inconclusive` | Discordant pattern. Repeat draw in 14 days. |
+| **Reactive** | **Non-Reactive** | *Not Done* | `Inconclusive` | `Inconclusive` | Discordant confirmation; $A_3$ tie-breaker required. |
+
+*   **HIVST Self-Test Screening:** Reactive self-test yields `Inconclusive` with clinical advisory mandating full 3-test clinical algorithm prior to ART initiation. Non-reactive self-test yields `Negative`.
+*   **Decoupled EID Assays:** Molecular Early Infant Diagnosis (`EID 1st PCR`, `EID 2nd PCR`, and `EID Final Rapid Test`) are evaluated independently as standalone assays, isolated from rapid antibody panel logic.
+
 ---
+
 
 ### 7. Analyzer Integrations & ReportLab PDF Engine
 

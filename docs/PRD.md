@@ -72,11 +72,14 @@ M-LIS replaces the physical paper register entirely:
 * **100% Database Capture:** The database acts as the single source of truth.
 * **Result Printing Workflow:** The web frontend dynamically triggers the system print dialog. CSS `@media print` rules strip the UI to generate clean, formatted results in a standardized letterhead layout.
 
-#### Epic 4: Configurable Clinical Critical Value Alerts
-To comply with ISO 15189 regarding alert values, the system features a built-in clinical warning engine:
+#### Epic 4: Configurable Clinical Critical Value Alerts & Algorithmic Outcomes
+To comply with ISO 15189 regarding alert values and national diagnostic standards, the system features a built-in clinical evaluation and warning engine:
 * **Seeded Standards:** The database is seeded with standard critical values for common panels (CBC, LFTs, RFTs, Blood Sugar) based on Ugandan national clinical standards.
 * **Dynamic Configuration:** Administrators can dynamically update these critical thresholds via the UI.
 * **Non-Disruptive UI Alerts:** Out-of-bounds results trigger high-visibility visual indicators (`[!] High`, `[!] Low`, `[!!] Critical`) directly on the results screen.
+* **National Algorithm Diagnostic Derivation:** Tiered clinical algorithms (such as the Uganda MoH 3-Test HIV Rapid Antibody Algorithm) automatically evaluate multi-kit results into discrete, standardized clinical outcomes (`Positive`, `Negative`, or `Inconclusive`), with mandatory advisory guidance for discordant/inconclusive patterns.
+* **Independent Pediatric Diagnostic Regimens:** Early Infant Diagnosis (EID) assays (`EID 1st PCR`, `EID 2nd PCR`, and `EID Final Rapid Test`) are separated from the rapid screening panel and managed as independent standalone tests.
+
 
 #### Epic 5: Immutable System Audit Logging
 To meet international regulatory requirements (FDA 21 CFR Part 11 style), the application runs a background audit system:

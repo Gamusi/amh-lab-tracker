@@ -60,6 +60,14 @@ As values are entered, the system dynamically renders high-contrast indicators d
 *   `[!] Low` (Blue): Falls below lower reference limits.
 *   `[!!] Critical` (Red icon): Falls into life-threatening threshold bounds.
 
+#### 3.4 HIV Testing Algorithm Workbench Presentation
+For multi-kit rapid HIV testing, parameters are strictly presented in clinical execution order:
+1.  **Self-Tests**: OraQuick® HIV Self-Test, Fingerstick HIVST.
+2.  **Screening Assay ($A_1$)**: MHS HIV 1/2 Kwiq Test, Determine™ HIV-1/2.
+3.  **Confirmatory Assay ($A_2$)**: HIV 1/2 Stat-Pak®.
+4.  **Tie-Breaker Assay ($A_3$)**: SD Bioline HIV-1/2.
+*   **Independent EID Assays**: Early Infant Diagnosis tests (`EID 1st PCR`, `EID 2nd PCR`, `EID Final Rapid Test`) appear and log as independent standalone assays outside the rapid algorithm.
+
 ---
 
 ### 4. Screen 3: Test Verification and Release
@@ -73,6 +81,12 @@ To comply with ISO 15189 (verification prior to release), entering a result does
 *   **Audit Diff Insight**: The Verification Panel dynamically renders the audit log history for that specific test run, highlighting if a value was modified after initial entry.
 *   **Click-to-Sign**: Clicking `[Approve and Sign Report]` writes the verifier’s unique user ID and timestamp to the record.
 *   **Unlocking the PDF**: The official vector PDF cannot be generated or printed until digital verification is complete.
+
+#### 4.3 Report Presentation & Algorithmic Summary Rows
+*   On official PDF lab reports, the HIV algorithm parameters are automatically rendered in clinical sequence (Self-test $\rightarrow$ Screening $\rightarrow$ Confirmation $\rightarrow$ Tie-breaker).
+*   The PDF generator appends an automated, highlighted **Final HIV Interpretation** row displaying strictly `Positive`, `Negative`, or `Inconclusive`.
+*   If discordance occurs, an automated clinical advisory box directs clinicians on re-testing intervals (e.g. 14-day repeat draw) and prohibits premature ART initiation.
+
 
 ---
 
