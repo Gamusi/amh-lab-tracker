@@ -96,3 +96,29 @@ def test_bulk_delete_visits_partial_missing_or_already_deleted():
     assert data["status"] == "deleted"
     assert data["deleted_visit_ids"] == [3]
     assert data["skipped_visit_ids"] == [99]
+
+
+def test_bulk_delete_clients_admin_success():
+    app.dependency_overrides[get_current_user] = lambda: {"id": 1, "username": "admin_user", "role": "admin"}
+    res = client.request("DELETE", "/api/clients/bulk", json={"client_ids": [1, 99]})
+    assert res.status_code == 200
+    data = res.json()
+    assert data["status"] == "deleted"
+    assert data["deleted_client_ids"] == [1]
+    assert data["skipped_client_ids"] == [99]
+
+
+def test_bulk_delete_clients_non_admin_forbidden():
+    app.dependency_overrides[get_current_user] = lambda: {"id": 2, "username": "staff_user", "role": "staff"}
+    res = client.request("DELETE", "/api/clients/bulk", json={"client_ids": [1]})
+    assert res.status_code == 403
+    assert "Only admins" in res.json()["detail"]
+
+
+def test_delete_single_client_success():
+    app.dependency_overrides[get_current_user] = lambda: {"id": 1, "username": "admin_user", "role": "admin"}
+    res = client.request("DELETE", "/api/clients/1")
+    assert res.status_code == 200
+    data = res.json()
+    assert data["status"] == "deleted"
+    assert data["client_id"] == 1

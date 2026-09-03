@@ -4,7 +4,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
 from ..database import get_db
 from ..auth import get_current_user, require_admin
-from ..schemas import VisitCreate, TestResultCreate, AddOrdersRequest, ClientUpdate, BulkOrderDeleteRequest, BulkVisitDeleteRequest
+from ..schemas import VisitCreate, TestResultCreate, AddOrdersRequest, ClientUpdate, BulkOrderDeleteRequest, BulkVisitDeleteRequest, BulkClientDeleteRequest
 from ..biochem_validator import validate_biochem_parameter, validate_panel_consistency
 from ..specimen_validator import validate_test_specimen_selection, get_compatible_specimens_for_test
 from ..evaluator import derive_hiv_outcome
@@ -1091,6 +1091,75 @@ def get_visit_details(visit_id: int, conn: sqlite3.Connection = Depends(get_db),
     data = dict(visit_row)
     data["orders"] = orders
     return data
+
+@router.delete("/api/clients/bulk")
+def bulk_delete_clients(req: BulkClientDeleteRequest, conn: sqlite3.Connection = Depends(get_db), current_user: dict = Depends(get_current_user)):
+    if current_user.get("role") not in ["admin", "superadmin"]:
+        raise HTTPException(status_code=403, detail="Only admins can delete clients in bulk")
+    logger.info(f"User '{current_user['username']}' is bulk deleting clients: {req.client_ids}")
+    cur = conn.cursor()
+    deleted_ids = []
+    skipped_ids = []
+    now_str = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+
+    for cid in req.client_ids:
+        cur.execute("SELECT id FROM clients WHERE id = ?", (cid,))
+        if not cur.fetchone():
+            skipped_ids.append(cid)
+            continue
+
+        # Get all visits for client
+        cur.execute("SELECT id FROM visits WHERE client_id = ?", (cid,))
+        visits = cur.fetchall()
+        for v in visits:
+            vid = v["id"]
+            cur.execute("SELECT id FROM test_orders WHERE visit_id = ?", (vid,))
+            orders = cur.fetchall()
+            for o in orders:
+                cur.execute("DELETE FROM test_results WHERE order_id = ?", (o["id"],))
+            cur.execute("DELETE FROM test_orders WHERE visit_id = ?", (vid,))
+            cur.execute("DELETE FROM visits WHERE id = ?", (vid,))
+
+        cur.execute("DELETE FROM clients WHERE id = ?", (cid,))
+        cur.execute(
+            "INSERT INTO audit_log (user_id, action, detail, timestamp) VALUES (?, 'DELETE_CLIENT', ?, ?)",
+            (current_user["id"], f"Deleted client ID {cid} and associated records (bulk)", now_str)
+        )
+        deleted_ids.append(cid)
+
+    conn.commit()
+    logger.info(f"Bulk deleted clients result - deleted: {deleted_ids}, skipped: {skipped_ids}")
+    return {"status": "deleted", "deleted_client_ids": deleted_ids, "skipped_client_ids": skipped_ids}
+
+@router.delete("/api/clients/{client_id}")
+def delete_client(client_id: int, conn: sqlite3.Connection = Depends(get_db), current_user: dict = Depends(get_current_user)):
+    if current_user.get("role") not in ["admin", "superadmin"]:
+        raise HTTPException(status_code=403, detail="Only administrators can delete clients.")
+    logger.info(f"User '{current_user['username']}' is deleting client ID {client_id}")
+    cur = conn.cursor()
+    cur.execute("SELECT id FROM clients WHERE id = ?", (client_id,))
+    if not cur.fetchone():
+        raise HTTPException(status_code=404, detail="Client not found")
+
+    cur.execute("SELECT id FROM visits WHERE client_id = ?", (client_id,))
+    visits = cur.fetchall()
+    for v in visits:
+        vid = v["id"]
+        cur.execute("SELECT id FROM test_orders WHERE visit_id = ?", (vid,))
+        orders = cur.fetchall()
+        for o in orders:
+            cur.execute("DELETE FROM test_results WHERE order_id = ?", (o["id"],))
+        cur.execute("DELETE FROM test_orders WHERE visit_id = ?", (vid,))
+        cur.execute("DELETE FROM visits WHERE id = ?", (vid,))
+
+    cur.execute("DELETE FROM clients WHERE id = ?", (client_id,))
+    now_str = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+    cur.execute(
+        "INSERT INTO audit_log (user_id, action, detail, timestamp) VALUES (?, 'DELETE_CLIENT', ?, ?)",
+        (current_user["id"], f"Deleted client ID {client_id} and associated records", now_str)
+    )
+    conn.commit()
+    return {"status": "deleted", "client_id": client_id}
 
 @router.delete("/api/visits/bulk")
 def bulk_delete_visits(req: BulkVisitDeleteRequest, conn: sqlite3.Connection = Depends(get_db), current_user: dict = Depends(get_current_user)):

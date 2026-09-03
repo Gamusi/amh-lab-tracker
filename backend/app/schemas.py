@@ -250,6 +250,9 @@ class BulkOrderDeleteRequest(BaseModel):
 class BulkVisitDeleteRequest(BaseModel):
     visit_ids: List[int]
 
+class BulkClientDeleteRequest(BaseModel):
+    client_ids: List[int]
+
 class ReferenceRangeBase(BaseModel):
     test_id: Optional[int] = None
     parameter_name: str
